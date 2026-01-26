@@ -18,7 +18,7 @@ export default function SignInForm() {
 
     useEffect(() => {
         if (isAuthLoaded && isSignedIn) {
-            router.replace("/dashboard");
+            router.replace("/");
         }
     }, [isAuthLoaded, isSignedIn, router]);
 
@@ -28,7 +28,7 @@ export default function SignInForm() {
         setError("");
 
         if (isAuthLoaded && isSignedIn) {
-            router.replace("/dashboard");
+            router.replace("/");
             return;
         }
 
@@ -44,7 +44,7 @@ export default function SignInForm() {
 
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
-                router.push("/dashboard");
+                router.push("/");
             } else {
                 console.log(result);
             }

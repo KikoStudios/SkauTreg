@@ -25,7 +25,7 @@ export default function SignUpForm() {
 
     useEffect(() => {
         if (isAuthLoaded && isSignedIn) {
-            router.replace("/dashboard");
+            router.replace("/");
         }
     }, [isAuthLoaded, isSignedIn, router]);
 
@@ -76,7 +76,7 @@ export default function SignUpForm() {
 
             if (completeSignUp.status === "complete") {
                 await setActive({ session: completeSignUp.createdSessionId });
-                router.push("/dashboard");
+                router.push("/");
             } else {
                 console.error(JSON.stringify(completeSignUp, null, 2));
             }

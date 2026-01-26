@@ -8,7 +8,7 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 const isProtectedRoute = createRouteMatcher([
-    "/dashboard(.*)",
+    "/",
     "/calendar(.*)",
     "/members(.*)",
     "/settings(.*)",
