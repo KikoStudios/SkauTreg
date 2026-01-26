@@ -13,8 +13,6 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
         <ClerkProvider
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
-            afterSignInUrl="/"
-            afterSignUpUrl="/"
         >
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
                 <UserSync />

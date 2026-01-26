@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useSignIn } from "@clerk/nextjs";
+import React, { useEffect, useState } from "react";
+import { useAuth, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from 'next/image';
@@ -9,16 +9,28 @@ import styles from "./AuthForm.module.css";
 import Button from "../Button";
 
 export default function SignInForm() {
+    const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
     const { isLoaded, signIn, setActive } = useSignIn();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const router = useRouter();
 
+    useEffect(() => {
+        if (isAuthLoaded && isSignedIn) {
+            router.replace("/dashboard");
+        }
+    }, [isAuthLoaded, isSignedIn, router]);
+
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+
+        if (isAuthLoaded && isSignedIn) {
+            router.replace("/dashboard");
+            return;
+        }
 
         if (!isLoaded || !signIn) {
             return;
@@ -32,7 +44,7 @@ export default function SignInForm() {
 
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
-                router.push("/");
+                router.push("/dashboard");
             } else {
                 console.log(result);
             }

@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { useSignUp } from "@clerk/nextjs";
+import React, { useEffect, useState } from "react";
+import { useAuth, useSignUp } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from 'next/image';
 import styles from "./AuthForm.module.css";
 import Button from "../Button";
 
+const USERNAME_REGEX = /^[A-Za-z0-9_-]+$/;
+
 export default function SignUpForm() {
+    const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
     const { isLoaded, signUp, setActive } = useSignUp();
     const [email, setEmail] = useState("");
     const [username, setUsername] = useState("");
@@ -20,15 +23,31 @@ export default function SignUpForm() {
     const [error, setError] = useState("");
     const router = useRouter();
 
+    useEffect(() => {
+        if (isAuthLoaded && isSignedIn) {
+            router.replace("/dashboard");
+        }
+    }, [isAuthLoaded, isSignedIn, router]);
+
+    if (isAuthLoaded && isSignedIn) {
+        return null;
+    }
+
     // Handle sign-up submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!isLoaded) return;
         setError("");
 
+        const normalizedUsername = username.trim();
+        if (!USERNAME_REGEX.test(normalizedUsername)) {
+            setError("Username can only contain letters, numbers, - or _.");
+            return;
+        }
+
         try {
             await signUp.create({
-                username,
+                username: normalizedUsername,
                 emailAddress: email,
                 password,
                 firstName,
@@ -57,7 +76,7 @@ export default function SignUpForm() {
 
             if (completeSignUp.status === "complete") {
                 await setActive({ session: completeSignUp.createdSessionId });
-                router.push("/");
+                router.push("/dashboard");
             } else {
                 console.error(JSON.stringify(completeSignUp, null, 2));
             }
@@ -191,8 +210,13 @@ export default function SignUpForm() {
                         onChange={(e) => setUsername(e.target.value)}
                         className={styles.input}
                         placeholder="janedoe123"
+                        pattern="[A-Za-z0-9_-]+"
+                        title="Use letters, numbers, hyphens or underscores only."
                         required
                     />
+                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                        Allowed characters: letters, numbers, - and _
+                    </span>
                 </div>
 
                 <div className={styles.formGroup}>

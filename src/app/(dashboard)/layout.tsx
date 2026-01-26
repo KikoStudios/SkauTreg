@@ -1,8 +1,9 @@
 "use client";
 
 import { useConvexAuth } from "convex/react";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import styles from "./DashboardLayout.module.css";
 import ProfileModal from "../../components/ProfileModal";
@@ -15,12 +16,16 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const { isLoading, isAuthenticated } = useConvexAuth();
+    const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
+    const { signOut } = useClerk();
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+    const convexAuthReady = useMemo(() => !isLoading && isAuthenticated, [isLoading, isAuthenticated]);
+
     useEffect(() => {
-        console.log("DashboardLayout auth check:", { isLoading, isAuthenticated });
-    }, [isLoading, isAuthenticated]);
+        console.log("DashboardLayout auth check:", { isLoading, isAuthenticated, isClerkLoaded, isSignedIn });
+    }, [isLoading, isAuthenticated, isClerkLoaded, isSignedIn]);
 
     if (isLoading) {
         return (
@@ -30,8 +35,57 @@ export default function DashboardLayout({
         );
     }
 
-    // Prevent flash of unauthenticated content
-    if (!isAuthenticated) {
+    // If Clerk is loaded and user is not signed in, bounce to sign-in for safety
+    if (isClerkLoaded && !isSignedIn) {
+        if (typeof window !== "undefined") {
+            window.location.href = "/sign-in";
+        }
+        return null;
+    }
+
+    // Surface a clear error when Clerk session exists but Convex auth failed
+    if (isClerkLoaded && isSignedIn && !convexAuthReady) {
+        return (
+            <div style={{ padding: "2rem", maxWidth: 600, margin: "4rem auto", textAlign: "center" }}>
+                <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Unable to load dashboard</h2>
+                <p style={{ color: "#4b5563", marginBottom: "1.5rem" }}>
+                    Your Clerk session is active, but Convex authentication failed. Make sure `npx convex dev` is running and that
+                    `CLERK_ISSUER_URL` / `NEXT_PUBLIC_CLERK_FRONTEND_API` are set in the Convex env.
+                </p>
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+                    <button
+                        onClick={() => window.location.reload()}
+                        style={{
+                            padding: "0.75rem 1.5rem",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: "8px",
+                            background: "white",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Retry
+                    </button>
+                    <button
+                        onClick={() => signOut()}
+                        style={{
+                            padding: "0.75rem 1.5rem",
+                            border: "1px solid #ef4444",
+                            color: "#ef4444",
+                            borderRadius: "8px",
+                            background: "white",
+                            cursor: "pointer",
+                            fontWeight: 600,
+                        }}
+                    >
+                        Sign out
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!convexAuthReady) {
         return null;
     }
 
