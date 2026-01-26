@@ -1,0 +1,35 @@
+.background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    background-color: #86efac;
+
+    /* Dot Grid Pattern - ensuring dots are visible on light green */
+    background-image: radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 24px 24px;
+
+    /* Vignette Overlay to focus center */
+    mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+/* Remove old pattern/animation classes as we are static now */
+.pattern {
+    display: none;
+}
+
+.content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    /* Fixed Top Alignment */
+    padding-top: 15vh;
+    /* Push down to a nice optical center-ish position */
+    min-height: 100vh;
+    box-sizing: border-box;
+}

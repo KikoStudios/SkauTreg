@@ -1,0 +1,13 @@
+- clenove pridat mail pole                    DONE
+
+- breadcrubs pridat ze pristup ze pole oddilu dela Domů/Oddíly/Detail/Členové an ne Domů/Členové to plati i pro vypravy DONE
+- ve výpravách ikona odkaz a nahled odvovedi z formulare pokud byl na talcitku ne soucasti tabulky DONE
+- mobilni kompatibilita  SEMI DONE
+- formatovani datumu DONE
+- ui refresh menu na tvorbu vyprav
+- dodělat home menu
+- menu vyprav prenest nazev z top listy pod ni na volne misto a na listu dat Výpravy
+- ikona fajifka a krizek DONE
+- kalendar z formularu DONE
+-změna jmena stranky z Gumroad ui kit na skautREG
+- smarter cmd K menu and icons in there

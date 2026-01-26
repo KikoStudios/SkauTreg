@@ -1,0 +1,59 @@
+/* DashboardLayout.module.css */
+.container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.mainContent {
+    margin-left: var(--sidebar-width);
+    flex: 1;
+    padding: 2rem;
+    min-height: 100vh;
+    background-color: var(--bg-app);
+    transition: margin-left 0.3s ease;
+}
+
+.mobileHeader {
+    display: none;
+    padding: 1rem;
+    background-color: var(--sidebar-bg);
+    color: white;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.hamburgerButton {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobileLogo {
+    height: 32px;
+    width: auto;
+}
+
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .mainContent {
+        margin-left: 0;
+        padding: 1rem;
+    }
+
+    .mobileHeader {
+        display: flex;
+    }
+}

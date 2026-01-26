@@ -1,0 +1,17 @@
+takze predtim nez mudeme pokracovat udelal si dobry zaklad aplikace 
+ale nektere veci nejsou uplen tak jak by jsem predpokladal
+proto si je ted projdeme a vymyslime jak to udelat lepe 
+takze prvni vec je ze nektere peklady nejsou prelozene ale to je problem 0 ted jdeme na hlavni veci 
+
+1 
+zacneme Muj oddil v zalozce muj oddil muzete vytvorit oddil a take videt vsechny oddily kterymi jste soucasti v moment kdy kliknete na oddil
+ukaze se vam stranka podobna te co je HOME tam je Jmeno doddilu a pak veke panely eg. HOME kde mate jednotlive veci clenove je tem odkaz na cleny 
+potom je tam zprava vedoucich kteri patri k oddilu a tak dale nektere veci schovane pod dalsimi 
+
+2 ui 
+pouzij ten ui kik ktery pouziva v home to je ten hlavni pouzivej ho vsude
+
+3 v tovrbe vypravy ti to vytvori vypravu muzes ji kdykoli upravovat a zkopirovat odkaz na registraci pro jakoukoli osobu take ve tvorbe formulare predtim vybiras jestli je formular na to ze se
+lidi odhlasuji nebo prihlasuji poku odhlasuji je to jen jedno tlacitko a jsou odhlaseni (na tu stranku se mohou kdykoli prihlasi vratit a zrusit svoje odhlaseni) nebo muzes vytaret formular formular ma nekolik typu vyberu muzes mit input to je ze proste primaryEmailAddress
+ano/ne tam mas otazku a muzes dat ano ne potom je tam checkbox taky vyber dropdown u kazdeho muzete dat i info coz je ikonka ve formulari kterea ukaze treba u inputu alergie kdyz na ni najedete rekne napriklad alergie na jidlo nebo pyl
+take u kazdeho muzete mit jestli je povine nebo ne a u inputu muzete mit priklad treba u inputu nazev druziny tam bude Vlci aby si mohli lidi predstavit co tam doplnit

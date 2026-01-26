@@ -1,0 +1,100 @@
+.container {
+    background-color: var(--bg-card);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: 8px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    /* explicit auto to avoid inheritance issues if any */
+
+    /* Centering content */
+    text-align: center;
+    align-items: center;
+
+    /* Ensure no transform interferes with layout, but keep hover effect ready */
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.container:hover {
+    box-shadow: 4px 4px 0 0 var(--border-color);
+    transform: translate(-2px, -2px);
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--text-main);
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    /* Ensure form takes full width of container */
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: left;
+    /* Reset text align for inputs */
+    width: 100%;
+}
+
+.label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-main);
+}
+
+.input {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: var(--border-width) solid #e4e4e7;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    outline: none;
+    background-color: white;
+}
+
+.input:focus {
+    border-color: #000;
+    box-shadow: 4px 4px 0 0 #000;
+    transform: translate(-2px, -2px);
+}
+
+.error {
+    padding: 0.75rem;
+    background-color: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #e11d48;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    width: 100%;
+    text-align: left;
+}
+
+.footer {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.link {
+    font-weight: 600;
+    color: var(--text-main);
+    text-decoration: underline;
+}
+
+.link:hover {
+    color: var(--color-primary-text);
+}

@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Brand Colors - Light Green Theme */
+  --color-primary: #86efac;
+  /* Light Green */
+  --color-primary-hover: #4ade80;
+  --color-primary-text: #052e16;
+
+  /* Sidebar */
+  --sidebar-bg: #000000;
+  --sidebar-text: #a1a1aa;
+  /* Light gray for inactive */
+  --sidebar-text-active: #86efac;
+  /* Light green for active */
+  --sidebar-hover-bg: #18181b;
+
+  /* Backgrounds */
+  --bg-app: #f4f4f5;
+  /* Light gray/off-white matches image */
+  --bg-card: #ffffff;
+
+  /* Text */
+  --text-main: #18181b;
+  --text-muted: #71717a;
+
+  /* Borders - Neobrutalism */
+  --border-color: #000000;
+  /* Pure Black */
+  --border-width: 2px;
+
+  /* Spacing */
+  --sidebar-width: 280px;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Command Menu Styles */
+[cmdk-item] {
+  content-visibility: auto;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: black;
+}
+
+[cmdk-item][data-selected="true"] {
+  background-color: #86efac;
+  /* Green accent */
+  border: 2px solid #000;
+  padding: calc(0.75rem - 2px);
+  /* Adjust for border */
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  /* Prevent default browser margin */
+  margin: 0;
+  height: 100vh;
+  /* Prevent horizontal scroll */
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* App-like feel */
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Utilities */
+.u-flex {
+  display: flex;
+}
+
+.u-items-center {
+  align-items: center;
+}
+
+.u-justify-between {
+  justify-content: space-between;
+}
+
+.u-justify-center {
+  justify-content: center;
+}
+
+.u-gap-2 {
+  gap: 0.5rem;
+}
+
+.u-gap-4 {
+  gap: 1rem;
+}
+
+.u-mb-4 {
+  margin-bottom: 1rem;
+}
+
+.u-font-bold {
+  font-weight: 700;
+}
+
+.u-text-sm {
+  font-size: 0.875rem;
+}
+
+.u-text-lg {
+  font-size: 1.125rem;
+}
+
+/* Grid Layout for dashboard cards */
+.u-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.u-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .u-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .u-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .u-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
