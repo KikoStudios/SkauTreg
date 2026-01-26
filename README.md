@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SkauTreg
 
-## Getting Started
+SkauTreg je moderní aplikace pro komplexní správu skautských oddílů. Cílem je usnadnit vedoucím každodenní veci od správy členů, přes plánování výprav, až po řešení docházky a registrací. Vše je navrženo jednoduše a přehledně.
 
-First, run the development server:
+## Jak to funguje (Technologie)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Aplikace je navržena jako **serverless** řešení, což znamená, že nemusíme spravovat vlastní servery. To nám umožňují nástroje jako:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+*   **Next.js** - pro rychlé a interaktivní uživatelské rozhraní.
+*   **Convex** - slouží jako náš backend a realtime databáze.
+*   **Clerk** - zajišťuje bezpečné přihlašování a správu uživatelů.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Feature Implementation Checklist
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 
-## Learn More
+- [x] **Autentifikace** (Přihlášení/Registrace přes Clerk)
+- [x] **Dashboard** (Hlavní přehled)
+- [x] **Správa členů** (Seznam a detaily členů)
+- [x] **Správa oddílu** (Informace o oddílu, vedení)
+- [x] **Výpravy** (Vytváření a správa akcí)
+- [x] **Kalendář** (Přehled akcí v čase)
+- [x] **RSVP systém** (Veřejné odkazy pro přihlašování/odhlašování na akce)
+- [x] **Nastavení** (Uživatelské preference)
+- [ ] 
+- [ ] 
+- [ ] 
 
-To learn more about Next.js, take a look at the following resources:
+*(Další funkce doplňujte sem...)*
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Jak aplikaci spustit
 
-## Deploy on Vercel
+Pro spuštění aplikace na vašem počítači postupujte následovně:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1.  **Nainstalujte potřebné balíčky:**
+    ```bash
+    npm install
+    ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2.  **Nastavte prostředí:**
+    Ujistěte se, že máte vytvořený soubor `.env.local` a v něm nastavené klíče pro Clerk a Convex (např. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CONVEX_DEPLOYMENT` atd.).
+
+3.  **Spusťte vývojové prostředí:**
+    Aplikace vyžaduje běh dvou procesů současně. Otevřete si dva terminály:
+
+    *V prvním terminálu (běží frontend):*
+    ```bash
+    npm run dev
+    ```
+
+    *V druhém terminálu (běží backend/databáze):*
+    ```bash
+    npx convex dev
+    ```
+
+4.  Aplikace poběží na adrese [http://localhost:3000](http://localhost:3000).
+
+
+## Kontribuce
+
+Chcete se zapojit do vývoje? Budeme rádi!
+1. Forkněte si repozitář.
+2. Vytvořte si vlastní větev pro vaši úpravu.
+3. Po dokončení odešlete Pull Request.
+4. Pro nahlášení chyb nebo nápadů využijte sekci Issues.
