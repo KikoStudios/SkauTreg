@@ -276,7 +276,7 @@ export default function PublicRSVPPage() {
                                     marginBottom: "1rem"
                                 }}
                             >
-                                <img src="/icons/kalendar-icon.svg" alt="calendar" style={{ width: "20px", height: "20px" }} />
+                                <img src="/icons/kalendar-icon.svg" alt="calendar" style={{ width: "20px", height: "20px", filter: "brightness(0)" }} />
                                 Přidat do kalendáře
                             </a>
                         )}
@@ -324,7 +324,7 @@ export default function PublicRSVPPage() {
                             }}
                             title="Přidat do kalendáře"
                         >
-                            <img src="/icons/kalendar-icon.svg" alt="calendar" style={{ width: "20px", height: "20px" }} />
+                            <img src="/icons/kalendar-icon.svg" alt="calendar" style={{ width: "20px", height: "20px", filter: "brightness(0)" }} />
                         </a>
                     </div>
                 </div>

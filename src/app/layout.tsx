@@ -5,7 +5,7 @@ import "./globals.css";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
 export const metadata: Metadata = {
-  title: "Dashboard UI Kit",
+  title: "skautREG",
   description: "Light Green Theme UI Kit",
 };
 

@@ -9,7 +9,7 @@ const navItems = [
     { label: 'Můj Oddíl', icon: <img src="/icons/oddil-icon.svg" alt="Můj Oddíl" style={{ width: "24px", height: "auto" }} />, href: '/troop' },
     { label: 'Členové', icon: <img src="/icons/clenove-icon.svg" alt="Členové" style={{ width: "24px", height: "auto" }} />, href: '/members' },
     { label: 'Výpravy', icon: <img src="/icons/vypravy-icon.svg" alt="Výpravy" style={{ width: "24px", height: "auto" }} />, href: '/trips' },
-    { label: 'Kalendář', icon: <img src="/icons/kalendar-icon.svg" alt="Kalendář" style={{ width: "24px", height: "auto" }} />, href: '/calendar' },
+    { label: 'Kalendář', icon: <img src="/icons/kalendar-white.svg" alt="Kalendář" style={{ width: "24px", height: "auto" }} />, href: '/calendar' },
 ];
 
 const bottomItems = [
