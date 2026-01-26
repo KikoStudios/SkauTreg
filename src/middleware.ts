@@ -7,20 +7,10 @@ const isPublicRoute = createRouteMatcher([
     "/api/public(.*)"
 ]);
 
-const isProtectedRoute = createRouteMatcher([
-    "/",
-    "/calendar(.*)",
-    "/members(.*)",
-    "/settings(.*)",
-    "/trips(.*)",
-    "/troop(.*)"
-]);
-
 export default clerkMiddleware(async (auth, request) => {
-    if (isProtectedRoute(request)) {
+    if (!isPublicRoute(request)) {
         await auth.protect({
-            unauthenticatedUrl: "/sign-in",
-            unauthorizedUrl: "/sign-in"
+            signInUrl: "/sign-in"
         });
     }
 });
