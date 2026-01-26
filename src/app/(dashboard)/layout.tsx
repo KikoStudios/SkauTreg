@@ -49,8 +49,13 @@ export default function DashboardLayout({
             <div style={{ padding: "2rem", maxWidth: 600, margin: "4rem auto", textAlign: "center" }}>
                 <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Unable to load dashboard</h2>
                 <p style={{ color: "#4b5563", marginBottom: "1.5rem" }}>
-                    Your Clerk session is active, but Convex authentication failed. Make sure `npx convex dev` is running and that
-                    `CLERK_ISSUER_URL` / `NEXT_PUBLIC_CLERK_FRONTEND_API` are set in the Convex env.
+                    Your Clerk session is active, but Convex authentication failed. This could mean:
+                    <br />
+                    • Convex service is down or misconfigured
+                    <br />
+                    • CLERK_ISSUER_URL not set in Convex environment
+                    <br />
+                    • NEXT_PUBLIC_CONVEX_URL not set correctly
                 </p>
                 <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
                     <button

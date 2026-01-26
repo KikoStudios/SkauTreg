@@ -6,13 +6,17 @@ import { ConvexReactClient } from "convex/react";
 import { ReactNode } from "react";
 import UserSync from "../components/UserSync";
 
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new ConvexReactClient(
+    process.env.NEXT_PUBLIC_CONVEX_URL || "https://falling-badger-123.convex.cloud"
+);
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
     return (
         <ClerkProvider
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
+            publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        >
         >
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
                 <UserSync />
