@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import Cropper from "react-easy-crop";
-import { Point, Area } from "react-easy-crop/types";
+import type { Point, Area } from "react-easy-crop";
 
 // Canvas Helper for Cropping
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {

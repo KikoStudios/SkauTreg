@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import Button from "../../../../components/Button";
 import Cropper from "react-easy-crop";
-import { Point, Area } from "react-easy-crop/types";
+import type { Point, Area } from "react-easy-crop";
 
 // --- Helpers for Image Upload (Copied/Adapted) ---
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
