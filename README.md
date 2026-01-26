@@ -13,7 +13,7 @@ Aplikace je navržena jako **serverless** řešení, což znamená, že nemusím
 ## Feature Implementation Checklist
 
 Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
-
+ **---BASE FUNKCE---**
 - [x] **Autentifikace** (Přihlášení/Registrace přes Clerk)
 - [x] **Dashboard** (Hlavní přehled)
 - [x] **Správa členů** (Seznam a detaily členů)
@@ -22,12 +22,11 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [x] **Kalendář** (Přehled akcí v čase)
 - [x] **RSVP systém** (Veřejné odkazy pro přihlašování/odhlašování na akce)
 - [x] **Nastavení** (Uživatelské preference)
-- [ ] 
-- [ ] 
-- [ ] 
-
-*(Další funkce doplňujte sem...)*
-
+- [ ] **Integrace s Databazi zakladen** na vyber zakladen
+- [ ] **Integrace s IDOS** na jednoduchy vyber jizdenek
+- [ ] **Managment Financi** v jednoduche tabulce pro organizaci
+- [ ] **Kontrola jestli se vyprava vyplati** vypocitat jestli se vuci dotacim vyprava vyplatí
+- [ ] **Uctenky k vypravam**
 
 ## Jak aplikaci spustit
 
