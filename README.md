@@ -13,7 +13,7 @@ Aplikace je navržena jako **serverless** řešení, což znamená, že nemusím
 ## Feature Implementation Checklist
 
 Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
- **---BASE FUNKCE---**
+
 - [x] **Autentifikace** (Přihlášení/Registrace přes Clerk)
 - [x] **Dashboard** (Hlavní přehled)
 - [x] **Správa členů** (Seznam a detaily členů)
@@ -27,6 +27,9 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [ ] **Managment Financi** v jednoduche tabulce pro organizaci
 - [ ] **Kontrola jestli se vyprava vyplati** vypocitat jestli se vuci dotacim vyprava vyplatí
 - [ ] **Uctenky k vypravam**
+- [ ] **Fotky** odkaz a videni alba na odkazech na prihlaseni po vyprave
+- [ ] **Managment** kdo zaplatil vypravu a kdo ne s uležením toho komu zaplatil
+- [ ] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
 
 ## Jak aplikaci spustit
 
