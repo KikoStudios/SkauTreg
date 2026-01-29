@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npx convex codegen && next build",
     "start": "next start",
     "lint": "eslint",
     "sync:all": "node scripts/sync-all-bases-with-stations.mjs",
