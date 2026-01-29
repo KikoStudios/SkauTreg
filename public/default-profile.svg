@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#e4e4e7"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="70" r="35" fill="#a1a1aa"/>
+  
+  <!-- Body -->
+  <rect x="75" y="110" width="50" height="60" rx="10" fill="#a1a1aa"/>
+  
+  <!-- Text fallback -->
+  <text x="100" y="195" font-size="12" text-anchor="middle" fill="#71717a" font-family="sans-serif">Profil</text>
+</svg>

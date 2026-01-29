@@ -34,7 +34,7 @@ export default function SettingsPage() {
     if (troops === undefined) return <div>Načítám nastavení...</div>;
 
     return (
-        <div style={{ width: "100%", position: "relative" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
@@ -49,7 +49,10 @@ export default function SettingsPage() {
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Nastavení</h1>
             </div>
 
-            <h2 className="u-text-lg u-font-bold u-mb-4">Vyberte oddíl k úpravě</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <img src="/icons/settings-icon.svg" alt="settings" style={{ width: '32px', height: '32px' }} />
+                <h2 style={{ fontSize: '1.25rem', fontWeight: '800', margin: 0 }}>Vyberte oddíl k úpravě</h2>
+            </div>
 
             {troops.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "2rem" }}>
@@ -80,7 +83,9 @@ export default function SettingsPage() {
                                     <h3 style={{ fontSize: "1.25rem", fontWeight: "900", margin: 0 }}>{troop.name}</h3>
                                     {troop.number && <p style={{ margin: 0, fontWeight: "600", color: "#666" }}>{troop.number}. Oddíl</p>}
                                 </div>
-                                <div style={{ marginLeft: "auto", fontSize: "1.5rem", fontWeight: "900" }}>⚙️</div>
+                                <div style={{ marginLeft: "auto" }}>
+                                    <img src="/icons/settings-icon.svg" alt="settings" style={{ width: "32px", height: "32px" }} />
+                                </div>
                             </div>
                         </Link>
                     ))}

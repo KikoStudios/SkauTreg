@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Button from "./Button";
+import Select from "./Select";
 
 const FIELD_TYPES = [
     { value: "text", label: "Textové pole (Input)" },
@@ -39,6 +40,17 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
     });
 
     const [customFields, setCustomFields] = useState<any[]>(initialData?.customFields || []);
+    const [activeTab, setActiveTab] = useState<'basic' | 'fields'>('basic');
+
+    // Add style tag for input focus effects
+    const inputFocusStyles = `
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            transform: translate(1px, 1px);
+            box-shadow: 1px 1px 0 0 #000 !important;
+        }
+    `;
+
 
     // Sync customFields state with formData just to be safe, though we use the state
     // We update formData.customFields on submit usually
@@ -120,108 +132,302 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
     };
 
     return (
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <input required placeholder="Název Výpravy" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={inputStyle} />
-            <textarea required placeholder="Popis" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} style={{ ...inputStyle, minHeight: "80px" }} />
-            <input required placeholder="Místo" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} style={inputStyle} />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+        <>
+            <style>{inputFocusStyles}</style>
+            
+            {/* Tabs */}
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", borderBottom: "2px solid var(--border-color)" }}>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('basic')}
+                    style={{
+                        padding: "0.75rem 1.5rem",
+                        border: "none",
+                        borderBottom: activeTab === 'basic' ? "3px solid #000" : "none",
+                        background: activeTab === 'basic' ? "white" : "transparent",
+                        fontWeight: activeTab === 'basic' ? "700" : "600",
+                        fontSize: "1rem",
+                        cursor: "pointer",
+                        marginBottom: "-2px"
+                    }}
+                >
+                    Základní Info
+                </button>
+                {formData.formType === "registration" && (
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('fields')}
+                        style={{
+                            padding: "0.75rem 1.5rem",
+                            border: "none",
+                            borderBottom: activeTab === 'fields' ? "3px solid #000" : "none",
+                            background: activeTab === 'fields' ? "white" : "transparent",
+                            fontWeight: activeTab === 'fields' ? "700" : "600",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            marginBottom: "-2px"
+                        }}
+                    >
+                        Otázky do formuláře ({customFields.length})
+                    </button>
+                )}
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {/* Basic Info Tab */}
+            {activeTab === 'basic' && (
+                <>
+            {/* Basic Trip Info */}
+            <div>
+                <input required placeholder="Název Výpravy" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={inputStyle} />
+            </div>
+            
+            <div>
+                <textarea required placeholder="Popis" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} style={{ ...inputStyle, minHeight: "80px" }} />
+            </div>
+            
+            <div>
+                <input required placeholder="Místo" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} style={inputStyle} />
+            </div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <input required type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} style={inputStyle} />
                 <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} style={inputStyle} />
             </div>
 
-            <div style={{ padding: "1rem", backgroundColor: "#f9fafb", borderRadius: "8px" }}>
-                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "bold" }}>Typ Přihlašování</label>
-                <div style={{ display: "flex", gap: "1rem" }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+            {/* Form Type Selection Box */}
+            <div style={{
+                backgroundColor: "var(--bg-card)",
+                border: "2px solid var(--border-color)",
+                borderRadius: "8px",
+                padding: "1.5rem",
+                boxShadow: "4px 4px 0 0 #000"
+            }}>
+                <label style={{ display: "block", marginBottom: "1rem", fontWeight: "700", fontSize: "1rem" }}>Typ Přihlašování</label>
+                <div style={{ display: "flex", gap: "1.5rem", flexDirection: "column" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer", fontWeight: "600" }}>
                         <input
                             type="radio"
                             name="formType"
                             value="registration"
                             checked={formData.formType === "registration"}
-                            onChange={() => setFormData({ ...formData, formType: "registration" })}
+                            onChange={() => {
+                                setFormData({ ...formData, formType: "registration" });
+                            }}
+                            style={{ width: "18px", height: "18px", cursor: "pointer" }}
                         />
                         Registrace + Omluvenky
                     </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer", fontWeight: "600" }}>
                         <input
                             type="radio"
                             name="formType"
                             value="apology"
                             checked={formData.formType === "apology"}
-                            onChange={() => setFormData({ ...formData, formType: "apology" })}
+                            onChange={() => {
+                                setFormData({ ...formData, formType: "apology" });
+                                setActiveTab('basic');
+                            }}
+                            style={{ width: "18px", height: "18px", cursor: "pointer" }}
                         />
                         Pouze Omluvenky
                     </label>
                 </div>
             </div>
+            </>
+            )}
 
-            {formData.formType === "registration" && (
-                <div style={{ borderTop: "1px solid #eee", paddingTop: "1rem" }}>
+            {/* Custom Fields Tab */}
+            {activeTab === 'fields' && formData.formType === "registration" && (
+                <div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                        <h3 style={{ fontSize: "1rem", fontWeight: "bold" }}>Otázky do formuláře</h3>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Otázky do formuláře</h3>
                         {!addingField && <Button type="button" onClick={startAdding} variant="outline">+ Přidat otázku</Button>}
                     </div>
 
-                    {customFields.length > 0 && !addingField && (
-                        <ul style={{ listStyle: "none", padding: 0, marginBottom: "1rem" }}>
-                            {customFields.map((f, i) => (
-                                <li key={i} style={{ backgroundColor: "#f3f4f6", padding: "0.5rem", marginBottom: "0.5rem", borderRadius: "4px", fontSize: "0.9rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    {/* Two-column layout when editing/adding */}
+                    <div style={{
+                        display: addingField ? "grid" : "block",
+                        gridTemplateColumns: addingField ? "1fr 1fr" : "1fr",
+                        gap: "1.5rem"
+                    }}>
+                        {/* Left: Form Editor (only when adding/editing) */}
+                        {addingField && (
+                            <div style={{
+                                backgroundColor: "var(--bg-card)",
+                                border: "2px solid var(--border-color)",
+                                borderRadius: "8px",
+                                padding: "1.5rem",
+                                boxShadow: "4px 4px 0 0 #000",
+                                height: "fit-content",
+                                position: "sticky",
+                                top: "1rem"
+                            }}>
+                                <h4 style={{ marginBottom: "1.5rem", fontWeight: "700", fontSize: "1rem" }}>
+                                    {editIndex !== null ? "Upravit otázku" : "Nová otázka"}
+                                </h4>
+                                <div style={{ display: "grid", gap: "1rem" }}>
                                     <div>
-                                        <strong>{f.label}</strong> <span style={{ color: "#666" }}>({f.type})</span>
-                                        {f.required && <img src="/exclamation-icon.svg" alt="required" style={{ marginLeft: "0.25rem", height: "20px", verticalAlign: "middle" }} />}
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", fontSize: "0.9rem" }}>Znění otázky</label>
+                                        <input
+                                            placeholder="Např. Alergie"
+                                            value={tempField.label}
+                                            onChange={e => setTempField({ ...tempField, label: e.target.value })}
+                                            style={inputStyle}
+                                        />
                                     </div>
-                                    <div style={{ display: "flex", gap: "0.5rem" }}>
-                                        <button type="button" onClick={() => startEditing(i)} style={{ cursor: "pointer", border: "none", background: "none", fontSize: "1rem" }}>
-                                            <img src="/edit-icon.svg" alt="edit" style={{ height: "20px" }} />
-                                        </button>
-                                        <button type="button" onClick={() => removeField(i)} style={{ cursor: "pointer", border: "none", background: "none", fontSize: "1rem" }}>
-                                            <img src="/delete-icon.svg" alt="delete" style={{ height: "20px" }} />
-                                        </button>
+
+                                    <div>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", fontSize: "0.9rem" }}>Typ pole</label>
+                                        <Select
+                                            value={tempField.type}
+                                            onChange={(value) => setTempField({ ...tempField, type: value })}
+                                            options={FIELD_TYPES}
+                                        />
                                     </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
 
-                    {addingField && (
-                        <div style={{ padding: "1rem", border: "1px solid #ddd", borderRadius: "8px", backgroundColor: "#fff" }}>
-                            <h4 style={{ marginBottom: "1rem", fontWeight: "bold" }}>{editIndex !== null ? "Upravit otázku" : "Nová otázka"}</h4>
-                            <div style={{ display: "grid", gap: "0.5rem" }}>
-                                <input placeholder="Znění otázky (např. Alergie)" value={tempField.label} onChange={e => setTempField({ ...tempField, label: e.target.value })} style={inputStyle} />
+                                    {tempField.type === 'select' && (
+                                        <div>
+                                            <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", fontSize: "0.9rem" }}>Možnosti oddělené čárkou</label>
+                                            <input
+                                                placeholder="Např. Stan, Chatka"
+                                                value={tempField.optionsString}
+                                                onChange={e => setTempField({ ...tempField, optionsString: e.target.value })}
+                                                style={inputStyle}
+                                            />
+                                        </div>
+                                    )}
 
-                                <select value={tempField.type} onChange={e => setTempField({ ...tempField, type: e.target.value })} style={inputStyle}>
-                                    {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                                </select>
+                                    <div>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", fontSize: "0.9rem" }}>Nápověda (tooltip)</label>
+                                        <input
+                                            placeholder="Doplňující text"
+                                            value={tempField.info}
+                                            onChange={e => setTempField({ ...tempField, info: e.target.value })}
+                                            style={inputStyle}
+                                        />
+                                    </div>
 
-                                {tempField.type === 'select' && (
-                                    <input placeholder="Možnosti oddělené čárkou (např. Stan, Chatka)" value={tempField.optionsString} onChange={e => setTempField({ ...tempField, optionsString: e.target.value })} style={inputStyle} />
-                                )}
+                                    <div>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "600", fontSize: "0.9rem" }}>Příklad vyplnění</label>
+                                        <input
+                                            placeholder="Příklad pro uživatele"
+                                            value={tempField.placeholder}
+                                            onChange={e => setTempField({ ...tempField, placeholder: e.target.value })}
+                                            style={inputStyle}
+                                        />
+                                    </div>
 
-                                <input placeholder="Nápověda (tooltip)" value={tempField.info} onChange={e => setTempField({ ...tempField, info: e.target.value })} style={inputStyle} />
-                                <input placeholder="Příklad vyplnění (placeholder)" value={tempField.placeholder} onChange={e => setTempField({ ...tempField, placeholder: e.target.value })} style={inputStyle} />
+                                    <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.95rem", cursor: "pointer", fontWeight: "600" }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={tempField.required}
+                                            onChange={e => setTempField({ ...tempField, required: e.target.checked })}
+                                            style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                                        />
+                                        Povinná otázka
+                                    </label>
 
-                                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem" }}>
-                                    <input type="checkbox" checked={tempField.required} onChange={e => setTempField({ ...tempField, required: e.target.checked })} />
-                                    Povinná otázka
-                                </label>
-
-                                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                                    <Button type="button" onClick={saveField}>{editIndex !== null ? "Uložit změny" : "Přidat otázku"}</Button>
-                                    <Button type="button" variant="outline" onClick={resetTempField}>Zrušit</Button>
+                                    <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+                                        <Button type="button" onClick={saveField}>
+                                            {editIndex !== null ? "Uložit změny" : "Přidat otázku"}
+                                        </Button>
+                                        <Button type="button" variant="outline" onClick={resetTempField}>Zrušit</Button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+
+                        {/* Right: List of existing fields */}
+                        {customFields.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                                {customFields.map((f, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            backgroundColor: "var(--bg-card)",
+                                            border: "2px solid var(--border-color)",
+                                            borderRadius: "8px",
+                                            padding: "1rem",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            boxShadow: "2px 2px 0 0 #000",
+                                            fontSize: "0.95rem"
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ fontWeight: "700" }}>
+                                                {f.label} {f.required && <span style={{ color: "red" }}>*</span>}
+                                            </div>
+                                            <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                                                {f.type}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => startEditing(i)}
+                                                style={{
+                                                    padding: "0.5rem 1rem",
+                                                    backgroundColor: "#86efac",
+                                                    border: "2px solid #000",
+                                                    borderRadius: "6px",
+                                                    fontWeight: "600",
+                                                    cursor: "pointer",
+                                                    fontSize: "0.85rem",
+                                                    boxShadow: "2px 2px 0 0 #000",
+                                                    transition: "transform 0.1s"
+                                                }}
+                                                onMouseDown={e => e.currentTarget.style.transform = "translate(1px, 1px)"}
+                                                onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                                            >
+                                                Upravit
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeField(i)}
+                                                style={{
+                                                    padding: "0.5rem 1rem",
+                                                    backgroundColor: "#fca5a5",
+                                                    border: "2px solid #000",
+                                                    borderRadius: "6px",
+                                                    fontWeight: "600",
+                                                    cursor: "pointer",
+                                                    fontSize: "0.85rem",
+                                                    boxShadow: "2px 2px 0 0 #000",
+                                                    transition: "transform 0.1s"
+                                                }}
+                                                onMouseDown={e => e.currentTarget.style.transform = "translate(1px, 1px)"}
+                                                onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                                            >
+                                                Smazat
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
-            <Button type="submit" disabled={isLoading} style={{ marginTop: "1rem" }}>
+            <Button type="submit" disabled={isLoading} style={{ marginTop: "0.5rem" }}>
                 {isLoading ? "Ukládám..." : buttonText}
             </Button>
         </form>
+        </>
     );
 }
 
 const inputStyle = {
-    width: "100%", padding: "0.5rem", border: "1px solid #ddd", borderRadius: "4px"
-};
+    width: "100%",
+    padding: "0.75rem",
+    border: "2px solid var(--border-color)",
+    borderRadius: "6px",
+    fontSize: "0.95rem",
+    fontFamily: "inherit",
+    fontWeight: "500",
+    boxShadow: "2px 2px 0 0 #000",
+    transition: "all 0.1s"
+} as React.CSSProperties;

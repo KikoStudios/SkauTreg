@@ -5,6 +5,7 @@ import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
 import { useEffect, useMemo, useState } from "react";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
+import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
 import styles from "./DashboardLayout.module.css";
 import ProfileModal from "../../components/ProfileModal";
 import { CommandMenu } from "../../components/CommandMenu";
@@ -15,11 +16,24 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode;
 }) {
+    return (
+        <SidebarProvider>
+            <DashboardLayoutInner>{children}</DashboardLayoutInner>
+        </SidebarProvider>
+    );
+}
+
+function DashboardLayoutInner({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
     const { isLoading, isAuthenticated } = useConvexAuth();
     const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
     const { signOut } = useClerk();
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
 
     const convexAuthReady = useMemo(() => !isLoading && isAuthenticated, [isLoading, isAuthenticated]);
 
@@ -106,11 +120,27 @@ export default function DashboardLayout({
                     <div style={{ width: "40px" }}></div> {/* Spacer for balancing */}
                 </div>
 
-                <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+                <Sidebar 
+                    isOpen={isSidebarOpen} 
+                    onClose={() => setIsSidebarOpen(false)}
+                    isCollapsed={isSidebarCollapsed}
+                    onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                />
+
+                {/* Desktop Sidebar Expand Button */}
+                {isSidebarCollapsed && (
+                    <button 
+                        className={styles.expandButton}
+                        onClick={() => setIsSidebarCollapsed(false)}
+                        title="Rozbalit sidebar"
+                    >
+                        ‹
+                    </button>
+                )}
 
                 <CommandMenu />
 
-                <main className={styles.mainContent}>
+                <main className={`${styles.mainContent} ${isSidebarCollapsed ? styles.mainContentExpanded : ''}`}>
                     <Breadcrumbs />
                     {children}
                 </main>

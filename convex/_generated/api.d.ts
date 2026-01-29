@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as bases from "../bases.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as members from "../members.js";
@@ -24,6 +25,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  bases: typeof bases;
   files: typeof files;
   http: typeof http;
   members: typeof members;

@@ -6,6 +6,7 @@ import { Id } from "../../../../../../convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "../../../../../components/Button";
+import Select from "../../../../../components/Select";
 
 const ROLES = [
     { value: "main_leader", label: "HL. Vedoucí" },
@@ -186,13 +187,11 @@ export default function TroopLeadersPage() {
 
                         <div>
                             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.25rem" }}>Role</label>
-                            <select
+                            <Select
                                 value={selectedRole}
-                                onChange={e => setSelectedRole(e.target.value)}
-                                style={{ width: "100%", padding: "0.75rem", border: "1px solid #ddd", borderRadius: "4px" }}
-                            >
-                                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                            </select>
+                                onChange={setSelectedRole}
+                                options={ROLES}
+                            />
                         </div>
 
                         <Button type="submit" disabled={isAdding}>

@@ -161,7 +161,7 @@ export default function MembersPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",

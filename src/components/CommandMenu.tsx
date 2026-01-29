@@ -6,14 +6,16 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 export function CommandMenu() {
     const router = useRouter();
     const [open, setOpen] = useState(false);
 
-    // Data for quick navigation
+    // Data for comprehensive search
     const troops = useQuery(api.troops.getByUser) || [];
     const trips = useQuery(api.trips.getAllUserTrips) || [];
+    const members = useQuery(api.members.getAllUserMembers) || [];
 
     useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -62,9 +64,14 @@ export function CommandMenu() {
                     label="Command Menu"
                 >
                     <div style={{ borderBottom: "3px solid #000", padding: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <span style={{ fontSize: "1.2rem" }}>🔍</span>
+                        <span style={{ fontSize: "1.2rem", width: "24px", height: "24px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.35-4.35" />
+                            </svg>
+                        </span>
                         <Command.Input
-                            placeholder="Napište příkaz nebo hledejte..."
+                            placeholder="Hledejte výpravy, členy, oddíly a další..."
                             style={{
                                 border: "none",
                                 outline: "none",
@@ -85,42 +92,80 @@ export function CommandMenu() {
                         </Command.Empty>
 
                         <Group heading="Stránky">
-                            <Item onSelect={() => runCommand(() => router.push("/"))}>🏠 Domů</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/troop"))}>🏕️ Moje Oddíly</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/members"))}>👥 Členové</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/trips"))}>🗺️ Výpravy</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/calendar"))}>🗓️ Kalendář</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/settings"))}>⚙️ Nastavení</Item>
+                            <Item icon="/icons/home-icon-dark.svg" onSelect={() => runCommand(() => router.push("/"))}>Domů</Item>
+                            <Item icon="/icons/oddil-icon-dark.svg" onSelect={() => runCommand(() => router.push("/troop"))}>Moje Oddíly</Item>
+                            <Item icon="/icons/clenove-icon-dark.svg" onSelect={() => runCommand(() => router.push("/members"))}>Členové</Item>
+                            <Item icon="/icons/vypravy-icon-dark.svg" onSelect={() => runCommand(() => router.push("/trips"))}>Výpravy</Item>
+                            <Item icon="/icons/kalendar-icon-dark.svg" onSelect={() => runCommand(() => router.push("/calendar"))}>Kalendář</Item>
+                            <Item icon="/icons/nastaveni-icon-dark.svg" onSelect={() => runCommand(() => router.push("/settings"))}>Nastavení</Item>
                         </Group>
 
                         <Group heading="Akce">
-                            <Item onSelect={() => runCommand(() => router.push("/troop?create=true"))}>➕ Vytvořit nový oddíl</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/trips?create=true"))}>➕ Naplánovat výpravu</Item>
-                            <Item onSelect={() => runCommand(() => router.push("/members?create=true"))}>➕ Přidat člena</Item>
+                            <Item
+                                icon={<PlusIcon />}
+                                onSelect={() => runCommand(() => router.push("/troop?create=true"))}
+                            >
+                                Vytvořit nový oddíl
+                            </Item>
+                            <Item
+                                icon={<PlusIcon />}
+                                onSelect={() => runCommand(() => router.push("/trips?create=true"))}
+                            >
+                                Naplánovat výpravu
+                            </Item>
+                            <Item
+                                icon={<PlusIcon />}
+                                onSelect={() => runCommand(() => router.push("/members?create=true"))}
+                            >
+                                Přidat člena
+                            </Item>
                         </Group>
 
                         {troops.length > 0 && (
                             <Group heading="Moje Oddíly">
                                 {troops.map((troop: any) => (
-                                    <Item key={troop._id} onSelect={() => runCommand(() => router.push(`/troop/${troop._id}`))}>
-                                        🏕️ {troop.name}
+                                    <Item
+                                        key={troop._id}
+                                        icon="/icons/oddil-icon-dark.svg"
+                                        onSelect={() => runCommand(() => router.push(`/troop/${troop._id}`))}
+                                    >
+                                        {troop.name}
                                     </Item>
                                 ))}
                             </Group>
                         )}
 
                         {trips.length > 0 && (
-                            <Group heading="Nadcházející Výpravy">
-                                {trips.slice(0, 5).map((trip: any) => (
-                                    <Item key={trip._id} onSelect={() => runCommand(() => router.push(`/trips/${trip._id}`))}>
-                                        📍 {trip.name}
-                                    </Item>
+                            <Group heading="Výpravy">
+                                {trips.map((trip: any) => (
+                                    <TripItem
+                                        key={trip._id}
+                                        trip={trip}
+                                        onSelect={() => runCommand(() => router.push(`/trips/${trip._id}`))}
+                                    />
+                                ))}
+                            </Group>
+                        )}
+
+                        {members.length > 0 && (
+                            <Group heading="Členové">
+                                {members.map((member: any) => (
+                                    <MemberItem
+                                        key={member._id}
+                                        member={member}
+                                        onSelect={() => runCommand(() => router.push(`/members?memberId=${member._id}`))}
+                                    />
                                 ))}
                             </Group>
                         )}
 
                         <Group heading="Systém">
-                            <Item onSelect={() => runCommand(() => window.location.reload())}>🔄 Obnovit stránku</Item>
+                            <Item
+                                icon={<RefreshIcon />}
+                                onSelect={() => runCommand(() => window.location.reload())}
+                            >
+                                Obnovit stránku
+                            </Item>
                         </Group>
 
                     </Command.List>
@@ -147,7 +192,7 @@ const Group = ({ heading, children }: { heading: string, children: React.ReactNo
     </Command.Group>
 );
 
-const Item = ({ children, onSelect, ...props }: any) => (
+const Item = ({ children, onSelect, icon, ...props }: any) => (
     <Command.Item
         onSelect={onSelect}
         style={{
@@ -160,11 +205,170 @@ const Item = ({ children, onSelect, ...props }: any) => (
             alignItems: "center",
             transition: "background 0.1s"
         }}
-        className="cmd-item" // We'll add a global style for hover via CSS or localized style injection if needed, but CSS module or global css is better.
-        // Quick inline hover hack not possible with standard React style without state, relying on global CSS or simple style.
-        // Let's use a class and assume globals.css or similar. Or basic active style.
         {...props}
     >
-        {children}
+        {typeof icon === "string" ? (
+            <Image src={icon} alt="" width={20} height={20} style={{ flexShrink: 0 }} />
+        ) : (
+            <span style={{ width: "20px", height: "20px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {icon}
+            </span>
+        )}
+        <span>{children}</span>
     </Command.Item>
+);
+
+// Trip Item with detailed info box
+const TripItem = ({ trip, onSelect }: any) => {
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString("cs-CZ", { day: "numeric", month: "short" });
+    };
+
+    return (
+        <Command.Item
+            onSelect={onSelect}
+            value={`${trip.name} ${trip.location} ${trip.description || ""}`}
+            style={{
+                padding: "0.75rem",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "600",
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "flex-start",
+                transition: "background 0.1s"
+            }}
+        >
+            <Image src="/icons/vypravy-icon-dark.svg" alt="" width={20} height={20} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "700", fontSize: "1rem" }}>{trip.name}</span>
+                    {trip.troopName && (
+                        <span style={{
+                            fontSize: "0.75rem",
+                            padding: "0.125rem 0.5rem",
+                            borderRadius: "4px",
+                            backgroundColor: trip.troopColor || "#e5e5e5",
+                            color: "#000",
+                            fontWeight: "600"
+                        }}>
+                            {trip.troopName}
+                        </span>
+                    )}
+                </div>
+                <div style={{ display: "flex", gap: "1rem", fontSize: "0.85rem", color: "#666" }}>
+                    <span>
+                        <MapPinIcon /> {trip.location}
+                    </span>
+                    <span>
+                        <CalendarIcon /> {formatDate(trip.startDate)}
+                        {trip.endDate && ` - ${formatDate(trip.endDate)}`}
+                    </span>
+                </div>
+                {trip.description && (
+                    <p style={{
+                        fontSize: "0.8rem",
+                        color: "#888",
+                        margin: "0.25rem 0 0 0",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: "100%"
+                    }}>
+                        {trip.description}
+                    </p>
+                )}
+            </div>
+        </Command.Item>
+    );
+};
+
+// Member Item with info
+const MemberItem = ({ member, onSelect }: any) => {
+    const getAge = (birthDate?: string) => {
+        if (!birthDate) return null;
+        const birth = new Date(birthDate);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return age;
+    };
+
+    const age = getAge(member.birthDate);
+
+    return (
+        <Command.Item
+            onSelect={onSelect}
+            value={`${member.name} ${member.nickname || ""} ${member.parentName || ""} ${member.email || ""}`}
+            style={{
+                padding: "0.75rem",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: "600",
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "flex-start",
+                transition: "background 0.1s"
+            }}
+        >
+            <Image src="/icons/clenove-icon-dark.svg" alt="" width={20} height={20} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: "700", fontSize: "1rem" }}>
+                        {member.name}
+                        {member.nickname && ` "${member.nickname}"`}
+                    </span>
+                    {age !== null && (
+                        <span style={{
+                            fontSize: "0.75rem",
+                            padding: "0.125rem 0.5rem",
+                            borderRadius: "4px",
+                            backgroundColor: "#e5e5e5",
+                            color: "#000",
+                            fontWeight: "600"
+                        }}>
+                            {age} let
+                        </span>
+                    )}
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "#666" }}>
+                    {member.troopName && <span>{member.troopName}</span>}
+                    {member.parentName && <span> • Rodič: {member.parentName}</span>}
+                </div>
+            </div>
+        </Command.Item>
+    );
+};
+
+// Icon components (inline SVG replacements)
+const PlusIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M12 5v14M5 12h14" />
+    </svg>
+);
+
+const RefreshIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+    </svg>
+);
+
+const MapPinIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: "inline", verticalAlign: "middle", marginRight: "0.25rem" }}>
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+        <circle cx="12" cy="10" r="3" />
+    </svg>
+);
+
+const CalendarIcon = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: "inline", verticalAlign: "middle", marginRight: "0.25rem" }}>
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
 );

@@ -66,3 +66,59 @@ export const remove = mutation({
         await ctx.db.delete(args.id);
     },
 });
+
+export const getAllUserMembers = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return [];
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) =>
+                q.eq("tokenIdentifier", identity.tokenIdentifier)
+            )
+            .unique();
+
+        if (!user) return [];
+
+        // Get all troops I am part of
+        const ownedTroops = await ctx.db
+            .query("troops")
+            .filter((q) => q.eq(q.field("ownerId"), user._id))
+            .collect();
+
+        const leaderships = await ctx.db
+            .query("troop_leaders")
+            .withIndex("by_user_troop", q => q.eq("userId", user._id))
+            .collect();
+
+        const leadingTroops = await Promise.all(
+            leaderships.map(l => ctx.db.get(l.troopId))
+        );
+
+        const allTroops = [...ownedTroops, ...leadingTroops]
+            .filter((t): t is NonNullable<typeof t> => t !== null);
+
+        const uniqueTroops = Array.from(new Map(allTroops.map(t => [t._id, t])).values());
+        const troopIds = uniqueTroops.map(t => t._id);
+
+        // Get members for these troops
+        const members = await Promise.all(
+            troopIds.map(async (troopId) => {
+                const troopMembers = await ctx.db
+                    .query("members")
+                    .withIndex("by_troop", (q) => q.eq("troopId", troopId))
+                    .collect();
+
+                const troop = uniqueTroops.find(t => t._id === troopId);
+                return troopMembers.map(member => ({
+                    ...member,
+                    troopName: troop?.name || "Neznámý oddíl"
+                }));
+            })
+        );
+
+        return members.flat();
+    }
+});

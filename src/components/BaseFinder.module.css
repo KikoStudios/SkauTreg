@@ -1,0 +1,1679 @@
+.container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-main);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.mapArea {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+}
+
+.infoPanel {
+    position: absolute;
+    right: 24px;
+    top: 24px;
+    bottom: 24px;
+    width: 450px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    border: 4px solid #000;
+    border-radius: 24px;
+    z-index: 100;
+    overflow: hidden;
+    box-shadow: 12px 12px 0 0 #000;
+    max-height: calc(100vh - 48px);
+    transition: all 0.3s ease;
+}
+
+.infoPanelFullscreen {
+    left: calc(var(--sidebar-width) + 24px);
+    right: 24px;
+    width: auto;
+}
+
+.infoPanelCollapsed {
+    left: 24px !important;
+}
+
+/* Tab Navigation */
+.tabNavWrapper {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 3px solid #000;
+    background: white;
+    flex-shrink: 0;
+    height: 52px;
+}
+
+.tabNav {
+    display: flex;
+    flex: 1;
+}
+
+.tab {
+    flex: 1;
+    border: none;
+    background: white;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 700;
+    color: #000;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-right: 3px solid #000;
+}
+
+.tab:last-child {
+    border-right: none;
+}
+
+.tabActive {
+    background: white;
+}
+
+.fullscreenButton {
+    width: 52px;
+    border: none;
+    border-left: 3px solid #000;
+    background: white;
+    cursor: pointer;
+    font-size: 24px;
+    font-weight: 700;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.fullscreenButton:hover {
+    background: #f5f5f5;
+}
+
+.panelHideButton {
+    position: fixed;
+    right: calc(450px + 24px + 24px);
+    bottom: 24px;
+    width: 52px;
+    height: 52px;
+    border: 4px solid #000;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: 700;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    box-shadow: 6px 6px 0 0 #000;
+    z-index: 101;
+}
+
+.panelHideButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 0 #000;
+}
+
+.panelShowButton {
+    position: absolute;
+    right: 24px;
+    top: 24px;
+    width: 52px;
+    height: 52px;
+    border: 4px solid #000;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    font-size: 24px;
+    font-weight: 700;
+    color: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+    box-shadow: 6px 6px 0 0 #000;
+    transition: all 0.2s;
+}
+
+.panelShowButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 8px 8px 0 0 #000;
+}
+
+.tabContent {
+    flex: 1 1 auto;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    padding: 16px;
+    padding-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    min-height: 0;
+    height: 100%;
+}
+
+.tabContent::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tabContent::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.tabContent::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.tabContent::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.baseTitle {
+    font-size: 20px;
+    font-weight: 900;
+    color: #000;
+    margin: 0;
+    padding: 0;
+}
+
+.emptyState {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 20px;
+    font-size: 1rem;
+}
+
+/* Badges Section */
+.badgesSection {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 12px;
+    background: white;
+    border: 2px solid #000;
+    border-radius: 999px; /* Pill shape */
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    position: relative;
+    height: 32px;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.badgeNumber {
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.badgeIconImg {
+    height: 18px;
+    width: auto;
+}
+
+.badgeName {
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.badgeQuestionImg {
+    height: 18px;
+    width: 18px;
+    margin-left: 4px;
+}
+
+/* Conditions Row */
+.conditionsRow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.conditionsHeader {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: white;
+    border: 2px solid #000;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+    width: fit-content;
+    box-shadow: 4px 4px 0 0 #000;
+    text-transform: uppercase;
+}
+
+.conditionsText {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #000;
+    font-weight: 600;
+    padding: 0 4px;
+    display: block;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.infoIconImg {
+    height: 20px;
+    width: auto;
+}
+
+.textTruncated {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.expandButton {
+    background: none;
+    border: none;
+    color: #000;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 4px;
+    text-decoration: underline;
+    margin-top: 4px;
+}
+
+.expandButton:hover {
+    opacity: 0.7;
+}
+
+/* Equipment Section */
+.equipmentSection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.equipmentHeader {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: white;
+    border: 2px solid #000;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 800;
+    width: fit-content;
+    box-shadow: 4px 4px 0 0 #000;
+}
+
+.sectionIconImg {
+    height: 20px;
+    width: auto;
+}
+
+.description {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #000;
+    font-weight: 600;
+    padding: 0 4px;
+    margin: 0;
+    display: block;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Details Split Section (Price & Contact) */
+.detailsSplit {
+    display: flex;
+    gap: 14px;
+    position: relative;
+    padding: 8px 0;
+}
+
+.priceColumn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.priceItem {
+    display: flex;
+    flex-direction: column;
+}
+
+.priceLabel {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.priceValue {
+    font-size: 12px;
+    font-weight: 700;
+    background: #86efac;
+    padding: 2px 6px;
+    border-radius: 4px;
+    width: fit-content;
+    border: 1px solid #000;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+.verticalDivider {
+    width: 2px;
+    background: #000;
+    border-radius: 2px;
+}
+
+.contactColumn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contactRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    color: #000;
+}
+
+.contactRow:hover .contactText {
+    text-decoration: underline;
+}
+
+.contactIconImg {
+    height: 16px;
+    width: 16px;
+    object-fit: contain;
+}
+
+.contactText {
+    font-size: 12px;
+    font-weight: 600;
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Photo Gallery */
+.photoGallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.photoItem {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    border: 2px solid #000;
+    overflow: hidden;
+    position: relative;
+}
+
+.photoGreen {
+    background: #4ade80; /* Stronger green */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photoText {
+    font-weight: 900;
+    font-size: 18px;
+    transform: rotate(-45deg);
+    color: #000;
+    letter-spacing: 1px;
+}
+
+.addPhotoButton {
+    width: 100%;
+    height: 100%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    gap: 4px;
+}
+
+.otherRow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #000;
+}
+
+.arrowIconImg {
+    height: 12px;
+    width: auto;
+}
+
+.plusRow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.plusIconImg {
+    height: 16px;
+    width: auto;
+}
+
+.plusText {
+    font-size: 16px;
+    font-weight: 800;
+}
+
+/* Footer Icons */
+.footerIcons {
+    display: flex;
+    gap: 14px;
+    margin-top: auto;
+}
+
+.databaseButton {
+    flex: 2;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 18px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 6px 6px 0 0 #000;
+    cursor: pointer;
+    transition: all 0.1s;
+    text-transform: uppercase;
+}
+
+.databaseButton:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 0 #000;
+}
+
+.dbIconImg {
+    height: 40px;
+    width: auto;
+}
+
+.mapButtons {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+}
+
+.mapIconBtn {
+    width: 68px;
+    height: 68px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 6px 6px 0 0 #000;
+    transition: all 0.1s;
+    padding: 8px;
+    flex-shrink: 0;
+}
+
+.mapIconBtn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 4px 4px 0 0 #000;
+}
+
+.mapPinIconImg {
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
+}
+
+.mapyCzBtn {
+    background: white;
+    color: #000;
+    font-weight: 900;
+}
+
+.mapyCzIconImg {
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
+}
+
+/* Assigned Trip Section */
+.assignedTripSection {
+    background: #E3F2FD;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 16px;
+    box-shadow: 4px 4px 0 0 #000;
+}
+
+.assignedTripHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.assignedTripTitle {
+    font-size: 14px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.removeTrip {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #000;
+    border-radius: 6px;
+    background: white;
+    color: #000;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.removeTrip:hover {
+    background: #ff4444;
+    color: white;
+}
+
+.assignedTripInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.assignedTripTime {
+    font-size: 16px;
+    font-weight: 900;
+    color: #000;
+}
+
+.assignedTripDetails {
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+    display: flex;
+    gap: 6px;
+}
+
+.assignedTripRoute {
+    font-size: 12px;
+    font-weight: 700;
+    color: #000;
+    line-height: 1.4;
+}
+
+.viewOnIdos {
+    display: inline-block;
+    padding: 6px 12px;
+    background: white;
+    border: 2px solid #000;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #000;
+    text-decoration: none;
+    box-shadow: 2px 2px 0 0 #000;
+    transition: all 0.2s;
+    margin-top: 4px;
+}
+
+.viewOnIdos:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+/* Stations List in Doprava Tab */
+.stationsList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.stationItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 12px;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: transform 0.2s;
+}
+
+.stationItem:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.stationRank {
+    font-size: 18px;
+    font-weight: 900;
+    color: #000;
+    background: #FFD700;
+    border: 2px solid #000;
+    border-radius: 8px;
+    padding: 4px 12px;
+    min-width: 45px;
+    text-align: center;
+}
+
+.stationInfo {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stationName {
+    font-size: 16px;
+    font-weight: 700;
+    color: #000;
+}
+
+.stationDetails {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    color: #666;
+}
+
+.stationType {
+    font-weight: 600;
+    color: #4A90E2;
+}
+
+.stationDistance {
+    font-weight: 500;
+    color: #E27D60;
+}
+
+.stationModes {
+    font-weight: 400;
+    color: #666;
+}
+
+.dopravSection h3 {
+    font-size: 20px;
+    font-weight: 900;
+    color: #000;
+    margin: 0 0 8px 0;
+}
+
+/* Trip Planner Styles */
+.tripPlanner {
+    margin-top: 8px;
+}
+
+.tripPlanner h3 {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.tripForm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.formGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.formGroup label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.formRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.input {
+    padding: 8px 12px;
+    border: 2px solid #000;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.inputWithButton {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.inputWithButton .input {
+    padding-right: 56px;
+    width: 100%;
+}
+
+.stationPickerButton {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border: 2px solid #000;
+    border-radius: 6px;
+    background: #F2C94C;
+    color: #000;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 2px 2px 0 0 #000;
+}
+
+.stationPickerButton:hover {
+    background: #F6D365;
+}
+
+.stationPickerPopup {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 2px solid #000;
+    border-radius: 8px;
+    box-shadow: 6px 6px 0 0 #000;
+    z-index: 20;
+}
+
+.stationPickerHeader {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    border-bottom: 2px solid #000;
+    background: #F8F9FA;
+    text-transform: uppercase;
+}
+
+.stationPickerList {
+    display: flex;
+    flex-direction: column;
+}
+
+.stationPickerEmpty {
+    padding: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #666;
+}
+
+.input:focus {
+    outline: none;
+    border-color: #4A90E2;
+}
+
+.searchButton {
+    padding: 10px 16px;
+    background: #4A90E2;
+    color: white;
+    border: 2px solid #000;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 0 #000;
+    transition: all 0.2s ease;
+}
+
+.searchButton:hover:not(:disabled) {
+    background: #357ABD;
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 0 #000;
+}
+
+.searchButton:active:not(:disabled) {
+    transform: translate(0, 0);
+    box-shadow: 1px 1px 0 0 #000;
+}
+
+.searchButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.timeTypeToggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.toggleButton {
+    padding: 10px;
+    background: white;
+    border: 2px solid #000;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggleButton:hover {
+    background: #f5f5f5;
+}
+
+.toggleButtonActive {
+    background: #4A90E2;
+    color: white;
+}
+
+.tripError {
+    padding: 12px;
+    background: #FFE5E5;
+    border: 2px solid #C43737;
+    border-radius: 8px;
+    color: #C43737;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.tripCard {
+    background: #ffffff;
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.tripCardHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.tripCardTimes {
+    font-size: 18px;
+}
+
+.tripCardDuration {
+    font-size: 16px;
+}
+
+.tripTimeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: #E3F2FD;
+    border-radius: 8px;
+}
+
+.tripTimelineItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.timelineDot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+}
+
+.timelineLine {
+    flex: 1;
+    height: 4px;
+    min-width: 30px;
+    max-width: 50px;
+}
+
+.timelineTime {
+    font-size: 10px;
+    font-weight: 700;
+    color: #000;
+    white-space: nowrap;
+}
+
+.tripLegs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.tripLeg {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    padding: 10px 0;
+    border-bottom: 2px solid #000;
+}
+
+.tripLeg:last-child {
+    border-bottom: none;
+}
+
+.tripLegIndex {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 2px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 14px;
+    color: #000;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
+.tripLegContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tripLegTop {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.tripLegBottom {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tripLegType {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 2px solid #000;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    background: #F2C94C;
+    white-space: nowrap;
+    flex-shrink: 0;
+    height: fit-content;
+}
+
+.tripLegTypeTrain { background: #F2C94C; }
+.tripLegTypeMetro { background: #FFF176; }
+.tripLegTypeTram { background: #B39DDB; }
+.tripLegTypeBus { background: #A5D6A7; }
+.tripLegTypeTrolley { background: #80DEEA; }
+
+.tripLegRoute {
+    font-weight: 800;
+    font-size: 14px;
+    flex: 1;
+    color: #000;
+}
+
+.tripLegTime {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 2px solid #000;
+    background: #F2C94C;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tripLegVehicle {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 2px solid #000;
+    background: #4DD0E1;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tripFooter {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.tripFooterIdos {
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 900;
+    text-align: center;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 3px 3px 0 0 #000;
+    text-decoration: none;
+    color: #000;
+}
+
+.tripFooterIdos img {
+    width: 24px;
+    height: 24px;
+}
+
+.tripFooterIdos:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 0 #000;
+}
+
+.tripFooterIdos:active {
+    transform: translate(0, 0);
+    box-shadow: 1px 1px 0 0 #000;
+}
+
+.tripFooterPrice {
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 900;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.tripFooterTransfers {
+    border: 3px solid #000;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: 900;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.tripFooterIcon {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+.loadMoreButton {
+    width: 100%;
+    padding: 12px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+    margin-top: 12px;
+}
+
+.loadMoreButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.loadMoreButton:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 0 #000;
+}
+
+.assignTripButton {
+    width: 100%;
+    padding: 14px;
+    background: #4A90E2;
+    color: white;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+    margin-top: 16px;
+    text-transform: uppercase;
+}
+
+.assignTripButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+    background: #357ABD;
+}
+
+.assignTripButton:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 0 #000;
+}
+
+.assignTripCardButton {
+    width: 44px;
+    height: 44px;
+    border: 3px solid #000;
+    border-radius: 8px;
+    background: #4A90E2;
+    color: white;
+    font-size: 24px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 0 #000;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.assignTripCardButton:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 0 #000;
+    background: #357ABD;
+}
+
+.assignTripCardButton:active {
+    transform: translate(0, 0);
+    box-shadow: 1px 1px 0 0 #000;
+}
+
+.assignToTripButton {
+    width: 100%;
+    margin-top: 12px;
+    padding: 14px;
+    background: #4A90E2;
+    border: 3px solid #000;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: white;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.assignToTripButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+    background: #357ABD;
+}
+
+.assignToTripButton:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 0 #000;
+}
+
+.assignTripPlus {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.viewGalleryButton {
+    width: 100%;
+    height: 100%;
+    background: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    gap: 4px;
+}
+
+.galleryIconRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.galleryIcon {
+    font-size: 24px;
+}
+
+.galleryCount {
+    font-size: 16px;
+    font-weight: 900;
+    color: #000;
+}
+
+.galleryText {
+    font-size: 14px;
+    font-weight: 800;
+    color: #000;
+}
+
+.stationItem {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.stationItem:hover {
+    background: #F0F0F0;
+}
+
+.stationItemSelected {
+    background: #E3F2FD;
+    border-left: 3px solid #4A90E2;
+}
+
+/* Close Button */
+.closeButton {
+    position: fixed;
+    top: 24px;
+    left: calc(var(--sidebar-width) + 24px);
+    width: 36px;
+    height: 36px;
+    border: 3px solid #C43737;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: bold;
+    color: #C43737;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    transition: left 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 4px 4px 0 0 #C43737;
+}
+
+.closeButton.closeButtonCollapsed {
+    left: 24px;
+}
+
+.closeButton:hover {
+    background: #f0f0f0;
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #C43737;
+}
+
+.closeButton:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 0 #C43737;
+}
+
+/* Gallery Modal */
+.galleryModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.galleryContent {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.galleryClose {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    width: 48px;
+    height: 48px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-size: 32px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+}
+
+.galleryClose:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.galleryImageContainer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    border: 4px solid #000;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.galleryImage {
+    max-width: 1400px;
+    max-height: 85vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+}
+
+.galleryNav {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-size: 48px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.5);
+    transition: all 0.2s;
+}
+
+.galleryNav:hover {
+    background: white;
+    transform: scale(1.1);
+}
+
+.galleryNavPrev {
+    left: 20px;
+}
+
+.galleryNavNext {
+    right: 20px;
+}
+
+.galleryCounter {
+    text-align: center;
+    color: white;
+    font-size: 18px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 2px solid #fff;
+}
+
+.galleryThumbnails {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 8px;
+    border: 2px solid #fff;
+}
+
+.galleryThumbnail {
+    width: 80px;
+    height: 80px;
+    background-size: cover;
+    background-position: center;
+    border: 3px solid #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    opacity: 0.6;
+}
+
+.galleryThumbnail:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.galleryThumbnailActive {
+    opacity: 1;
+    border-color: #4A90E2;
+    box-shadow: 0 0 0 3px #4A90E2;
+}
+
+/* Trip Assignment Modal */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modalContent {
+    background: white;
+    border: 4px solid #000;
+    border-radius: 16px;
+    box-shadow: 8px 8px 0 0 #000;
+    max-width: 600px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 3px solid #000;
+}
+
+.modalTitle {
+    font-size: 20px;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin: 0;
+}
+
+.modalClose {
+    width: 36px;
+    height: 36px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-size: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.modalClose:hover {
+    background: #ff4444;
+    color: white;
+}
+
+.modalBody {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.noTripsMessage {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #666;
+}
+
+.tripsList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tripModalItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: white;
+    border: 3px solid #000;
+    border-radius: 12px;
+    box-shadow: 3px 3px 0 0 #000;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tripModalItem:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 0 #000;
+    background: #f5f5f5;
+}
+
+.tripModalInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.tripModalName {
+    font-size: 16px;
+    font-weight: 900;
+    color: #000;
+}
+
+.tripModalDate {
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+}
+
+.tripModalTroop {
+    font-size: 12px;
+    font-weight: 700;
+    color: #4A90E2;
+}
+
+.tripAssignedBadge {
+    padding: 6px 12px;
+    background: #4CAF50;
+    border: 2px solid #000;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: white;
+    white-space: nowrap;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .infoPanel {
+        position: fixed;
+        right: 16px;
+        left: 16px;
+        top: auto;
+        bottom: 16px;
+        width: auto;
+        height: 60vh;
+        border-radius: 16px;
+    }
+}

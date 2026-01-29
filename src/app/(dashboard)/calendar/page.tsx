@@ -29,26 +29,28 @@ export default function CalendarPage() {
     }
 
     return (
-        <div style={{ width: "100%", position: "relative" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
+                padding: "1rem",
                 margin: "0 -2rem 2rem -2rem", // Break out to full width
                 width: "calc(100% + 4rem)",
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "center"
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "0.5rem"
             }}>
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Kalendář</h1>
-                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
                     <button onClick={prevMonth} style={navButtonStyle}>←</button>
-                    <span style={{ fontSize: "1.2rem", fontWeight: "800", minWidth: "150px", textAlign: "center" }}>
+                    <span style={{ fontSize: "1rem", fontWeight: "800", minWidth: "120px", textAlign: "center" }}>
                         {format(currentDate, "MMMM yyyy", { locale: cs })}
                     </span>
                     <button onClick={nextMonth} style={navButtonStyle}>→</button>
-                    <button onClick={today} style={{ ...navButtonStyle, fontSize: "0.9rem", width: "auto", padding: "0 1rem" }}>Dnes</button>
+                    <button onClick={today} style={{ ...navButtonStyle, fontSize: "0.8rem", width: "auto", padding: "0 0.75rem", whiteSpace: "nowrap" }}>Dnes</button>
                 </div>
             </div>
 
@@ -69,10 +71,11 @@ export default function CalendarPage() {
                 }}>
                     {["Po", "Út", "St", "Čt", "Pá", "So", "Ne"].map(day => (
                         <div key={day} style={{
-                            padding: "1rem",
+                            padding: "0.75rem 0.5rem",
                             textAlign: "center",
                             fontWeight: "800",
-                            borderRight: "1px solid #ccc"
+                            borderRight: "1px solid #ccc",
+                            fontSize: "0.875rem"
                         }}>
                             {day}
                         </div>
@@ -96,13 +99,14 @@ export default function CalendarPage() {
 
                         return (
                             <div key={day.toString()} style={{
-                                minHeight: "120px",
-                                padding: "0.5rem",
+                                minHeight: "80px",
+                                padding: "0.25rem",
                                 borderRight: (dayIdx + 1) % 7 === 0 ? "none" : "1px solid #eee",
                                 borderBottom: "1px solid #eee",
                                 backgroundColor: isSameMonth(day, currentDate) ? "white" : "#fafafa",
                                 opacity: isSameMonth(day, currentDate) ? 1 : 0.5,
-                                position: "relative"
+                                position: "relative",
+                                overflow: "hidden"
                             }}>
                                 <div style={{
                                     textAlign: "right",
@@ -145,8 +149,8 @@ export default function CalendarPage() {
 }
 
 const navButtonStyle = {
-    width: "40px",
-    height: "40px",
+    width: "36px",
+    height: "36px",
     borderRadius: "8px",
     border: "2px solid #000",
     backgroundColor: "white",
@@ -156,5 +160,6 @@ const navButtonStyle = {
     alignItems: "center",
     justifyContent: "center",
     boxShadow: "2px 2px 0 0 #000",
-    fontSize: "1.2rem"
+    fontSize: "1rem",
+    flexShrink: 0
 };

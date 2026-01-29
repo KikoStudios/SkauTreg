@@ -202,10 +202,10 @@ export default function TroopSettingsPage() {
     if (!troop) return <div>Načítám...</div>;
 
     return (
-        <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", paddingBottom: "4rem" }}>
+        <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", paddingBottom: "5rem", overflowX: "hidden" }}>
             <div className="settings-header">
                 <button onClick={() => router.back()} style={{ background: "none", border: "none", fontSize: "2rem", cursor: "pointer" }}>←</button>
-                <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0 }}>Nastavení Oddílu</h1>
+                <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0, wordBreak: "break-word" }}>Nastavení Oddílu</h1>
             </div>
 
             {/* Tabs */}
@@ -279,7 +279,7 @@ export default function TroopSettingsPage() {
                                 required
                             />
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem" }}>
                             <div style={formGroupStyle}>
                                 <label style={labelStyle}>Číslo</label>
                                 <input
@@ -410,24 +410,27 @@ export default function TroopSettingsPage() {
                     <div style={{
                         position: "fixed",
                         bottom: 0, left: 0, right: 0,
-                        padding: "1.5rem",
+                        padding: "1rem",
                         backgroundColor: "white",
                         borderTop: "3px solid #000",
                         display: "flex",
                         justifyContent: "center",
-                        gap: "1rem",
-                        zIndex: 100
+                        gap: "0.5rem",
+                        zIndex: 100,
+                        flexWrap: "wrap"
                     }}>
                         <button
                             type="button"
                             onClick={() => router.back()}
                             style={{
-                                padding: "0.75rem 2rem",
+                                padding: "0.75rem 1.5rem",
                                 backgroundColor: "white",
                                 border: "3px solid #000",
                                 borderRadius: "8px",
                                 fontWeight: "800",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                flex: "1 1 auto",
+                                minWidth: "120px"
                             }}
                         >
                             Zrušit
@@ -436,13 +439,15 @@ export default function TroopSettingsPage() {
                             type="submit"
                             disabled={isSaving}
                             style={{
-                                padding: "0.75rem 3rem",
+                                padding: "0.75rem 1.5rem",
                                 backgroundColor: "#86efac",
                                 border: "3px solid #000",
                                 borderRadius: "8px",
                                 fontWeight: "900",
                                 cursor: "pointer",
-                                boxShadow: "4px 4px 0 0 #000"
+                                boxShadow: "4px 4px 0 0 #000",
+                                flex: "1 1 auto",
+                                minWidth: "120px"
                             }}
                         >
                             {isSaving ? "Ukládám..." : "Uložit Změny"}

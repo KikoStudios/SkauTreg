@@ -33,7 +33,7 @@ export const store = mutation({
         return await ctx.db.insert("users", {
             name: identity.name,
             email: identity.email,
-            image: identity.pictureUrl,
+            image: identity.pictureUrl || "/default-profile.svg",
             tokenIdentifier: identity.tokenIdentifier,
         });
     },

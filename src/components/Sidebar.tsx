@@ -12,6 +12,10 @@ const navItems = [
     { label: 'Kalendář', icon: <img src="/icons/kalendar-white.svg" alt="Kalendář" style={{ width: "24px", height: "auto" }} />, href: '/calendar' },
 ];
 
+const toolsItems = [
+    { label: 'Vyhledávač Základen', icon: <span style={{ fontSize: "20px" }}>🔍</span>, href: '/tools' },
+];
+
 const bottomItems = [
     { label: 'Nastavení', icon: <img src="/icons/nastaveni-icon.svg" alt="Nastavení" style={{ width: "24px", height: "auto" }} />, href: '/settings' },
 ];
@@ -19,9 +23,11 @@ const bottomItems = [
 interface SidebarProps {
     isOpen?: boolean;
     onClose?: () => void;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
 }
 
-export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
     const { openProfile } = useProfileModal();
 
     return (
@@ -32,12 +38,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 onClick={onClose}
             />
 
-            <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
+            <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''} ${isCollapsed ? styles.collapsed : ''}`}>
                 <div className={styles.logoArea}>
-                    <img src="/Logo-light.svg" alt="SkautReg" style={{ height: '32px', width: 'auto', maxWidth: '100%' }} />
+                    <img src="/Logo-light.svg" alt="SkautReg" style={{ width: '100%', height: 'auto', maxWidth: '180px' }} />
                     {/* Close button for mobile */}
                     <button className={styles.closeButton} onClick={onClose}>×</button>
                 </div>
+                
+                {/* Desktop collapse toggle button */}
+                <button className={styles.collapseButton} onClick={onToggleCollapse} title={isCollapsed ? "Rozbalit sidebar" : "Skrýt sidebar"}>
+                    {isCollapsed ? '›' : '‹'}
+                </button>
 
                 <nav className={styles.nav}>
                     <ul className={styles.navList}>
@@ -55,7 +66,26 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                         ))}
                     </ul>
 
-                    {/* Separator similar to reference image */}
+                    {/* Tools Separator */}
+                    <div className={styles.separator} />
+
+                    <div className={styles.sectionLabel}>Nástrojů</div>
+                    <ul className={styles.navList}>
+                        {toolsItems.map((item) => (
+                            <li key={item.label}>
+                                <Link
+                                    href={item.href || '#'}
+                                    className={styles.navItem}
+                                    onClick={onClose}
+                                >
+                                    <span className={styles.icon}>{item.icon}</span>
+                                    {item.label}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+
+                    {/* Settings Separator */}
                     <div className={styles.separator} />
 
                     <ul className={styles.navList}>
@@ -80,7 +110,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                                 className={styles.navItem}
                             >
                                 <span className={styles.icon}>
-                                    <img src="/icons/ucet-icon.svg" alt="Profile" style={{ width: "24px", height: "auto" }} />
+                                    <img src="/icons/ucet-icon.svg" alt="Profile" style={{ width: "32px", height: "auto" }} />
                                 </span>
                                 View Profile
                             </button>

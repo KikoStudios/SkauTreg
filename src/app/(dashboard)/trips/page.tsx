@@ -103,12 +103,12 @@ export default function TripsPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
+                padding: "1rem",
                 margin: "0 -2rem 2rem -2rem", // Break out to full width
                 width: "calc(100% + 4rem)",
                 display: "flex",
@@ -319,6 +319,23 @@ export default function TripsPage() {
                                         <p style={{ fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}>
                                             <img src="/place-icon.svg" alt="Location" style={{ width: "16px", height: "16px" }} /> {trip.location}
                                         </p>
+                                        {trip.baseName && (
+                                            <div style={{
+                                                marginTop: "0.75rem",
+                                                padding: "0.5rem 0.75rem",
+                                                backgroundColor: "#E3F2FD",
+                                                border: "2px solid #000",
+                                                borderRadius: "8px",
+                                                fontSize: "0.85rem",
+                                                fontWeight: "700",
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: "0.5rem"
+                                            }}>
+                                                <img src="/houe-icon.svg" alt="Base" style={{ width: "16px", height: "16px" }} />
+                                                {trip.baseName}
+                                            </div>
+                                        )}
                                     </div>
                                     <div style={{
                                         marginTop: "1.5rem",

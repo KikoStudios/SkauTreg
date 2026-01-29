@@ -116,9 +116,16 @@ export const getDashboard = query({
             })
         );
 
+        // Fetch assigned base if exists
+        let base = null;
+        if (trip.baseId) {
+            base = await ctx.db.get(trip.baseId);
+        }
+
         return {
             trip,
             participants: participantsWithDetails,
+            base,
         };
     },
 });
@@ -130,7 +137,23 @@ export const list = query({
             .query("trips")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
             .collect();
-        return trips;
+        
+        // Fetch base data for each trip
+        const tripsWithBases = await Promise.all(
+            trips.map(async (trip) => {
+                let baseName = null;
+                if (trip.baseId) {
+                    const base = await ctx.db.get(trip.baseId);
+                    baseName = base?.name || null;
+                }
+                return {
+                    ...trip,
+                    baseName,
+                };
+            })
+        );
+        
+        return tripsWithBases;
     },
 });
 
@@ -194,4 +217,23 @@ export const getAllUserTrips = query({
 
         return trips.flat();
     }
+});
+
+export const assignBase = mutation({
+    args: {
+        tripId: v.id("trips"),
+        baseId: v.id("bases"),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.tripId, { baseId: args.baseId });
+    },
+});
+
+export const unassignBase = mutation({
+    args: {
+        tripId: v.id("trips"),
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.tripId, { baseId: undefined });
+    },
 });

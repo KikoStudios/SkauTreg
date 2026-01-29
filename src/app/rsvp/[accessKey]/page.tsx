@@ -384,11 +384,11 @@ export default function PublicRSVPPage() {
                                             {field.type === 'boolean' && (
                                                 <div style={{ display: 'flex', gap: '1rem' }}>
                                                     <label style={radioLabelStyle}>
-                                                        <input type="radio" name={field.label} value="yes" onChange={() => setResponses({ ...responses, [field.label]: "Ano" })} style={{ width: "20px", height: "20px", accentColor: "#000", marginRight: "0.5rem" }} />
+                                                        <input type="radio" name={field.label} value="yes" checked={responses[field.label] === "Ano"} onChange={() => setResponses({ ...responses, [field.label]: "Ano" })} style={{ width: "20px", height: "20px", accentColor: "#000", marginRight: "0.5rem" }} />
                                                         Ano
                                                     </label>
                                                     <label style={radioLabelStyle}>
-                                                        <input type="radio" name={field.label} value="no" onChange={() => setResponses({ ...responses, [field.label]: "Ne" })} style={{ width: "20px", height: "20px", accentColor: "#000", marginRight: "0.5rem" }} />
+                                                        <input type="radio" name={field.label} value="no" checked={responses[field.label] === "Ne"} onChange={() => setResponses({ ...responses, [field.label]: "Ne" })} style={{ width: "20px", height: "20px", accentColor: "#000", marginRight: "0.5rem" }} />
                                                         Ne
                                                     </label>
                                                 </div>
