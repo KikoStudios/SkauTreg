@@ -199,7 +199,7 @@ export default function BaseFinder() {
                     bases={mapBases}
                     selectedBaseId={selectedBaseId}
                     onBaseSelect={setSelectedBaseId}
-                    stations={selectedBaseData?.stations || []}
+                    stations={selectedBaseData?.stations?.filter(s => s.lat !== undefined && s.lng !== undefined) as Array<{ _id: Id<"stations">; name: string; lat: number; lng: number; type?: string; distanceKm: number; }> || []}
                 />
             </div>
 
