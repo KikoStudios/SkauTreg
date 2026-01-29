@@ -102,22 +102,24 @@ export const getBaseWithStations = query({
       .withIndex("by_base", (q) => q.eq("baseId", args.baseId))
       .collect();
 
-    const stations = await Promise.all(
-      links.map(async (link) => {
-        const station = await ctx.db.get(link.stationId);
-        if (!station) return null;
-        return {
-          ...station,
-          distanceKm: link.distanceKm,
-          rank: link.rank,
-          score: link.score,
-        };
-      })
-    );
+    // Use denormalized station data from base_stations links
+    // (no need to look up stations separately)
+    const stations = links.map((link) => ({
+      _id: link.stationId,
+      name: link.stationName || "",
+      idosName: link.stationIdosName,
+      lat: link.lat,
+      lng: link.lng,
+      type: link.type,
+      transportModes: link.transportModes,
+      distanceKm: link.distanceKm,
+      rank: link.rank,
+      score: link.score,
+    }));
 
     return {
       ...base,
-      stations: stations.filter((s) => s !== null),
+      stations: stations,
     };
   },
 });
@@ -242,22 +244,23 @@ export const listBasesWithStations = query({
         .withIndex("by_base", (q) => q.eq("baseId", base._id))
         .collect();
 
-      const stations = await Promise.all(
-        links.map(async (link) => {
-          const station = await ctx.db.get(link.stationId);
-          if (!station) return null;
-          return {
-            ...station,
-            distanceKm: link.distanceKm,
-            rank: link.rank,
-            score: link.score,
-          };
-        })
-      );
+      // Use denormalized station data from base_stations links
+      const stations = links.map((link) => ({
+        _id: link.stationId,
+        name: link.stationName || "",
+        idosName: link.stationIdosName,
+        lat: link.lat,
+        lng: link.lng,
+        type: link.type,
+        transportModes: link.transportModes,
+        distanceKm: link.distanceKm,
+        rank: link.rank,
+        score: link.score,
+      }));
 
       result.push({
         base,
-        stations: stations.filter((s) => s !== null),
+        stations: stations,
       });
     }
 
