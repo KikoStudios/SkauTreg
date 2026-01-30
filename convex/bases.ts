@@ -104,18 +104,26 @@ export const getBaseWithStations = query({
 
     // Use denormalized station data from base_stations links
     // (no need to look up stations separately)
-    const stations = links.map((link) => ({
-      _id: link.stationId,
-      name: link.stationName || "",
-      idosName: link.stationIdosName,
-      lat: link.lat,
-      lng: link.lng,
-      type: link.type,
-      transportModes: link.transportModes,
-      distanceKm: link.distanceKm,
-      rank: link.rank,
-      score: link.score,
-    }));
+    // Filter out stations with missing required fields
+    const stations = links
+      .filter((link) => 
+        link.lat !== undefined && 
+        link.lng !== undefined && 
+        link.type !== undefined &&
+        link.transportModes !== undefined
+      )
+      .map((link) => ({
+        _id: link.stationId,
+        name: link.stationName || "",
+        idosName: link.idosName || "",
+        lat: link.lat!,
+        lng: link.lng!,
+        type: link.type!,
+        transportModes: link.transportModes!,
+        distanceKm: link.distanceKm,
+        rank: link.rank,
+        score: link.score,
+      }));
 
     return {
       ...base,
@@ -245,18 +253,26 @@ export const listBasesWithStations = query({
         .collect();
 
       // Use denormalized station data from base_stations links
-      const stations = links.map((link) => ({
-        _id: link.stationId,
-        name: link.stationName || "",
-        idosName: link.stationIdosName,
-        lat: link.lat,
-        lng: link.lng,
-        type: link.type,
-        transportModes: link.transportModes,
-        distanceKm: link.distanceKm,
-        rank: link.rank,
-        score: link.score,
-      }));
+      // Filter out stations with missing required fields
+      const stations = links
+        .filter((link) => 
+          link.lat !== undefined && 
+          link.lng !== undefined && 
+          link.type !== undefined &&
+          link.transportModes !== undefined
+        )
+        .map((link) => ({
+          _id: link.stationId,
+          name: link.stationName || "",
+          idosName: link.idosName || "",
+          lat: link.lat!,
+          lng: link.lng!,
+          type: link.type!,
+          transportModes: link.transportModes!,
+          distanceKm: link.distanceKm,
+          rank: link.rank,
+          score: link.score,
+        }));
 
       result.push({
         base,

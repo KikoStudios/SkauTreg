@@ -9,7 +9,7 @@
     "lint": "eslint",
     "sync:all": "node scripts/sync-all-bases-with-stations.mjs",
     "deploy:convex": "npx convex deploy --prod",
-    "sync:prod": "node scripts/sync-all-bases-with-stations.mjs"
+    "sync:prod": "node scripts/sync-all-bases-with-stations.mjs --prod"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",

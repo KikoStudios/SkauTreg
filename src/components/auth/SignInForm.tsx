@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useAuth, useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from 'next/image';
 import styles from "./AuthForm.module.css";
 import Button from "../Button";
 
@@ -57,12 +56,10 @@ export default function SignInForm() {
     return (
         <div className={styles.container}>
             <div className="flex justify-center mb-6" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-                <Image
+                <img
                     src="/logo_skautreg.svg"
                     alt="Logo"
-                    width={180}
-                    height={40}
-                    priority
+                    style={{ width: '180px', height: '40px' }}
                 />
             </div>
 

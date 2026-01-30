@@ -12,8 +12,14 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api.js";
 
-// Load environment variables from .env.local
-const CONVEX_URL = "https://kindred-okapi-371.convex.cloud";
+// Determine which deployment to use
+const USE_PROD = process.argv.includes('--prod');
+const CONVEX_URL = USE_PROD 
+  ? (process.env.NEXT_PUBLIC_CONVEX_URL || "https://kindred-okapi-371.convex.cloud")
+  : "https://kindred-okapi-371.convex.cloud";
+
+console.log(`🎯 Syncing to: ${USE_PROD ? 'PRODUCTION' : 'DEV'}`);
+console.log(`📡 URL: ${CONVEX_URL}`);
 
 if (!CONVEX_URL) {
   console.error("❌ CONVEX_URL not found");
