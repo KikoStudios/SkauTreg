@@ -3,7 +3,7 @@
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import UserSync from "../components/UserSync";
 
 const convex = new ConvexReactClient(
@@ -11,6 +11,17 @@ const convex = new ConvexReactClient(
 );
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Prevent hydration mismatch by not rendering Clerk until client-side is ready
+    if (!mounted) {
+        return null;
+    }
+
     return (
         <ClerkProvider
             signInUrl="/sign-in"
