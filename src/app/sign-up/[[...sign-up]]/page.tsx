@@ -1,10 +1,19 @@
-import SignUpForm from "../../../components/auth/SignUpForm";
+import { SignUp } from "@clerk/nextjs";
 import AnimatedBackground from "../../../components/auth/AnimatedBackground";
 
 export default function Page() {
     return (
         <AnimatedBackground>
-            <SignUpForm />
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+                <SignUp 
+                    appearance={{
+                        elements: {
+                            rootBox: "mx-auto",
+                            card: "shadow-lg"
+                        }
+                    }}
+                />
+            </div>
         </AnimatedBackground>
     );
 }
