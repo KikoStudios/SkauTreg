@@ -67,31 +67,6 @@ export default function SignInForm() {
                 />
             </div>
 
-            {needsTwoFactor ? (
-                <form onSubmit={handleTwoFactorSubmit} className={styles.form}>
-                    <div className={styles.formGroup}>
-                        <label className={styles.label}>
-                            Two-Factor Authentication Code
-                        </label>
-                        <input
-                            type="text"
-                            value={twoFactorCode}
-                            onChange={(e) => setTwoFactorCode(e.target.value)}
-                            className={styles.input}
-                            placeholder="Enter 6-digit code"
-                            required
-                            autoComplete="one-time-code"
-                            maxLength={6}
-                        />
-                    </div>
-
-                    {error && (
-                        <div className={styles.error}>
-                            {error}
-                        </div>
-                    )}
-
-                    <Button type="submit" variant="primary" style={{ width: '100%', justifyContent: 'center' }}>
             <form onSubmit={handleSubmit} className={styles.form}>
                 <div className={styles.formGroup}>
                     <label className={styles.label}>
@@ -131,3 +106,13 @@ export default function SignInForm() {
                     Sign In
                 </Button>
             </form>
+
+            <div className={styles.footer}>
+                Don't have an account?{" "}
+                <Link href="/sign-up" className={styles.link}>
+                    Sign up
+                </Link>
+            </div>
+        </div>
+    );
+}
