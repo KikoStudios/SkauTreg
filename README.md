@@ -22,8 +22,8 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [x] **Kalendář** (Přehled akcí v čase)
 - [x] **RSVP systém** (Veřejné odkazy pro přihlašování/odhlašování na akce)
 - [x] **Nastavení** (Uživatelské preference)
-- [ ] **Integrace s Databazi zakladen** na vyber zakladen
-- [ ] **Integrace s IDOS** na jednoduchy vyber jizdenek
+- [x] **Integrace s Databazi zakladen** na vyber zakladen
+- [x] **Integrace s IDOS** na jednoduchy vyber jizdenek
 - [ ] **Managment Financi** v jednoduche tabulce pro organizaci
 - [ ] **Kontrola jestli se vyprava vyplati** vypocitat jestli se vuci dotacim vyprava vyplatí
 - [ ] **Uctenky k vypravam**
