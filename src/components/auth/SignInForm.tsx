@@ -13,8 +13,6 @@ export default function SignInForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
-    const [needsTwoFactor, setNeedsTwoFactor] = useState(false);
-    const [twoFactorCode, setTwoFactorCode] = useState("");
     const router = useRouter();
 
     useEffect(() => {
@@ -47,40 +45,15 @@ export default function SignInForm() {
                 await setActive({ session: result.createdSessionId });
                 router.push("/");
             } else if (result.status === "needs_second_factor") {
-                setNeedsTwoFactor(true);
+                // If 2FA is required but not set up, show helpful error
+                setError("Two-factor authentication is required but not configured. Please contact support or use the Clerk sign-in page.");
             } else {
-                console.log(result);
+                // Handle other statuses
+                setError(`Authentication incomplete. Status: ${result.status}. Please try again or contact support.`);
             }
         } catch (err: any) {
             console.error(err);
             setError(err.errors?.[0]?.message || "Something went wrong. Please try again.");
-        }
-    };
-
-    // Handle 2FA verification
-    const handleTwoFactorSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
-
-        if (!isLoaded || !signIn) {
-            return;
-        }
-
-        try {
-            const result = await signIn.attemptSecondFactor({
-                strategy: "totp",
-                code: twoFactorCode,
-            });
-
-            if (result.status === "complete") {
-                await setActive({ session: result.createdSessionId });
-                router.push("/");
-            } else {
-                console.log(result);
-            }
-        } catch (err: any) {
-            console.error(err);
-            setError(err.errors?.[0]?.message || "Invalid code. Please try again.");
         }
     };
 
@@ -119,66 +92,42 @@ export default function SignInForm() {
                     )}
 
                     <Button type="submit" variant="primary" style={{ width: '100%', justifyContent: 'center' }}>
-                        Verify
-                    </Button>
-                    
-                    <button 
-                        type="button" 
-                        onClick={() => setNeedsTwoFactor(false)}
-                        className={styles.link}
-                        style={{ marginTop: '1rem', textAlign: 'center', width: '100%' }}
-                    >
-                        ← Back to sign in
-                    </button>
-                </form>
-            ) : (
-                <form onSubmit={handleSubmit} className={styles.form}>
-                    <div className={styles.formGroup}>
-                        <label className={styles.label}>
-                            Email or Username
-                        </label>
-                        <input
-                            type="text"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className={styles.input}
-                            placeholder="you@example.com or username"
-                            required
-                        />
+            <form onSubmit={handleSubmit} className={styles.form}>
+                <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                        Email or Username
+                    </label>
+                    <input
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className={styles.input}
+                        placeholder="you@example.com or username"
+                        required
+                    />
+                </div>
+
+                <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={styles.input}
+                        placeholder="••••••••"
+                        required
+                    />
+                </div>
+
+                {error && (
+                    <div className={styles.error}>
+                        {error}
                     </div>
+                )}
 
-                    <div className={styles.formGroup}>
-                        <label className={styles.label}>
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className={styles.input}
-                            placeholder="••••••••"
-                            required
-                        />
-                    </div>
-
-                    {error && (
-                        <div className={styles.error}>
-                            {error}
-                        </div>
-                    )}
-
-                    <Button type="submit" variant="primary" style={{ width: '100%', justifyContent: 'center' }}>
-                        Sign In
-                    </Button>
-                </form>
-            )}
-
-            <div className={styles.footer}>
-                Don't have an account?{" "}
-                <Link href="/sign-up" className={styles.link}>
-                    Sign up
-                </Link>
-            </div>
-        </div>
-    );
-}
+                <Button type="submit" variant="primary" style={{ width: '100%', justifyContent: 'center' }}>
+                    Sign In
+                </Button>
+            </form>
