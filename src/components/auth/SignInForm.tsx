@@ -44,12 +44,9 @@ export default function SignInForm() {
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
                 router.push("/");
-            } else if (result.status === "needs_second_factor") {
-                // If 2FA is required but not set up, show helpful error
-                setError("Two-factor authentication is required but not configured. Please contact support or use the Clerk sign-in page.");
             } else {
-                // Handle other statuses
-                setError(`Authentication incomplete. Status: ${result.status}. Please try again or contact support.`);
+                console.log("Sign in result:", result);
+                setError("Authentication incomplete. Please try again.");
             }
         } catch (err: any) {
             console.error(err);
