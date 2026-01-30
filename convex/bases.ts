@@ -264,7 +264,7 @@ export const listBasesWithStations = query({
         .map((link) => ({
           _id: link.stationId,
           name: link.stationName || "",
-          idosName: link.idosName || "",
+          idosName: link.stationIdosName || "",
           lat: link.lat!,
           lng: link.lng!,
           type: link.type!,
