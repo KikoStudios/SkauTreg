@@ -9,10 +9,18 @@
  */
 
 import type * as bases from "../bases.js";
+import type * as editorPresence from "../editorPresence.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as meetingFiles from "../meetingFiles.js";
+import type * as meetings from "../meetings.js";
 import type * as members from "../members.js";
+import type * as mentions from "../mentions.js";
 import type * as migrations from "../migrations.js";
+import type * as pages from "../pages.js";
+import type * as presence from "../presence.js";
+import type * as prosemirror from "../prosemirror.js";
+import type * as prosemirrorSync from "../prosemirrorSync.js";
 import type * as public_rsvp from "../public_rsvp.js";
 import type * as trips from "../trips.js";
 import type * as troops from "../troops.js";
@@ -26,10 +34,18 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   bases: typeof bases;
+  editorPresence: typeof editorPresence;
   files: typeof files;
   http: typeof http;
+  meetingFiles: typeof meetingFiles;
+  meetings: typeof meetings;
   members: typeof members;
+  mentions: typeof mentions;
   migrations: typeof migrations;
+  pages: typeof pages;
+  presence: typeof presence;
+  prosemirror: typeof prosemirror;
+  prosemirrorSync: typeof prosemirrorSync;
   public_rsvp: typeof public_rsvp;
   trips: typeof trips;
   troops: typeof troops;
@@ -62,4 +78,81 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  prosemirrorSync: {
+    lib: {
+      deleteDocument: FunctionReference<
+        "mutation",
+        "internal",
+        { id: string },
+        null
+      >;
+      deleteSnapshots: FunctionReference<
+        "mutation",
+        "internal",
+        { afterVersion?: number; beforeVersion?: number; id: string },
+        null
+      >;
+      deleteSteps: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          afterVersion?: number;
+          beforeTs: number;
+          deleteNewerThanLatestSnapshot?: boolean;
+          id: string;
+        },
+        null
+      >;
+      getSnapshot: FunctionReference<
+        "query",
+        "internal",
+        { id: string; version?: number },
+        { content: null } | { content: string; version: number }
+      >;
+      getSteps: FunctionReference<
+        "query",
+        "internal",
+        { id: string; version: number },
+        {
+          clientIds: Array<string | number>;
+          steps: Array<string>;
+          version: number;
+        }
+      >;
+      latestVersion: FunctionReference<
+        "query",
+        "internal",
+        { id: string },
+        null | number
+      >;
+      submitSnapshot: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          content: string;
+          id: string;
+          pruneSnapshots?: boolean;
+          version: number;
+        },
+        null
+      >;
+      submitSteps: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          clientId: string | number;
+          id: string;
+          steps: Array<string>;
+          version: number;
+        },
+        | {
+            clientIds: Array<string | number>;
+            status: "needs-rebase";
+            steps: Array<string>;
+          }
+        | { status: "synced" }
+      >;
+    };
+  };
+};

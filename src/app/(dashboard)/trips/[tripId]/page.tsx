@@ -8,7 +8,7 @@ import { useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
 
-type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici';
+type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace';
 
 export default function TripDashboardPage() {
     const params = useParams();
@@ -25,6 +25,11 @@ export default function TripDashboardPage() {
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [viewResponse, setViewResponse] = useState<any | null>(null);
+    const [showCreateDoc, setShowCreateDoc] = useState(false);
+    const [newDocTitle, setNewDocTitle] = useState("");
+
+    const tripDocs = useQuery(api.meetings.listByTrip, { tripId });
+    const createDoc = useMutation(api.meetings.create);
 
     const copyLink = async (accessKey: string) => {
         const url = `${window.location.origin}/rsvp/${accessKey}`;
@@ -86,6 +91,31 @@ export default function TripDashboardPage() {
             }
         }
     }
+
+    const handleOpenTripDocs = async () => {
+        if (!trip.troopId) return;
+        
+        // Check if documentation already exists
+        const docMeeting = tripDocs?.find(m => m.category === "documentation");
+        
+        if (docMeeting) {
+            router.push(`/rady/${docMeeting._id}`);
+        } else {
+            try {
+                const meetingId = await createDoc({
+                    troopId: trip.troopId,
+                    tripId: tripId,
+                    title: `Dokumentace: ${trip.name}`,
+                    description: `Sjednocená dokumentace a podklady k výpravě`,
+                    category: "documentation"
+                });
+                router.push(`/rady/${meetingId}`);
+            } catch (error) {
+                console.error(error);
+                alert("Chyba při vytváření dokumentu.");
+            }
+        }
+    };
 
     const getParsedResponses = (responses: any) => {
         if (!responses) return {};
@@ -197,7 +227,7 @@ export default function TripDashboardPage() {
                 flexWrap: "wrap",
                 gap: "0.5rem"
             }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Výpravy</h1>
+                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Výpravy</h1>
             </div>
 
             {/* Controls Row & Info */}
@@ -251,86 +281,129 @@ export default function TripDashboardPage() {
 
             {/* Tab Navigation */}
             <div style={{
-                display: "flex",
-                gap: "0.5rem",
                 borderBottom: "3px solid #000",
                 marginBottom: "2rem",
                 marginLeft: "-2rem",
                 marginRight: "-2rem",
-                paddingLeft: "2rem",
-                paddingRight: "2rem"
+                overflow: "hidden"
             }}>
-                <button
-                    onClick={() => setActiveTab('info')}
-                    style={{
-                        padding: "1rem 1.5rem",
-                        backgroundColor: activeTab === 'info' ? "white" : "#f0f0f0",
-                        border: activeTab === 'info' ? "3px solid #000" : "2px solid #999",
-                        borderBottom: activeTab === 'info' ? "none" : "2px solid #999",
-                        borderRadius: "12px 12px 0 0",
-                        fontWeight: "900",
-                        fontSize: "1rem",
-                        cursor: "pointer",
-                        textTransform: "uppercase",
-                        transition: "all 0.2s",
-                        marginBottom: "-3px"
-                    }}
-                >
-                    Info
-                </button>
-                <button
-                    onClick={() => setActiveTab('zakladna')}
-                    style={{
-                        padding: "1rem 1.5rem",
-                        backgroundColor: activeTab === 'zakladna' ? "white" : "#f0f0f0",
-                        border: activeTab === 'zakladna' ? "3px solid #000" : "2px solid #999",
-                        borderBottom: activeTab === 'zakladna' ? "none" : "2px solid #999",
-                        borderRadius: "12px 12px 0 0",
-                        fontWeight: "900",
-                        fontSize: "1rem",
-                        cursor: "pointer",
-                        textTransform: "uppercase",
-                        transition: "all 0.2s",
-                        marginBottom: "-3px"
-                    }}
-                >
-                    Základna
-                </button>
-                <button
-                    onClick={() => setActiveTab('doprava')}
-                    style={{
-                        padding: "1rem 1.5rem",
-                        backgroundColor: activeTab === 'doprava' ? "white" : "#f0f0f0",
-                        border: activeTab === 'doprava' ? "3px solid #000" : "2px solid #999",
-                        borderBottom: activeTab === 'doprava' ? "none" : "2px solid #999",
-                        borderRadius: "12px 12px 0 0",
-                        fontWeight: "900",
-                        fontSize: "1rem",
-                        cursor: "pointer",
-                        textTransform: "uppercase",
-                        transition: "all 0.2s",
-                        marginBottom: "-3px"
-                    }}
-                >
-                    Doprava
-                </button>                <button
-                    onClick={() => setActiveTab('ucastnici')}
-                    style={{
-                        padding: "1rem 1.5rem",
-                        backgroundColor: activeTab === 'ucastnici' ? "white" : "#f0f0f0",
-                        border: activeTab === 'ucastnici' ? "3px solid #000" : "2px solid #999",
-                        borderBottom: activeTab === 'ucastnici' ? "none" : "2px solid #999",
-                        borderRadius: "12px 12px 0 0",
-                        fontWeight: "900",
-                        fontSize: "1rem",
-                        cursor: "pointer",
-                        textTransform: "uppercase",
-                        transition: "all 0.2s",
-                        marginBottom: "-3px"
-                    }}
-                >
-                    ÚČASTNÍCI
-                </button>            </div>
+                <div style={{
+                    display: "flex",
+                    gap: "0.5rem",
+                    paddingLeft: "2rem",
+                    paddingRight: "2rem",
+                    overflowX: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none"
+                }} className="trip-tabs-container">
+                    <button
+                        onClick={() => setActiveTab('info')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'info' ? "white" : "#f0f0f0",
+                            border: activeTab === 'info' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'info' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        Info
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('zakladna')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'zakladna' ? "white" : "#f0f0f0",
+                            border: activeTab === 'zakladna' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'zakladna' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        Základna
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('doprava')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'doprava' ? "white" : "#f0f0f0",
+                            border: activeTab === 'doprava' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'doprava' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        Doprava
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('ucastnici')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'ucastnici' ? "white" : "#f0f0f0",
+                            border: activeTab === 'ucastnici' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'ucastnici' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        ÚČASTNÍCI
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('dokumentace')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'dokumentace' ? "white" : "#f0f0f0",
+                            border: activeTab === 'dokumentace' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'dokumentace' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        Dokumentace
+                    </button>
+                </div>
+                <style jsx>{`
+                    .trip-tabs-container::-webkit-scrollbar {
+                        display: none;
+                    }
+                `}</style>
+            </div>
 
             {/* Tab Content - INFO */}
             {activeTab === 'info' && (
@@ -1251,6 +1324,110 @@ export default function TripDashboardPage() {
                 </div>
             )}
 
+            {/* Tab Content - dokumentace */}
+            {activeTab === 'dokumentace' && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+                    {/* Documentation Banner */}
+                    <div style={{
+                        backgroundColor: "#FFF9E6",
+                        border: "3px solid #000",
+                        borderRadius: "16px",
+                        padding: "2.5rem",
+                        boxShadow: "8px 8px 0 0 #000",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "2rem",
+                        flexWrap: "wrap"
+                    }}>
+                        <div style={{ flex: "1 1 300px" }}>
+                            <h2 style={{ fontSize: "2rem", fontWeight: "900", margin: "0 0 1rem 0", textTransform: "uppercase" }}>
+                                Dokumentace výpravy
+                            </h2>
+                            <p style={{ margin: 0, fontSize: "1.1rem", color: "#666", lineHeight: 1.5 }}>
+                                Sjednocené místo pro veškeré přípravy, dokumenty a podklady k této výpravě.
+                            </p>
+                        </div>
+                        
+                        <button
+                            onClick={handleOpenTripDocs}
+                            style={{
+                                padding: "1.25rem 2.5rem",
+                                backgroundColor: "#fcd34d",
+                                border: "4px solid #000",
+                                borderRadius: "12px",
+                                fontWeight: "900",
+                                cursor: "pointer",
+                                boxShadow: "6px 6px 0 0 #000",
+                                fontSize: "1.25rem",
+                                transition: "all 0.1s"
+                            }}
+                            onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
+                            onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                        >
+                            {tripDocs?.find(m => m.category === "documentation") ? "OTEVŘÍT DOKUMENTACI" : "VYTVOŘIT DOKUMENTACI"}
+                        </button>
+                    </div>
+
+                    {/* Integrated Councils Section */}
+                    <div style={{
+                        backgroundColor: "white",
+                        border: "3px solid #000",
+                        borderRadius: "16px",
+                        padding: "2rem",
+                        boxShadow: "6px 6px 0 0 #000"
+                    }}>
+                        <h3 style={{ fontSize: "1.4rem", fontWeight: "900", margin: "0 0 1.5rem 0", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                            <span style={{ fontSize: "1.8rem" }}>📓</span> Připojené zápisy z rad
+                        </h3>
+                        
+                        {tripDocs === undefined ? (
+                            <div>Načítám...</div>
+                        ) : (() => {
+                            const councils = tripDocs.filter(m => m.category === "notebook");
+                            return councils.length === 0 ? (
+                                <div style={{ padding: "2rem", textAlign: "center", border: "2px dashed #ccc", borderRadius: "12px", color: "#999", fontStyle: "italic" }}>
+                                    K této výpravě zatím není připojena žádná rada.
+                                </div>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
+                                    {councils.map(council => (
+                                        <div
+                                            key={council._id}
+                                            onClick={() => router.push(`/rady/${council._id}`)}
+                                            style={{
+                                                backgroundColor: "#f9fafb",
+                                                border: "3px solid #000",
+                                                borderRadius: "12px",
+                                                padding: "1.5rem",
+                                                boxShadow: "4px 4px 0 0 #000",
+                                                cursor: "pointer",
+                                                transition: "all 0.1s"
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.transform = "translate(-2px, -2px)";
+                                                e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.transform = "translate(0, 0)";
+                                                e.currentTarget.style.boxShadow = "4px 4px 0 0 #000";
+                                            }}
+                                        >
+                                            <h4 style={{ margin: "0 0 0.5rem 0", fontWeight: "900", fontSize: "1.1rem" }}>{council.title}</h4>
+                                            <p style={{ margin: 0, fontSize: "0.85rem", color: "#666" }}>{council.description || "Administrativní zápisník"}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                        
+                        <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "#f0fdf4", border: "2px solid #bbf7d0", borderRadius: "8px", fontSize: "0.9rem", color: "#166534" }}>
+                            <strong>O integraci:</strong> Rady jsou administrativní zápisníky připojené k výpravě pro kontext. Dokumentace výpravy je sjednocený pracovní dokument.
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Responses Modal */}
             {viewResponse && (
                 <div style={{
@@ -1284,8 +1461,6 @@ export default function TripDashboardPage() {
                             {trip.customFields && Array.isArray(trip.customFields) ? (
                                 trip.customFields.map((field: any, i: number) => {
                                     const val = viewResponse.responses[field.label];
-                                    // Only show if there is a value or if we want to show empty fields as "-"
-                                    // Let's show all fields defined in the trip form
                                     return (
                                         <div key={i} style={{ borderBottom: "1px solid #eee", paddingBottom: "0.5rem" }}>
                                             <div style={{ fontWeight: "800", fontSize: "0.9rem", color: "#666", marginBottom: "0.25rem" }}>
@@ -1304,7 +1479,6 @@ export default function TripDashboardPage() {
                     </div>
                 </div>
             )}
-
         </div>
     );
 }

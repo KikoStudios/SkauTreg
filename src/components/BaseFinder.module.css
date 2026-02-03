@@ -1428,6 +1428,7 @@
     justify-content: center;
     box-shadow: 4px 4px 0 0 #000;
     transition: all 0.2s;
+    z-index: 10000;
 }
 
 .galleryClose:hover {
@@ -1665,15 +1666,166 @@
 }
 
 /* Responsive */
+/* Mobile Styles */
 @media (max-width: 768px) {
+    .container {
+        overflow: hidden;
+        position: fixed;
+        overscroll-behavior: none;
+    }
+
+    body {
+        overscroll-behavior: none;
+        overflow: hidden;
+    }
+
     .infoPanel {
         position: fixed;
-        right: 16px;
-        left: 16px;
+        right: 0;
+        left: 0;
         top: auto;
-        bottom: 16px;
-        width: auto;
-        height: 60vh;
-        border-radius: 16px;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        height: 70vh;
+        max-height: 70vh;
+        border-radius: 24px 24px 0 0;
+        border: 4px solid #000;
+        border-bottom: none;
+        box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease, height 0.3s ease;
+        transform: translateY(0);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
+
+    .infoPanel.infoPanelMinimized {
+        height: 120px !important;
+        max-height: 120px !important;
+    }
+
+    .infoPanel.infoPanelMinimized .tabContent {
+        display: none;
+    }
+
+    .infoPanel.infoPanelMinimized .tabNavWrapper {
+        display: none;
+    }
+
+    .infoPanel.infoPanelMinimized .emptyState {
+        display: none;
+    }
+
+    .infoPanelFullscreen {
+        left: 0;
+        right: 0;
+    }
+
+    .infoPanelCollapsed {
+        left: 0;
+    }
+
+    .panelHideButton {
+        display: none;
+    }
+
+    .panelShowButton {
+        right: 16px;
+        bottom: 16px;
+        top: auto;
+    }
+
+    .mobileCloseButton {
+        display: flex !important;
+    }
+
+    .mobileDragHandle {
+        display: flex !important;
+        background: #f9fafb;
+        min-height: 50px;
+    }
+    /* Hide desktop close button on mobile */
+    .closeButton {
+        display: none;
+    }
+
+    .galleryClose {
+        top: 16px;
+        right: 16px;
+    }
+}
+
+/* Desktop - hide mobile controls */
+@media (min-width: 769px) {
+    .mobileCloseButton {
+        display: none;
+    }
+
+    .mobileDragHandle {
+        display: none;
+    }
+}
+
+/* Mobile Close Button */
+.mobileCloseButton {
+    display: none;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    border: 3px solid #000;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    font-size: 24px;
+    font-weight: 700;
+    color: #000;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+}
+
+.mobileCloseButton:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 0 #000;
+}
+
+/* Mobile Drag Handle */
+.mobileDragHandle {
+    display: none;
+    width: 100%;
+    padding: 18px 0;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #f3f4f6 0%, #ffffff 100%);
+    border-bottom: 3px solid #d1d5db;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
+}
+
+.mobileDragHandle:active {
+    background: linear-gradient(180deg, #e5e7eb 0%, #f9fafb 100%);
+}
+
+.dragHandleBar {
+    width: 90px;
+    height: 10px;
+    background: linear-gradient(180deg, #4b5563 0%, #374151 100%);
+    border-radius: 999px;
+    transition: all 0.2s;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2), inset 0 -1px 2px rgba(255, 255, 255, 0.3);
+}
+
+.mobileDragHandle:active .dragHandleBar {
+    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+    transform: scaleY(0.9);
 }

@@ -1,0 +1,59 @@
+.cursorOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 100000; /* Extremely high to stay above everything */
+    overflow: visible;
+}
+
+.selectionRect {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.3;
+    mix-blend-mode: multiply;
+}
+
+.cursor {
+    position: absolute;
+    width: 2px;
+    height: 20px;
+    transition: all 0.15s ease-out;
+    pointer-events: none;
+    transform: translateX(-1px); /* Center the cursor line */
+}
+
+.cursorLine {
+    width: 100%;
+    height: 100%;
+    animation: blink 1s infinite;
+    border-radius: 1px;
+}
+
+@keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.6; }
+}
+
+.cursorLabel {
+    position: absolute;
+    top: -26px;
+    left: -4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: white;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.selection {
+    position: absolute;
+    opacity: 0.2;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+}

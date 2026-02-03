@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -56,6 +56,7 @@ export default function BaseFinder() {
     const [tripError, setTripError] = useState<string>('');
     const [isStationPickerOpen, setIsStationPickerOpen] = useState(false);
     const [isPanelHidden, setIsPanelHidden] = useState(false);
+    const [isPanelMinimized, setIsPanelMinimized] = useState(false); // New state for mobile bottom panel
     const [departureDate, setDepartureDate] = useState<string>('');
     const [departureTime, setDepartureTime] = useState<string>('');
     const [isArrivalTime, setIsArrivalTime] = useState<boolean>(false);
@@ -71,6 +72,13 @@ export default function BaseFinder() {
     // Assigned trip state
     const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
     const [selectedTripForAssignment, setSelectedTripForAssignment] = useState<Trip | null>(null);
+
+    // Auto-show panel when base is selected
+    useEffect(() => {
+        if (selectedBaseId) {
+            setIsPanelHidden(false);
+        }
+    }, [selectedBaseId]);
 
     // Fetch all bases from Convex
     const bases = useQuery(api.bases.getAllBases);
@@ -182,17 +190,29 @@ export default function BaseFinder() {
     };
 
     return (
-        <div className={styles.container}>
-            {/* Close Button */}
-            {selectedBaseId && (
-                <button
-                    className={`${styles.closeButton} ${isSidebarCollapsed ? styles.closeButtonCollapsed : ''}`}
-                    onClick={() => setSelectedBaseId(null)}
-                    title="Zavřít"
-                >
-                    ✕
-                </button>
-            )}
+        <>
+            <style dangerouslySetInnerHTML={{__html: `
+                @media (max-width: 768px) {
+                    html, body {
+                        overscroll-behavior: none !important;
+                        overflow: hidden !important;
+                        position: fixed !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                    }
+                }
+            `}} />
+            <div className={styles.container}>
+                {/* Close Button */}
+                {selectedBaseId && (
+                    <button
+                        className={`${styles.closeButton} ${isSidebarCollapsed ? styles.closeButtonCollapsed : ''}`}
+                        onClick={() => setSelectedBaseId(null)}
+                        title="Zavřít"
+                    >
+                        ✕
+                    </button>
+                )}
             {/* Left Map Area */}
             <div className={styles.mapArea}>
                 <BaseFinderMap
@@ -205,7 +225,27 @@ export default function BaseFinder() {
 
             {/* Right Info Panel */}
             {!isPanelHidden && (
-                <div className={styles.infoPanel}>
+                <div className={`${styles.infoPanel} ${isPanelMinimized ? styles.infoPanelMinimized : ''}`}>
+                    {/* Mobile Close Button */}
+                    <button 
+                        className={styles.mobileCloseButton}
+                        onClick={() => {
+                            setSelectedBaseId(null);
+                            setIsPanelMinimized(false);
+                        }}
+                        title="Zavřít"
+                    >
+                        ✕
+                    </button>
+                    
+                    {/* Mobile Drag Handle */}
+                    <div 
+                        className={styles.mobileDragHandle}
+                        onClick={() => setIsPanelMinimized(!isPanelMinimized)}
+                    >
+                        <div className={styles.dragHandleBar}></div>
+                    </div>
+                    
                 {selectedBaseData ? (
                     <>
                         {/* Tab Navigation */}
@@ -851,7 +891,8 @@ export default function BaseFinder() {
                     </div>
                 </div>
             )}
-        </div>
+            </div>
+        </>
     );
 }
 

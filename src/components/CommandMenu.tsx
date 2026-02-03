@@ -96,6 +96,8 @@ export function CommandMenu() {
                             <Item icon="/icons/oddil-icon-dark.svg" onSelect={() => runCommand(() => router.push("/troop"))}>Moje Oddíly</Item>
                             <Item icon="/icons/clenove-icon-dark.svg" onSelect={() => runCommand(() => router.push("/members"))}>Členové</Item>
                             <Item icon="/icons/vypravy-icon-dark.svg" onSelect={() => runCommand(() => router.push("/trips"))}>Výpravy</Item>
+                            <Item icon="/icons/rady-icon.svg" onSelect={() => runCommand(() => router.push("/rady"))}>Rady</Item>
+                            <Item icon="/icons/wall-dark.svg" onSelect={() => runCommand(() => router.push("/tools"))}>Vyhledávač základen</Item>
                             <Item icon="/icons/kalendar-icon-dark.svg" onSelect={() => runCommand(() => router.push("/calendar"))}>Kalendář</Item>
                             <Item icon="/icons/nastaveni-icon-dark.svg" onSelect={() => runCommand(() => router.push("/settings"))}>Nastavení</Item>
                         </Group>

@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import Button from "../../../../components/Button";
+import { useMemo } from "react";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -64,10 +65,7 @@ export default function TroopDashboard() {
         }
     };
 
-    if (troop === undefined) return <div>Načítám oddíl...</div>;
-    if (troop === null) return <div>Oddíl nenalezen.</div>;
-
-    const sections = [
+    const sections = useMemo(() => [
         {
             title: "Členové",
             description: "Správa členů a kontaktů.",
@@ -83,6 +81,13 @@ export default function TroopDashboard() {
             action: () => router.push(`/trips?troopId=${troopId}`)
         },
         {
+            title: "Rady",
+            description: "Správa rad a zápisů.",
+            icon: <img src="/illustrations/meetings-illustartion.svg" alt="Rady" style={{ height: "80px", width: "auto", display: "block" }} />,
+            status: "active",
+            action: () => router.push(`/troop/${troopId}/meetings`)
+        },
+        {
             title: "Vedení",
             description: "Správa vedoucích oddílu.",
             icon: <img src="/illustrations/satek-illustration.svg" alt="Leaders" style={{ height: "110px", width: "auto", display: "block" }} />,
@@ -96,7 +101,10 @@ export default function TroopDashboard() {
             status: "active",
             action: handleEditClick
         }
-    ];
+    ], [router, troopId, handleEditClick]);
+
+    if (troop === undefined) return <div>Načítám oddíl...</div>;
+    if (troop === null) return <div>Oddíl nenalezen.</div>;
 
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>

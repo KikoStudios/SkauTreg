@@ -187,4 +187,67 @@ export default defineSchema({
     })
         .index("by_base", ["baseId"])
         .index("by_station", ["stationId"]),
+
+    meetings: defineTable({
+        troopId: v.id("troops"),
+        tripId: v.optional(v.id("trips")),
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        category: v.optional(v.string()), // "notebook" or "documentation"
+        activePageId: v.optional(v.string()), // For syncing view state if needed. Storing as string to be flexible (id or prosemirror doc id)
+        status: v.optional(v.string()), // Legacy field for backwards compatibility
+    }).index("by_troop", ["troopId"])
+      .index("by_trip", ["tripId"]),
+
+    meeting_pages: defineTable({
+        meetingId: v.id("meetings"),
+        title: v.string(),
+        // content is stored in prosemirror-sync component
+        excludeFromExport: v.optional(v.boolean()),
+        order: v.number(),
+    }).index("by_meeting", ["meetingId"]),
+
+    meeting_files: defineTable({
+        meetingId: v.id("meetings"),
+        storageId: v.string(),
+        name: v.string(),
+        type: v.string(), // "image", "pdf"
+        uploadedBy: v.id("users"),
+    }).index("by_meeting", ["meetingId"]),
+
+    meeting_annotations: defineTable({
+        fileId: v.id("meeting_files"),
+        type: v.string(), // "point" or "draw"
+        x: v.optional(v.number()), // Percentage for point annotations
+        y: v.optional(v.number()),
+        content: v.optional(v.string()), // Comment text for point annotations
+        authorId: v.id("users"),
+        color: v.optional(v.string()), // Color for drawing annotations
+        resolved: v.optional(v.boolean()),
+        drawingData: v.optional(v.string()), // SVG path string for draw annotations
+        createdAt: v.string(), // ISO timestamp
+    }).index("by_file", ["fileId"]),
+
+    meeting_participants: defineTable({
+        meetingId: v.id("meetings"),
+        userId: v.id("users"),
+        firstname: v.optional(v.string()),
+        lastname: v.optional(v.string()),
+        joinedAt: v.string(),
+        leftAt: v.optional(v.string()),
+    }).index("by_meeting", ["meetingId"]),
+
+    editor_cursors: defineTable({
+        pageId: v.id("meeting_pages"),
+        userId: v.id("users"),
+        position: v.optional(v.number()), // Cursor position in the document
+        selection: v.optional(v.object({
+            from: v.number(),
+            to: v.number(),
+        })),
+        lastUpdate: v.number(), // Timestamp in milliseconds
+    })
+        .index("by_page", ["pageId"])
+        .index("by_user_page", ["userId", "pageId"]),
+
 });

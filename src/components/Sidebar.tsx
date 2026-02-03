@@ -9,11 +9,12 @@ const navItems = [
     { label: 'Můj Oddíl', icon: <img src="/icons/oddil-icon.svg" alt="Můj Oddíl" style={{ width: "24px", height: "auto" }} />, href: '/troop' },
     { label: 'Členové', icon: <img src="/icons/clenove-icon.svg" alt="Členové" style={{ width: "24px", height: "auto" }} />, href: '/members' },
     { label: 'Výpravy', icon: <img src="/icons/vypravy-icon.svg" alt="Výpravy" style={{ width: "24px", height: "auto" }} />, href: '/trips' },
+    { label: 'Rady', icon: <img src="/icons/rady-icon-light.svg" alt="Rady" style={{ width: "24px", height: "auto" }} />, href: '/rady' },
     { label: 'Kalendář', icon: <img src="/icons/kalendar-white.svg" alt="Kalendář" style={{ width: "24px", height: "auto" }} />, href: '/calendar' },
 ];
 
 const toolsItems = [
-    { label: 'Vyhledávač Základen', icon: <span style={{ fontSize: "20px" }}>🔍</span>, href: '/tools' },
+    { label: 'Vyhledávač Základen', icon: <img src="/icons/wall-light.svg" alt="Vyhledávač" style={{ width: "24px", height: "auto" }} />, href: '/tools' },
 ];
 
 const bottomItems = [
@@ -44,7 +45,7 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                     {/* Close button for mobile */}
                     <button className={styles.closeButton} onClick={onClose}>×</button>
                 </div>
-                
+
                 {/* Desktop collapse toggle button */}
                 <button className={styles.collapseButton} onClick={onToggleCollapse} title={isCollapsed ? "Rozbalit sidebar" : "Skrýt sidebar"}>
                     {isCollapsed ? '›' : '‹'}
@@ -69,7 +70,7 @@ export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, 
                     {/* Tools Separator */}
                     <div className={styles.separator} />
 
-                    <div className={styles.sectionLabel}>Nástrojů</div>
+                    <div className={styles.sectionLabel}>Nástroje</div>
                     <ul className={styles.navList}>
                         {toolsItems.map((item) => (
                             <li key={item.label}>

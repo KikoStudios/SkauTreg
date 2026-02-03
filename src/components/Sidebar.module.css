@@ -2,7 +2,9 @@
     width: var(--sidebar-width);
     background-color: var(--sidebar-bg);
     color: var(--sidebar-text);
-    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: visible;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -30,11 +32,16 @@
     border-radius: 0 8px 8px 0;
     cursor: pointer;
     font-size: 24px;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 51;
+    z-index: 1000;
     transition: all 0.3s ease;
+}
+
+.collapseButton:hover {
+    background: #4caf50;
+    transform: translateX(2px);
 }
 
 .sidebar.collapsed .collapseButton {
@@ -42,9 +49,9 @@
     pointer-events: none;
 }
 
-@media (min-width: 769px) {
-    .sidebar:not(.collapsed) .collapseButton {
-        display: flex;
+@media (max-width: 768px) {
+    .collapseButton {
+        display: none !important;
     }
 }
 
@@ -112,9 +119,11 @@
 }
 
 .nav {
-    flex: 1;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
     padding: 1rem 0;
-    overflow-y: auto;
+    overflow: hidden;
 }
 
 .navList {
