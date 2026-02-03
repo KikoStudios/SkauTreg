@@ -92,6 +92,16 @@ export const update = mutation({
     }
 });
 
+export const updateStatus = mutation({
+    args: {
+        meetingId: v.id("meetings"),
+        status: v.string(), // "prepared", "ongoing", "past"
+    },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.meetingId, { status: args.status });
+    }
+});
+
 export const join = mutation({
     args: {
         meetingId: v.id("meetings"),
