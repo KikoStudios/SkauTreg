@@ -100,6 +100,7 @@ interface BaseFinderMapProps {
 }
 
 export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, stations = [] }: BaseFinderMapProps) {
+    const mapyApiKey = process.env.NEXT_PUBLIC_MAPY_API_KEY || "";
     const selectedBase = bases.find(b => b.id === selectedBaseId);
     const center: [number, number] = selectedBase
         ? [selectedBase.lat, selectedBase.lng]
@@ -114,8 +115,8 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
         >
             <ZoomControl position="bottomright" />
             <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://mapy.com/">Mapy.com</a> &copy; <a href="https://api.mapy.cz/copyright">Seznam.cz a.s. a další</a>'
+                url={`https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${mapyApiKey}&lang=cs`}
             />
 
             <MapController selectedLocation={selectedBase ? [selectedBase.lat, selectedBase.lng] : null} />
