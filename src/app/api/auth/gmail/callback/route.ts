@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
-const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-
 /**
  * Gmail OAuth Callback Handler
  * 
@@ -16,6 +13,9 @@ const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
  * 7. Redirect back to settings page
  */
 export async function GET(req: NextRequest) {
+  const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+  const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+
   const searchParams = req.nextUrl.searchParams;
   const code = searchParams.get('code');
   const state = searchParams.get('state');

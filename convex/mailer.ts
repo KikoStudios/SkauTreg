@@ -29,9 +29,13 @@ const encodeSubject = (subject: string) => {
 
 // Get access token from troop's OAuth refresh token or fallback to global
 async function getGmailAccessToken(troopRefreshToken?: string) {
-  const clientId = getEnv("GMAIL_CLIENT_ID");
-  const clientSecret = getEnv("GMAIL_CLIENT_SECRET");
-  const refreshToken = troopRefreshToken || getEnv("GMAIL_REFRESH_TOKEN");
+  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = troopRefreshToken || process.env.GMAIL_REFRESH_TOKEN;
+
+  if (!clientId) throw new Error(`Missing env: GMAIL_CLIENT_ID`);
+  if (!clientSecret) throw new Error(`Missing env: GMAIL_CLIENT_SECRET`);
+  if (!refreshToken) throw new Error(`Missing env: GMAIL_REFRESH_TOKEN`);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -268,7 +272,8 @@ export const sendFromDraft = action({
 
     // Use troop's OAuth if available
     const troopRefreshToken = (troop as any).gmailOAuth?.refreshToken;
-    const senderEmail = (troop as any).gmailOAuth?.email || getEnv("GMAIL_SENDER");
+    const senderEmail = (troop as any).gmailOAuth?.email || process.env.GMAIL_SENDER;
+    if (!senderEmail) throw new Error("Missing env: GMAIL_SENDER");
     const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
     const replyTo = troop.infoEmail || troop.contactEmail || undefined;
 
