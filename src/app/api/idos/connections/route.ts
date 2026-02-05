@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
 import * as cheerio from 'cheerio';
 
 interface Stop {
@@ -140,18 +139,12 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let browser;
       try {
-        browser = await puppeteer.launch({
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage'
-          ]
-        });
-
-        const page = await browser.newPage();
+        const browserlessToken = process.env.BROWSERLESS_API_KEY;
+        const browserlessBaseUrl = process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';
+        if (!browserlessToken) {
+          throw new Error('BROWSERLESS_API_KEY environment variable not set');
+        }
 
         let url = `https://idos.cz/vlakyautobusymhdvse/spojeni/vysledky/?f=${encodeURIComponent(from)}&t=${encodeURIComponent(to)}`;
         
@@ -165,69 +158,39 @@ export async function GET(request: NextRequest) {
           url += `&arr=true`;
         }
 
-        await page.goto(url, {
-          waitUntil: 'networkidle2',
-          timeout: 30000
+        // Fetch using Browserless (minimal payload to avoid 400s)
+        const browserlessResponse = await fetch(`${browserlessBaseUrl.replace(/\/$/, '')}/content?token=${browserlessToken}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url
+          })
         });
 
-        await new Promise(resolve => setTimeout(resolve, 4000));
-
-        // Dismiss cookie banner
-        try {
-          const cookieBtn = await page.$('button[id*="didomi-notice-agree-button"]');
-          if (cookieBtn) {
-            await cookieBtn.click();
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch (e) {
-          // Cookie banner not found
+        if (!browserlessResponse.ok) {
+          const errorText = await browserlessResponse.text();
+          throw new Error(`Browserless request failed: ${browserlessResponse.status} - ${errorText}`);
         }
 
+        const html = await browserlessResponse.text();
+        const trips = parseConnections(html);
         const seenDedupKeys = new Set<string>();
-        let pageNum = 1;
-
-        while (pageNum <= maxPages) {
-          const html = await page.content();
-          const trips = parseConnections(html);
-          
-          // Send new unique trips immediately
-          for (const trip of trips) {
-            const segmentKey = trip.segments.map(s => `${s.departureStation}-${s.arrivalStation}-${s.departureTime}-${s.arrivalTime}`).join('|');
-            const key = `${trip.departureTime}|${trip.arrivalTime}|${trip.duration}|${segmentKey}`;
-            if (!seenDedupKeys.has(key)) {
-              seenDedupKeys.add(key);
-              // Stream this trip immediately
-              const data = JSON.stringify(trip) + '\n';
-              controller.enqueue(encoder.encode(data));
-            }
-          }
-
-          if (pageNum >= maxPages) break;
-
-          try {
-            await new Promise(r => setTimeout(r, 1500));
-            const nextButton = await page.$('a.pagingNext');
-            
-            if (nextButton) {
-              await nextButton.click();
-              await new Promise(r => setTimeout(r, 2500));
-              pageNum++;
-            } else {
-              break;
-            }
-          } catch (e) {
-            break;
+        
+        // Send trips immediately
+        for (const trip of trips) {
+          const segmentKey = trip.segments.map(s => `${s.departureStation}-${s.arrivalStation}-${s.departureTime}-${s.arrivalTime}`).join('|');
+          const key = `${trip.departureTime}|${trip.arrivalTime}|${trip.duration}|${segmentKey}`;
+          if (!seenDedupKeys.has(key)) {
+            seenDedupKeys.add(key);
+            const data = JSON.stringify(trip) + '\n';
+            controller.enqueue(encoder.encode(data));
           }
         }
 
-        await page.close();
-        await browser.close();
         controller.close();
       } catch (error) {
-        if (browser) {
-          await browser.close();
-        }
-        const errorData = JSON.stringify({ error: 'Failed to fetch connections' }) + '\n';
+        console.error('IDOS scraper error:', error);
+        const errorData = JSON.stringify({ error: 'Failed to fetch connections', details: error instanceof Error ? error.message : 'Unknown error' }) + '\n';
         controller.enqueue(encoder.encode(errorData));
         controller.close();
       }

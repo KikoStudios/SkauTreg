@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
@@ -67,6 +68,22 @@ export default function MembersPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [editingMemberId, setEditingMemberId] = useState<Id<"members"> | null>(null);
 
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [importFileName, setImportFileName] = useState<string | null>(null);
+    const [importHeaders, setImportHeaders] = useState<string[]>([]);
+    const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+    const [importMapping, setImportMapping] = useState({
+        name: "",
+        nickname: "",
+        birthDate: "",
+        parentName: "",
+        parentPhone: "",
+        email: ""
+    });
+    const [isImporting, setIsImporting] = useState(false);
+    const [importError, setImportError] = useState<string | null>(null);
+    const importFileInputRef = useRef<HTMLInputElement>(null);
+
     const [formData, setFormData] = useState({
         name: "",
         nickname: "",
@@ -100,6 +117,106 @@ export default function MembersPage() {
             email: member.email || ""
         });
         setShowModal(true);
+    };
+
+    const guessMapping = (headers: string[]) => {
+        const normalized = headers.map(h => h.toLowerCase());
+        const pick = (patterns: RegExp[]) => {
+            const idx = normalized.findIndex(h => patterns.some(p => p.test(h)));
+            return idx >= 0 ? headers[idx] : "";
+        };
+        return {
+            name: pick([/jméno/, /name/]),
+            nickname: pick([/přezdív/, /nick/]),
+            birthDate: pick([/rok/, /birth/, /naro/]),
+            parentName: pick([/rodič/, /parent/]),
+            parentPhone: pick([/telefon/, /phone/, /tel/]),
+            email: pick([/email/])
+        };
+    };
+
+    const handleImportFileChange = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        setImportError(null);
+        try {
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: "array" });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
+
+            if (!rows || rows.length === 0) {
+                setImportError("Soubor je prázdný.");
+                return;
+            }
+
+            const [headerRow, ...dataRows] = rows;
+            const headers = headerRow.map(h => String(h || "").trim()).filter(h => h.length > 0);
+
+            if (headers.length === 0) {
+                setImportError("Nepodařilo se najít hlavičku (první řádek).");
+                return;
+            }
+
+            const mappedRows: Record<string, string>[] = dataRows
+                .map(row => {
+                    const obj: Record<string, string> = {};
+                    headers.forEach((h, i) => {
+                        obj[h] = String(row[i] ?? "").trim();
+                    });
+                    return obj;
+                })
+                .filter(r => Object.values(r).some(v => v && v.length > 0));
+
+            setImportFileName(file.name);
+            setImportHeaders(headers);
+            setImportRows(mappedRows);
+            setImportMapping(guessMapping(headers));
+            setShowImportModal(true);
+        } catch (e) {
+            console.error("Import parse failed:", e);
+            setImportError("Soubor se nepodařilo načíst. Zkontrolujte, že jde o CSV nebo XLSX.");
+        } finally {
+            if (importFileInputRef.current) {
+                importFileInputRef.current.value = "";
+            }
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        if (!selectedTroopId) return;
+        if (!importMapping.name || !importMapping.parentName || !importMapping.parentPhone) {
+            setImportError("Vyberte sloupce pro Jméno, Rodič a Telefon.");
+            return;
+        }
+
+        setIsImporting(true);
+        setImportError(null);
+        try {
+            const rowsToImport = importRows.map((row) => ({
+                name: row[importMapping.name] || "",
+                nickname: importMapping.nickname ? (row[importMapping.nickname] || "") : "",
+                birthDate: importMapping.birthDate ? (row[importMapping.birthDate] || "") : "",
+                parentName: row[importMapping.parentName] || "",
+                parentPhone: row[importMapping.parentPhone] || "",
+                email: importMapping.email ? (row[importMapping.email] || "") : ""
+            })).filter(r => r.name && r.parentName && r.parentPhone);
+
+            for (const row of rowsToImport) {
+                await createMember({
+                    troopId: selectedTroopId,
+                    ...row
+                });
+            }
+
+            setShowImportModal(false);
+        } catch (e) {
+            console.error("Import failed:", e);
+            setImportError("Import se nezdařil. Zkuste to prosím znovu.");
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -222,6 +339,23 @@ export default function MembersPage() {
                 >
                     <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> ADD
                 </button>
+
+                {/* IMPORT Button */}
+                <button
+                    onClick={() => importFileInputRef.current?.click()}
+                    className="add-button"
+                    onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
+                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                >
+                    IMPORT
+                </button>
+                <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    style={{ display: "none" }}
+                    onChange={(e) => handleImportFileChange(e.target.files)}
+                />
             </div>
 
             <style jsx>{`
@@ -504,6 +638,133 @@ export default function MembersPage() {
                                 {isSaving ? "Ukládám..." : "Uložit"}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Import Mapping Modal */}
+            {showImportModal && (
+                <div style={{
+                    position: "fixed",
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    zIndex: 2000,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }} onClick={() => setShowImportModal(false)}>
+                    <div style={{
+                        backgroundColor: "white",
+                        padding: "2rem",
+                        border: "3px solid #000",
+                        borderRadius: "16px",
+                        boxShadow: "8px 8px 0 0 #000",
+                        width: "100%",
+                        maxWidth: "700px",
+                        maxHeight: "90vh",
+                        overflowY: "auto"
+                    }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                            <h2 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Import členů</h2>
+                            <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{importFileName}</span>
+                        </div>
+
+                        <p style={{ marginTop: 0, fontWeight: "600" }}>Vyberte, který sloupec odpovídá kterému poli.</p>
+
+                        {importError && (
+                            <div style={{ backgroundColor: "#fef2f2", border: "2px solid #fecaca", borderRadius: "12px", padding: "0.75rem", color: "#991b1b", fontWeight: "700", marginBottom: "1rem" }}>
+                                {importError}
+                            </div>
+                        )}
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                            {([
+                                { key: "name", label: "Jméno" },
+                                { key: "nickname", label: "Přezdívka" },
+                                { key: "birthDate", label: "Rok narození" },
+                                { key: "parentName", label: "Rodič" },
+                                { key: "parentPhone", label: "Telefon" },
+                                { key: "email", label: "Email" }
+                            ] as const).map(field => (
+                                <div key={field.key}>
+                                    <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>{field.label}</label>
+                                    <select
+                                        value={importMapping[field.key]}
+                                        onChange={(e) => setImportMapping({ ...importMapping, [field.key]: e.target.value })}
+                                        style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                    >
+                                        <option value="">— Neimportovat —</option>
+                                        {importHeaders.map(h => (
+                                            <option key={h} value={h}>{h}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{ marginTop: "1.5rem" }}>
+                            <h3 style={{ fontSize: "1.1rem", fontWeight: "900" }}>Náhled (prvních 5 řádků)</h3>
+                            <div style={{ border: "2px solid #000", borderRadius: "12px", overflow: "hidden" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                    <thead style={{ backgroundColor: "#f3f4f6" }}>
+                                        <tr>
+                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Jméno</th>
+                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Přezdívka</th>
+                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Rok</th>
+                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Rodič</th>
+                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Telefon</th>
+                                            <th style={{ padding: "0.5rem", textAlign: "left" }}>Email</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {importRows.slice(0, 5).map((row, idx) => (
+                                            <tr key={idx}>
+                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.name ? row[importMapping.name] : ""}</td>
+                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.nickname ? row[importMapping.nickname] : ""}</td>
+                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.birthDate ? row[importMapping.birthDate] : ""}</td>
+                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.parentName ? row[importMapping.parentName] : ""}</td>
+                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.parentPhone ? row[importMapping.parentPhone] : ""}</td>
+                                                <td style={{ padding: "0.5rem" }}>{importMapping.email ? row[importMapping.email] : ""}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
+                            <button
+                                onClick={() => setShowImportModal(false)}
+                                style={{
+                                    backgroundColor: "white",
+                                    color: "black",
+                                    padding: "0.6rem 1rem",
+                                    borderRadius: "6px",
+                                    border: "2px solid #000",
+                                    fontWeight: "900",
+                                    boxShadow: "4px 4px 0 0 #000",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Zrušit
+                            </button>
+                            <button
+                                onClick={handleConfirmImport}
+                                disabled={isImporting}
+                                style={{
+                                    backgroundColor: "#86efac",
+                                    color: "black",
+                                    padding: "0.6rem 1rem",
+                                    borderRadius: "6px",
+                                    border: "2px solid #000",
+                                    fontWeight: "900",
+                                    boxShadow: "4px 4px 0 0 #000",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                {isImporting ? "Importuji..." : "Importovat"}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
