@@ -93,7 +93,9 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     };
 
     const debugClientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID || "(missing)";
-    const debugRedirectUri = process.env.NEXT_PUBLIC_GMAIL_REDIRECT_URI || "(missing)";
+    const debugRedirectUri = typeof window !== "undefined"
+        ? `${window.location.origin}/api/auth/gmail/callback`
+        : "(dynamic)";
 
     const handleDisconnect = async () => {
         if (!confirm("Opravdu odpojit Gmail účet? E-maily bude třeba odesílat znovu přes globální nastavení.")) {

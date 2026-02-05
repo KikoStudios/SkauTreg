@@ -70,10 +70,10 @@ Email system ready!
 ```env
 # Gmail OAuth 2.0
 NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 ```
+
+Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 
 **Status**: ✅ Configured for local development
 
@@ -213,22 +213,15 @@ npm run dev
 
 ## 🔧 Production Deployment
 
-When deploying to `skautreg.overload.studio`:
+When deploying to production:
 
-### Step 1: Update Environment Variables
-```bash
-# Change in production deployment settings:
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-```
-
-### Step 2: Update Google Cloud Console
+### Step 1: Update Google Cloud Console
 1. Go to [Google Cloud Console](https://console.cloud.google.com)
 2. Find your OAuth 2.0 Client ID
 3. Add to **Authorized JavaScript origins**:
-   - `https://skautreg.overload.studio`
+   - `<APP_ORIGIN>`
 4. Add to **Authorized redirect URIs**:
-   - `https://skautreg.overload.studio/api/auth/gmail/callback`
+   - `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ### Step 3: Deploy
 ```bash

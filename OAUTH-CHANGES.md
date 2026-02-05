@@ -78,10 +78,10 @@ useEffect(() => {
 ```env
 # Gmail OAuth 2.0
 NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 ```
+
+Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ## Files Created (Documentation)
 

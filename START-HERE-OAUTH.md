@@ -286,17 +286,11 @@ Your complete email system includes:
 
 ## 🚀 Production Deployment
 
-When ready to deploy to `skautreg.overload.studio`:
+When ready to deploy:
 
-1. **Update environment variables**:
-   ```env
-   NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-   GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-   ```
-
-2. **Update Google Cloud Console**:
-   - Add `https://skautreg.overload.studio` to authorized origins
-   - Add redirect URI to Google
+1. **Update Google Cloud Console**:
+   - Add `<APP_ORIGIN>` to authorized origins
+   - Add `<APP_ORIGIN>/api/auth/gmail/callback` to authorized redirect URIs
 
 3. **Deploy and test**:
    ```bash

@@ -10,9 +10,11 @@ export default function GmailConnectPage() {
 
     useEffect(() => {
         const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
-        const redirectUri = process.env.NEXT_PUBLIC_GMAIL_REDIRECT_URI;
+        const redirectUri = typeof window !== "undefined"
+            ? `${window.location.origin}/api/auth/gmail/callback`
+            : "";
 
-        if (!clientId || !redirectUri) {
+        if (!clientId) {
             setError("Chyba konfigurace: chybí Gmail credentials");
             return;
         }

@@ -33,10 +33,10 @@ Click "Propojit s Gmailu"
 
 ```env
 NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 ```
+
+Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ## Quick Test
 
@@ -83,13 +83,7 @@ Start the app, click the button, and authorize with Google!
 
 ## For Production
 
-Change in `.env.local`:
-```env
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-```
-
-Update Google Cloud Console to match.
+Ensure Google Cloud Console has redirect URI: `<APP_ORIGIN>/api/auth/gmail/callback`.
 
 ## Need Help?
 

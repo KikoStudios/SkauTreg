@@ -19,7 +19,7 @@ Your SkautREG email system now has proper **OAuth 2.0 redirect-based login** ins
 ```
 Client ID:     YOUR_GOOGLE_OAUTH_CLIENT_ID
 Client Secret: YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-Redirect URL:  http://localhost:3000/api/auth/gmail/callback
+Redirect URL:  <APP_ORIGIN>/api/auth/gmail/callback
 ```
 
 **Domains Authorized:**
@@ -78,17 +78,9 @@ Redirect URL:  http://localhost:3000/api/auth/gmail/callback
 
 ## Production Deployment
 
-When deploying to `skautreg.overload.studio`:
-
-```bash
-# Update in production environment:
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-```
-
-Verify in Google Cloud Console:
-- Authorized origins include `https://skautreg.overload.studio`
-- Authorized redirect URI updated to production URL
+When deploying, ensure Google Cloud Console has:
+- Authorized origins set to your domain
+- Authorized redirect URI set to `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ## Testing
 

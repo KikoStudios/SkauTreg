@@ -142,8 +142,7 @@ After successful OAuth:
 **Fix**:
 1. Check `.env.local` has these lines:
    ```
-   NEXT_PUBLIC_GMAIL_CLIENT_ID=806370560203-...
-   NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
+   NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
    ```
 2. Stop dev server: `Ctrl+C`
 3. Restart: `npm run dev`
@@ -156,9 +155,9 @@ After successful OAuth:
 
 **Fix**:
 1. Verify `.env.local`:
-   - `GMAIL_CLIENT_SECRET=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`
+   - `GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET`
    - Exactly matches Google credentials
-2. Check redirect URI matches exactly
+2. Check redirect URI matches exactly: `<APP_ORIGIN>/api/auth/gmail/callback`
 3. Look at server logs: `npm run dev` output
 4. Should show error details
 
@@ -195,14 +194,13 @@ After successful OAuth:
 
 ## Production Testing Checklist
 
-Before deploying to `skautreg.overload.studio`:
+Before deploying:
 
 ### 1. Update Environment Variables
 
 ```bash
-# In production .env.local or deployment config:
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
-GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
+# Ensure Google redirect URI is set to:
+<APP_ORIGIN>/api/auth/gmail/callback
 ```
 
 ### 2. Verify Google Cloud Console
@@ -210,12 +208,8 @@ GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback
 - [Google Cloud Console](https://console.cloud.google.com)
 - **APIs & Services** → **Credentials**
 - Select OAuth 2.0 Client ID
-- Check **Authorized JavaScript origins**:
-  - `https://skautreg.overload.studio` ✅
-  - `http://localhost:3000` ✅
-- Check **Authorized redirect URIs**:
-  - `https://skautreg.overload.studio/api/auth/gmail/callback` ✅
-  - `http://localhost:3000/api/auth/gmail/callback` ✅
+- Check **Authorized JavaScript origins** include your domain and localhost (if needed)
+- Check **Authorized redirect URIs** include `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ### 3. Test on Staging
 

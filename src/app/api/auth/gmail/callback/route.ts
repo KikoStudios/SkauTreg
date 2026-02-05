@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID || process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
-const GMAIL_REDIRECT_URI = process.env.GMAIL_REDIRECT_URI;
 
 /**
  * Gmail OAuth Callback Handler
@@ -21,6 +20,7 @@ export async function GET(req: NextRequest) {
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   const error = searchParams.get('error');
+  const redirectUri = `${req.nextUrl.origin}/api/auth/gmail/callback`;
 
   // Parse state to get troopId early for use in all redirects
   let troopId = null;
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         client_secret: GMAIL_CLIENT_SECRET!,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: GMAIL_REDIRECT_URI!,
+        redirect_uri: redirectUri,
       }).toString(),
     });
 

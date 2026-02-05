@@ -61,14 +61,10 @@ File: `.env.local`
 ```env
 # Gmail OAuth 2.0
 NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 ```
 
-**Note:** For production, update:
-- `NEXT_PUBLIC_GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback`
-- `GMAIL_REDIRECT_URI=https://skautreg.overload.studio/api/auth/gmail/callback`
+Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`.
 
 ## OAuth 2.0 Flow (Visual)
 
@@ -78,7 +74,7 @@ User clicks "Propojit s Gmailu"
 Browser redirects to: 
 https://accounts.google.com/o/oauth2/auth?
   client_id=...&
-  redirect_uri=http://localhost:3000/api/auth/gmail/callback&
+   redirect_uri=<APP_ORIGIN>/api/auth/gmail/callback&
   response_type=code&
   scope=gmail.send&
   access_type=offline&
@@ -89,7 +85,7 @@ User logs in to Google
 User grants "Send email" permission
          ↓
 Google redirects back with code:
-http://localhost:3000/api/auth/gmail/callback?code=4/...
+<APP_ORIGIN>/api/auth/gmail/callback?code=4/...
          ↓
 Backend exchanges code for tokens (server-side, secure)
          ↓
@@ -127,9 +123,9 @@ Email system ready to use! ✅
 
 ### Local Development (localhost:3000)
 ```bash
-# Ensure .env.local has:
-NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
-GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
+# Ensure .env.local has Gmail OAuth credentials:
+NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
+GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
 
 # Start dev server
 npm run dev
@@ -147,11 +143,10 @@ npm run dev
 9. Refresh page - email should persist (stored in Convex)
 10. Try sending email from a trip - should use this email
 
-### Production Setup (skautreg.overload.studio)
+### Production Setup
 Before deploying, ensure Google Cloud Console has:
-- Authorized JavaScript origins: `https://skautreg.overload.studio`
-- Authorized redirect URIs: `https://skautreg.overload.studio/api/auth/gmail/callback`
-- Environment variables updated with production URIs
+- Authorized JavaScript origins: `<APP_ORIGIN>`
+- Authorized redirect URIs: `<APP_ORIGIN>/api/auth/gmail/callback`
 
 ## Files Modified/Created
 
@@ -171,7 +166,7 @@ Before deploying, ensure Google Cloud Console has:
 
 ✅ .env.local (Modified)
    - Added Gmail OAuth credentials
-   - Client ID, secret, redirect URIs
+   - Client ID and client secret
 ```
 
 ## Connected Systems
