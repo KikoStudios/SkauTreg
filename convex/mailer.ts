@@ -245,71 +245,72 @@ export const sendFromDraft = action({
     failed: Array<{ email: string; error: string }>; 
     total: number 
   }> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Unauthenticated");
+    try {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity) throw new Error("Unauthenticated");
 
-    const user = await ctx.runQuery(api.users.viewer, {});
-    if (!user) throw new Error("User not found");
+      const user = await ctx.runQuery(api.users.viewer, {});
+      if (!user) throw new Error("User not found");
 
-    const draft: any = await ctx.runQuery(api.emailDrafts.getById, { id: args.draftId });
-    if (!draft) throw new Error("Draft not found");
+      const draft: any = await ctx.runQuery(api.emailDrafts.getById, { id: args.draftId });
+      if (!draft) throw new Error("Draft not found");
 
-    const trip: any = await ctx.runQuery(api.trips.getDashboard, { tripId: draft.tripId });
-    if (!trip) throw new Error("Trip not found");
+      const trip: any = await ctx.runQuery(api.trips.getDashboard, { tripId: draft.tripId });
+      if (!trip) throw new Error("Trip not found");
 
-    const troop = await ctx.runQuery(api.troops.getById, { id: trip.trip.troopId });
-    if (!troop) throw new Error("Troop not found");
+      const troop = await ctx.runQuery(api.troops.getById, { id: trip.trip.troopId });
+      if (!troop) throw new Error("Troop not found");
 
-    // Check permissions - only main_leader or owner can send
-    const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: trip.trip.troopId });
-    const canSend = leaders?.some((l: any) => 
-      l?._id === user._id && (l.role === "owner" || l.role === "main_leader")
-    );
-    
-    if (!canSend) {
-      throw new Error("Pouze vedoucí může odesílat e-maily.");
-    }
-
-    // Use troop's OAuth only
-    const troopGmail = (troop as any).gmailOAuth;
-    const troopRefreshToken = troopGmail?.refreshToken;
-    const senderEmail = troopGmail?.email;
-    if (!troopRefreshToken || !senderEmail) {
-      throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
-    }
-    const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
-    const replyTo = troop.infoEmail || troop.contactEmail || undefined;
-
-    const accessToken = await getGmailAccessToken(troopRefreshToken);
-    const baseUrl = args.baseUrl.replace(/\/$/, "");
-
-    let sentCount = 0;
-    let skippedCount = 0;
-    const failed: Array<{ email: string; error: string }> = [];
-
-    // Filter participants by selected memberIds if provided
-    const selectedMemberIds = args.memberIds ? new Set(args.memberIds) : null;
-    const participantsToSend = selectedMemberIds 
-      ? trip.participants.filter((p: any) => selectedMemberIds.has(p.member?._id))
-      : trip.participants;
-
-    for (const p of participantsToSend) {
-      const email = p.member?.email;
-      if (!email) {
-        skippedCount++;
-        continue;
+      // Check permissions - only main_leader or owner can send
+      const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: trip.trip.troopId });
+      const canSend = leaders?.some((l: any) => 
+        l?._id === user._id && (l.role === "owner" || l.role === "main_leader")
+      );
+      
+      if (!canSend) {
+        throw new Error("Pouze vedoucí může odesílat e-maily.");
       }
 
-      const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
-      const memberName = p.member?.name || "";
-      
-      // Replace smart tags
-      let bodyText = draft.body
-        .replace(/<user\.sign\.link>/g, userLink)
-        .replace(/<user\.name>/g, memberName);
-      
-      // Create simple, personal HTML (avoid promotional styling)
-      let html = `<!DOCTYPE html>
+      // Use troop's OAuth only
+      const troopGmail = (troop as any).gmailOAuth;
+      const troopRefreshToken = troopGmail?.refreshToken;
+      const senderEmail = troopGmail?.email;
+      if (!troopRefreshToken || !senderEmail) {
+        throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
+      }
+      const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
+      const replyTo = troop.infoEmail || troop.contactEmail || undefined;
+
+      const accessToken = await getGmailAccessToken(troopRefreshToken);
+      const baseUrl = args.baseUrl.replace(/\/$/, "");
+
+      let sentCount = 0;
+      let skippedCount = 0;
+      const failed: Array<{ email: string; error: string }> = [];
+
+      // Filter participants by selected memberIds if provided
+      const selectedMemberIds = args.memberIds ? new Set(args.memberIds) : null;
+      const participantsToSend = selectedMemberIds 
+        ? trip.participants.filter((p: any) => selectedMemberIds.has(p.member?._id))
+        : trip.participants;
+
+      for (const p of participantsToSend) {
+        const email = p.member?.email;
+        if (!email) {
+          skippedCount++;
+          continue;
+        }
+
+        const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
+        const memberName = p.member?.name || "";
+        
+        // Replace smart tags
+        let bodyText = draft.body
+          .replace(/<user\.sign\.link>/g, userLink)
+          .replace(/<user\.name>/g, memberName);
+        
+        // Create simple, personal HTML (avoid promotional styling)
+        let html = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; max-width: 600px; margin: 0; padding: 20px;">
@@ -317,32 +318,43 @@ ${bodyText.replace(/\n/g, "<br/>")}
 </body>
 </html>`;
 
-      try {
-        await sendGmailMessage({
-          accessToken,
-          from: `${fromName} <${senderEmail}>`,
-          to: email,
-          subject: draft.subject,
-          html,
-          replyTo,
-        });
-        sentCount++;
-      } catch (err: any) {
-        failed.push({ email, error: err?.message || "Failed" });
+        try {
+          await sendGmailMessage({
+            accessToken,
+            from: `${fromName} <${senderEmail}>`,
+            to: email,
+            subject: draft.subject,
+            html,
+            replyTo,
+          });
+          sentCount++;
+        } catch (err: any) {
+          failed.push({ email, error: err?.message || "Failed" });
+        }
       }
+
+      // Mark draft as sent
+      await ctx.runMutation(api.emailDrafts.markAsSent, {
+        id: args.draftId,
+        recipientCount: sentCount,
+      });
+
+      return {
+        sentCount,
+        skippedCount,
+        failed,
+        total: trip.participants.length,
+      };
+    } catch (err: any) {
+      console.error("mailer:sendFromDraft failed", {
+        draftId: args.draftId,
+        baseUrl: args.baseUrl,
+        hasClientId: Boolean(process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID),
+        hasClientSecret: Boolean(process.env.GMAIL_CLIENT_SECRET),
+        error: err?.message || err,
+      });
+      const message = err?.message || "Unknown error";
+      throw new Error(`[mailer:sendFromDraft] ${message}`);
     }
-
-    // Mark draft as sent
-    await ctx.runMutation(api.emailDrafts.markAsSent, {
-      id: args.draftId,
-      recipientCount: sentCount,
-    });
-
-    return {
-      sentCount,
-      skippedCount,
-      failed,
-      total: trip.participants.length,
-    };
   },
 });
