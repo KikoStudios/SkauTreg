@@ -21,7 +21,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
     const [showNewDraft, setShowNewDraft] = useState(false);
     const [editingDraft, setEditingDraft] = useState<any | null>(null);
     const [sendingDraftId, setSendingDraftId] = useState<Id<"email_drafts"> | null>(null);
-    const [sendingSelectedMembers, setSendingSelectedMembers] = useState<Set<string>>(new Set());
+    const [sendingSelectedMembers, setSendingSelectedMembers] = useState<Set<Id<"members">>>(new Set());
     
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
@@ -30,6 +30,12 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
     const [sendResult, setSendResult] = useState<any | null>(null);
 
     const allMembers = Array.isArray(recipients?.recipients) ? recipients.recipients : [];
+    const memberIds = allMembers
+        .map((m) => m.memberId)
+        .filter((id): id is Id<"members"> => Boolean(id));
+    const selectableMembers = allMembers.filter(
+        (member): member is typeof member & { memberId: Id<"members"> } => Boolean(member.memberId)
+    );
 
     const highlightTags = (text: string) => {
         const parts = text.split(/(<[^>]+>)/g);
@@ -107,7 +113,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
 
     const handleOpenSendPopup = (draft: any) => {
         setSendingDraftId(draft._id);
-        setSendingSelectedMembers(new Set(allMembers.map(m => m.memberId).filter(Boolean) as string[]));
+        setSendingSelectedMembers(new Set(memberIds));
     };
 
     const handleCloseSendPopup = () => {
@@ -116,7 +122,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
         setSendResult(null);
     };
 
-    const toggleMember = (memberId: string) => {
+    const toggleMember = (memberId: Id<"members">) => {
         const newSet = new Set(sendingSelectedMembers);
         if (newSet.has(memberId)) {
             newSet.delete(memberId);
@@ -495,7 +501,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
                             
                             <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                                 <button
-                                    onClick={() => setSendingSelectedMembers(new Set(allMembers.map(m => m.memberId)))}
+                                    onClick={() => setSendingSelectedMembers(new Set(memberIds))}
                                     style={{
                                         padding: "0.5rem 0.75rem",
                                         backgroundColor: "#dbeafe",
@@ -527,7 +533,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
                             </div>
 
                             <div style={{ flex: "1 1 auto", overflowY: "auto", marginBottom: "1rem" }}>
-                                {allMembers && allMembers.length > 0 ? allMembers.map((member) => (
+                                {selectableMembers.length > 0 ? selectableMembers.map((member) => (
                                     <div
                                         key={member.memberId}
                                         style={{
@@ -582,7 +588,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
                                 marginBottom: "1rem",
                                 textAlign: "center"
                             }}>
-                                Vybrání: {sendingSelectedMembers.size} / {allMembers.length}
+                                Vybrání: {sendingSelectedMembers.size} / {selectableMembers.length}
                             </div>
 
                             {sendResult && (
