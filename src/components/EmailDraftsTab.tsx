@@ -107,7 +107,7 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
 
     const handleOpenSendPopup = (draft: any) => {
         setSendingDraftId(draft._id);
-        setSendingSelectedMembers(new Set(allMembers.map(m => m._id)));
+        setSendingSelectedMembers(new Set(allMembers.map(m => m.memberId).filter(Boolean) as string[]));
     };
 
     const handleCloseSendPopup = () => {
