@@ -122,10 +122,54 @@ export const getDashboard = query({
             base = await ctx.db.get(trip.baseId);
         }
 
+        // Current user (if authenticated)
+        const identity = await ctx.auth.getUserIdentity();
+        const currentUser = identity
+            ? await ctx.db
+                .query("users")
+                .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+                .unique()
+            : null;
+
+        // Leaders for troop
+        const troop = await ctx.db.get(trip.troopId);
+        const leaders = troop
+            ? await (async () => {
+                const owner = await ctx.db.get(troop.ownerId);
+                const leaderRecords = await ctx.db
+                    .query("troop_leaders")
+                    .withIndex("by_troop", (q) => q.eq("troopId", trip.troopId))
+                    .collect();
+
+                const leaderUsers = await Promise.all(
+                    leaderRecords.map(async (record) => {
+                        const user = await ctx.db.get(record.userId);
+                        if (!user) return null;
+                        return {
+                            ...user,
+                            role: record.role,
+                            isOwner: user._id === troop.ownerId,
+                        };
+                    })
+                );
+
+                const validLeaders = leaderUsers.filter((l) => l !== null) as Array<any>;
+                const ownerInList = validLeaders.find((l) => l?._id === troop.ownerId);
+
+                if (!ownerInList && owner) {
+                    return [{ ...owner, role: "owner", isOwner: true }, ...validLeaders];
+                }
+
+                return validLeaders;
+            })()
+            : [];
+
         return {
             trip,
             participants: participantsWithDetails,
             base,
+            leaders,
+            currentUser,
         };
     },
 });
