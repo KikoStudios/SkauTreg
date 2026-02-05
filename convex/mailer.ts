@@ -27,15 +27,15 @@ const encodeSubject = (subject: string) => {
   return subject;
 };
 
-// Get access token from troop's OAuth refresh token or fallback to global
+// Get access token from troop's OAuth refresh token
 async function getGmailAccessToken(troopRefreshToken?: string) {
   const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  const refreshToken = troopRefreshToken || process.env.GMAIL_REFRESH_TOKEN;
+  const refreshToken = troopRefreshToken;
 
   if (!clientId) throw new Error(`Missing env: NEXT_PUBLIC_GMAIL_CLIENT_ID`);
   if (!clientSecret) throw new Error(`Missing env: GMAIL_CLIENT_SECRET`);
-  if (!refreshToken) throw new Error(`Missing env: GMAIL_REFRESH_TOKEN`);
+  if (!refreshToken) throw new Error(`Troop must have Gmail OAuth configured. Please connect Gmail in settings.`);
 
   const params = new URLSearchParams({
     client_id: clientId,
