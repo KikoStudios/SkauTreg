@@ -454,7 +454,7 @@ export default function CollaborativeEditor({
                         editor.chain().focus().setColor(color).run();
                     }}
                     onClose={() => setShowColorPicker(false)}
-                    buttonRef={colorButtonRef}
+                    buttonRef={colorButtonRef as React.RefObject<HTMLButtonElement>}
                 />
             )}
             
@@ -464,7 +464,7 @@ export default function CollaborativeEditor({
                         editor.chain().focus().toggleHighlight({ color }).run();
                     }}
                     onClose={() => setShowHighlightPicker(false)}
-                    buttonRef={highlightButtonRef}
+                    buttonRef={highlightButtonRef as React.RefObject<HTMLButtonElement>}
                 />
             )}
         </div>
