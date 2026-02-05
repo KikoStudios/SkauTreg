@@ -29,11 +29,11 @@ const encodeSubject = (subject: string) => {
 
 // Get access token from troop's OAuth refresh token or fallback to global
 async function getGmailAccessToken(troopRefreshToken?: string) {
-  const clientId = process.env.GMAIL_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = troopRefreshToken || process.env.GMAIL_REFRESH_TOKEN;
 
-  if (!clientId) throw new Error(`Missing env: GMAIL_CLIENT_ID`);
+  if (!clientId) throw new Error(`Missing env: NEXT_PUBLIC_GMAIL_CLIENT_ID`);
   if (!clientSecret) throw new Error(`Missing env: GMAIL_CLIENT_SECRET`);
   if (!refreshToken) throw new Error(`Missing env: GMAIL_REFRESH_TOKEN`);
 

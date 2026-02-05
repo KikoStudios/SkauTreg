@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * 7. Redirect back to settings page
  */
 export async function GET(req: NextRequest) {
-  const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
+  const GMAIL_CLIENT_ID = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
   const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
 
   const searchParams = req.nextUrl.searchParams;
