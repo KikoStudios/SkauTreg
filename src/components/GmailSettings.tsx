@@ -92,7 +92,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
         router.push(`/settings/${troopId}/gmail-connect`);
     };
 
-    const debugClientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID || "(missing)";
+    const debugClientId = "(fetched from API)";
     const debugRedirectUri = typeof window !== "undefined"
         ? `${window.location.origin}/api/auth/gmail/callback`
         : "(dynamic)";
