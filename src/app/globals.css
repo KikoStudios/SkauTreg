@@ -81,6 +81,8 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   /* App-like feel */
+  /* Prevent unwanted touch dragging on mobile */
+  touch-action: pan-y pinch-zoom;
 }
 
 a {

@@ -394,7 +394,7 @@ export default function RadyTab() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
             {/* Top Title Bar removed as it's typically handled by the page wrapper or breadcrumbs */}
 
             {/* Controls Row */}
@@ -590,6 +590,7 @@ export default function RadyTab() {
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
                 gap: "1.5rem",
+                padding: "0.5rem",
             }}>
                 {/* 1. Trip Folders */}
                 {(activeTab === "all" || activeTab === "trips") && Array.from(meetingsByTrip.entries())

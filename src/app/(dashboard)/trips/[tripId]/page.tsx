@@ -275,7 +275,7 @@ export default function TripDashboardPage() {
     }
 
     return (
-        <div style={{ width: "100%", position: "relative" }}>
+        <div style={{ width: "100%", position: "relative", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",

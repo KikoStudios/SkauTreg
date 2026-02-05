@@ -208,7 +208,7 @@ export default function TroopSettingsPage() {
     if (!troop) return <div>Načítám...</div>;
 
     return (
-        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingBottom: "6rem", overflowX: "visible" }}>
+        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingBottom: "6rem", overflowX: "hidden" }}>
             <div style={{
                 background: "linear-gradient(140deg, #fef3c7 0%, #e0e7ff 100%)",
                 border: "3px solid #000",

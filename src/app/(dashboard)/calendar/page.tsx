@@ -29,7 +29,7 @@ export default function CalendarPage() {
     }
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
@@ -83,7 +83,7 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Days Grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", padding: "0.5rem" }}>
                     {calendarDays.map((day, dayIdx) => {
                         const dayTrips = trips.filter(trip => {
                             const start = parseISO(trip.startDate); // Assuming YYYY-MM-DD

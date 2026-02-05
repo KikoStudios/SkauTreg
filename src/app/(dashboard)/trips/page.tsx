@@ -103,7 +103,7 @@ export default function TripsPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
@@ -280,7 +280,7 @@ export default function TripsPage() {
                         Žádné výpravy nenalezeny. Klikněte na ADD pro naplánování nové.
                     </div>
                 ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2rem", padding: "0.5rem" }}>
                         {filteredTrips.map((trip: any) => (
                             <Link key={trip._id} href={`/trips/${trip._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                                 <div style={{

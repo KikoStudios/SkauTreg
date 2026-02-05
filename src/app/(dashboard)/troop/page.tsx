@@ -195,7 +195,7 @@ export default function TroopsPage() {
     };
 
     return (
-        <div style={{ position: "relative", minHeight: "80vh" }} onClick={() => setShowCreateForm(false)}>
+        <div style={{ position: "relative", minHeight: "80vh", paddingBottom: "2rem" }} onClick={() => setShowCreateForm(false)}>
             <div className="u-flex u-justify-between u-items-center u-mb-4" style={{ position: 'relative' }}>
                 <h1 className="u-text-lg u-font-bold">Moje Oddíly</h1>
 

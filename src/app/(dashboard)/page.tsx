@@ -164,13 +164,7 @@ export default function Home() {
       <div style={{ marginBottom: "2rem" }}>
         <h2 style={{ fontSize: "1.125rem", fontWeight: "900", marginBottom: "1rem" }}>Nejbližší výpravy</h2>
         {trips && trips.length > 0 ? (
-          <div style={{
-            backgroundColor: "white",
-            border: "2px solid var(--border-color)",
-            borderRadius: "8px",
-            boxShadow: "2px 2px 0 0 #000",
-            overflow: "hidden"
-          }}>
+          <div style={{ backgroundColor: "white", border: "2px solid var(--border-color)", borderRadius: "8px", boxShadow: "2px 2px 0 0 #000", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--border-color)", backgroundColor: "#86efac" }}>
@@ -193,16 +187,7 @@ export default function Home() {
                       {formatDate(trip.startDate)}
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      <span style={{
-                        display: "inline-block",
-                        backgroundColor: "#86efac",
-                        border: "2px solid #000",
-                        borderRadius: "6px",
-                        padding: "0.25rem 0.75rem",
-                        fontWeight: "700",
-                        fontSize: "0.85rem",
-                        boxShadow: "2px 2px 0 0 #000"
-                      }}>
+                      <span style={{ display: "inline-block", backgroundColor: "#86efac", border: "2px solid #000", borderRadius: "6px", padding: "0.25rem 0.75rem", fontWeight: "700", fontSize: "0.85rem", boxShadow: "2px 2px 0 0 #000" }}>
                         Plánuje se
                       </span>
                     </td>
@@ -212,14 +197,7 @@ export default function Home() {
             </table>
           </div>
         ) : (
-          <div style={{
-            backgroundColor: "white",
-            border: "2px solid var(--border-color)",
-            borderRadius: "8px",
-            padding: "2rem",
-            textAlign: "center",
-            color: "var(--text-muted)"
-          }}>
+          <div style={{ backgroundColor: "white", border: "2px solid var(--border-color)", borderRadius: "8px", padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
             Žádné výpravy. <Link href="/trips"><Button variant="outline" style={{ display: "inline-block", marginTop: "1rem" }}>Vytvořit výpravu</Button></Link>
           </div>
         )}

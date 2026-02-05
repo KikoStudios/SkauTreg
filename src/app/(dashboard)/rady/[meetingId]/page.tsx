@@ -16,14 +16,17 @@ import "tippy.js/dist/tippy.css";
 export default function MeetingRoomPage({ params }: { params: Promise<{ meetingId: string }> }) {
     const router = useRouter();
     const { meetingId: meetingIdParam } = use(params);
-    const meetingId = meetingIdParam as Id<"meetings">;
     const { isSidebarCollapsed } = useSidebar();
+    
+    // Validate that meetingId is a valid Convex ID format (no dots, slashes, or special chars)
+    const isValidId = /^[a-z0-9_]+$/i.test(meetingIdParam);
+    const meetingId = isValidId ? (meetingIdParam as Id<"meetings">) : null;
 
-    const meeting = useQuery(api.meetings.get, { meetingId });
+    const meeting = useQuery(api.meetings.get, meetingId ? { meetingId } : "skip");
     const tripId = meeting?.tripId;
     const tripDocs = useQuery(api.meetings.listByTrip, tripId ? { tripId } : "skip");
     
-    const pages = useQuery(api.pages.getByMeeting, { meetingId });
+    const pages = useQuery(api.pages.getByMeeting, meetingId ? { meetingId } : "skip");
     const allTripPages = useQuery(api.pages.getPagesByTrip, tripId ? { tripId } : "skip");
     const joinMeeting = useMutation(api.meetings.join);
     const updateMeeting = useMutation(api.meetings.update);
@@ -103,6 +106,28 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
         setSelectedImage({ fileId, url });
         setShowAnnotator(true);
     };
+
+    // Redirect to meetings list if invalid ID
+    useEffect(() => {
+        if (!isValidId) {
+            router.push("/rady");
+        }
+    }, [isValidId, router]);
+
+    if (!isValidId || !meetingId) {
+        return (
+            <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100vh",
+                flexDirection: "column",
+                gap: "1rem"
+            }}>
+                <div style={{ fontSize: "1.25rem", fontWeight: "700" }}>Redirecting...</div>
+            </div>
+        );
+    }
 
     if (!meeting) {
         return (

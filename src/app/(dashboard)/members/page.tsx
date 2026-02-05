@@ -278,7 +278,7 @@ export default function MembersPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
@@ -465,6 +465,7 @@ export default function MembersPage() {
                 overflow: "hidden",
                 backgroundColor: "white"
             }}>
+                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     {/* Green Accented Header */}
                     <thead style={{ backgroundColor: "#86efac", borderBottom: "3px solid #000" }}>
@@ -512,6 +513,7 @@ export default function MembersPage() {
                         )}
                     </tbody>
                 </table>
+                </div>
             </div>
 
             {/* Add/Edit Member Modal */}
@@ -568,7 +570,7 @@ export default function MembersPage() {
                                     style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
                                 />
                             </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", padding: "0.5rem" }}>
                                 <div>
                                     <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Přezdívka</label>
                                     <input
@@ -677,7 +679,7 @@ export default function MembersPage() {
                             </div>
                         )}
 
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", padding: "0.5rem" }}>
                             {([
                                 { key: "name", label: "Jméno" },
                                 { key: "nickname", label: "Přezdívka" },
@@ -705,6 +707,7 @@ export default function MembersPage() {
                         <div style={{ marginTop: "1.5rem" }}>
                             <h3 style={{ fontSize: "1.1rem", fontWeight: "900" }}>Náhled (prvních 5 řádků)</h3>
                             <div style={{ border: "2px solid #000", borderRadius: "12px", overflow: "hidden" }}>
+                                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                                     <thead style={{ backgroundColor: "#f3f4f6" }}>
                                         <tr>
@@ -729,6 +732,7 @@ export default function MembersPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                                </div>
                             </div>
                         </div>
 

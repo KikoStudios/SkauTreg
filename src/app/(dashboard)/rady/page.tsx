@@ -4,7 +4,7 @@ import RadyTab from "../../../components/RadyTab";
 
 export default function RadyPage() {
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",

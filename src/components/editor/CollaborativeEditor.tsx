@@ -7,14 +7,21 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Mention from "@tiptap/extension-mention";
+import Underline from "@tiptap/extension-underline";
+import TextStyle from "@tiptap/extension-text-style";
+import Color from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
 import { useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { mergeAttributes } from "@tiptap/core";
 import { createMentionSuggestion, MentionItem } from "./MentionSuggestion";
 import CollaborativeCursors from "./CollaborativeCursors";
+import PromptModal from "../PromptModal";
+import ColorPicker from "../ColorPicker";
 import styles from "./Editor.module.css";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface CollaborativeEditorProps {
     pageId: Id<"meeting_pages">;
@@ -27,11 +34,18 @@ export default function CollaborativeEditor({
     troopId,
     editable = true,
 }: CollaborativeEditorProps) {
+    const router = useRouter();
     const convex = useConvex();
     const updateCursor = useMutation(api.editorPresence.updateCursor);
     const removeCursor = useMutation(api.editorPresence.removeCursor);
     const editorContainerRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const colorButtonRef = useRef<HTMLButtonElement>(null);
+    const highlightButtonRef = useRef<HTMLButtonElement>(null);
+    
+    const [showLinkModal, setShowLinkModal] = useState(false);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const [showHighlightPicker, setShowHighlightPicker] = useState(false);
 
     // Search mentions function
     const searchMentions = async (query: string): Promise<MentionItem[]> => {
@@ -96,14 +110,18 @@ export default function CollaborativeEditor({
             StarterKit.configure({
                 history: false, // Disable local history when using collaboration
             }),
+            Underline,
+            TextStyle,
+            Color,
+            Highlight.configure({ multicolor: true }),
+            Link.configure({
+                openOnClick: false, // Disable default click handling
+                HTMLAttributes: {
+                    class: 'editor-link',
+                },
+            }),
             Placeholder.configure({
                 placeholder: "Start typing your notes...",
-            }),
-            Link.configure({
-                openOnClick: false,
-                HTMLAttributes: {
-                    class: "editor-link",
-                },
             }),
             Image.configure({
                 HTMLAttributes: {
@@ -123,6 +141,14 @@ export default function CollaborativeEditor({
         editorProps: {
             attributes: {
                 class: "prose prose-invert max-w-none",
+            },
+            handleClickOn: (view, pos, node, nodePos, event, direct) => {
+                // Allow clicks on links and mentions to pass through
+                const target = event.target as HTMLElement;
+                if (target.tagName === 'A' || target.closest('a')) {
+                    return false; // Let the click event propagate
+                }
+                return false;
             },
         },
         onSelectionUpdate: ({ editor }) => {
@@ -149,6 +175,41 @@ export default function CollaborativeEditor({
             });
         };
     }, [pageId]);
+
+    // Handle link clicks to prevent default navigation
+    useEffect(() => {
+        if (!editor) return;
+        
+        const handleLinkClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            
+            // Check if the clicked element is a link or has a link parent
+            const linkElement = target.tagName === 'A' ? target as HTMLAnchorElement : target.closest('a');
+            
+            if (linkElement) {
+                const href = linkElement.getAttribute('href');
+                if (!href) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Check if it's an internal link (starts with / or is relative)
+                const isInternal = href.startsWith('/') || (!href.startsWith('http://') && !href.startsWith('https://'));
+                
+                if (isInternal) {
+                    // Navigate internally using Next.js router
+                    router.push(href);
+                } else {
+                    // Open external links in new tab
+                    window.open(href, '_blank', 'noopener,noreferrer');
+                }
+            }
+        };
+
+        const editorElement = editor.view.dom;
+        editorElement.addEventListener('click', handleLinkClick);
+        return () => editorElement.removeEventListener('click', handleLinkClick);
+    }, [editor, router]);
 
     // Loading state
     if (sync.isLoading) {
@@ -211,7 +272,20 @@ export default function CollaborativeEditor({
 
     return (
         <div className={styles.editor} ref={editorContainerRef}>
-            {/* Formatting Toolbar */}
+            {/* Main Editor Content */}
+            <div className={styles.editorContent}>
+                <div className={styles.editorWrapper} ref={wrapperRef}>
+                    <EditorContent editor={editor} />
+                    {/* Show other users' cursors */}
+                    <CollaborativeCursors 
+                        pageId={pageId} 
+                        editor={editor}
+                        containerRef={wrapperRef}
+                    />
+                </div>
+            </div>
+            
+            {/* Formatting Toolbar - Right Side */}
             {editable && (
                 <div className={styles.toolbar}>
                     <div className={styles.toolbarGroup}>
@@ -235,6 +309,13 @@ export default function CollaborativeEditor({
                             title="Strikethrough"
                         >
                             <s>S</s>
+                        </button>
+                        <button
+                            onClick={() => editor.chain().focus().toggleUnderline().run()}
+                            className={`${styles.toolbarButton} ${editor.isActive("underline") ? styles.isActive : ""}`}
+                            title="Underline"
+                        >
+                            <u>U</u>
                         </button>
                     </div>
 
@@ -301,29 +382,91 @@ export default function CollaborativeEditor({
 
                     <div className={styles.toolbarGroup}>
                         <button
+                            ref={colorButtonRef}
+                            onClick={() => setShowColorPicker(!showColorPicker)}
+                            className={`${styles.toolbarButton}`}
+                            title="Text Color"
+                        >
+                            A
+                        </button>
+                        <button
+                            ref={highlightButtonRef}
+                            onClick={() => setShowHighlightPicker(!showHighlightPicker)}
+                            className={`${styles.toolbarButton} ${editor.isActive("highlight") ? styles.isActive : ""}`}
+                            title="Highlight"
+                        >
+                            ⬛
+                        </button>
+                        <button
                             onClick={() => {
-                                const url = window.prompt("Enter URL:");
-                                if (url) {
-                                    editor.chain().focus().setLink({ href: url }).run();
+                                editor.chain().focus().unsetAllMarks().run();
+                            }}
+                            className={`${styles.toolbarButton}`}
+                            title="Clear Formatting"
+                        >
+                            ✕
+                        </button>
+                    </div>
+
+                    <div className={styles.toolbarDivider} />
+
+                    <div className={styles.toolbarGroup}>
+                        <button
+                            onClick={() => {
+                                if (editor.isActive("link")) {
+                                    editor.chain().focus().unsetLink().run();
+                                } else {
+                                    setShowLinkModal(true);
                                 }
                             }}
                             className={`${styles.toolbarButton} ${editor.isActive("link") ? styles.isActive : ""}`}
-                            title="Add Link"
+                            title={editor.isActive("link") ? "Remove Link" : "Add Link"}
                         >
-                            🔗
+                            {editor.isActive("link") ? "🔗✕" : "🔗"}
                         </button>
                     </div>
                 </div>
             )}
-            <div className={styles.editorWrapper} ref={wrapperRef}>
-                <EditorContent editor={editor} />
-                {/* Show other users' cursors */}
-                <CollaborativeCursors 
-                    pageId={pageId} 
-                    editor={editor}
-                    containerRef={wrapperRef}
+            
+            {/* Custom Modals */}
+            {showLinkModal && (
+                <PromptModal
+                    title="Přidat odkaz"
+                    placeholder="example.com nebo https://example.com"
+                    defaultValue=""
+                    onConfirm={(url) => {
+                        let formattedUrl = url.trim();
+                        // Auto-add https:// if no protocol specified
+                        if (formattedUrl && !formattedUrl.match(/^[a-zA-Z]+:\/\//)) {
+                            formattedUrl = 'https://' + formattedUrl;
+                        }
+                        editor.chain().focus().setLink({ href: formattedUrl }).run();
+                        setShowLinkModal(false);
+                    }}
+                    onCancel={() => setShowLinkModal(false)}
                 />
-            </div>
+            )}
+            
+            {/* Color Pickers */}
+            {showColorPicker && (
+                <ColorPicker
+                    onSelect={(color) => {
+                        editor.chain().focus().setColor(color).run();
+                    }}
+                    onClose={() => setShowColorPicker(false)}
+                    buttonRef={colorButtonRef}
+                />
+            )}
+            
+            {showHighlightPicker && (
+                <ColorPicker
+                    onSelect={(color) => {
+                        editor.chain().focus().toggleHighlight({ color }).run();
+                    }}
+                    onClose={() => setShowHighlightPicker(false)}
+                    buttonRef={highlightButtonRef}
+                />
+            )}
         </div>
     );
 }
