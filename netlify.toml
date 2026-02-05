@@ -4,7 +4,7 @@
 
 # Secrets scanning configuration
 # NEXT_PUBLIC_GMAIL_CLIENT_ID is intentionally public (OAuth 2.0 public client ID)
-# and should not be treated as a secret - it's designed to be exposed to clients
+# Omit GMAIL_CLIENT_ID from scanning since we don't use it in the code anymore
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_GMAIL_CLIENT_ID"
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_GMAIL_CLIENT_ID,GMAIL_CLIENT_ID"
 
