@@ -270,10 +270,13 @@ export const sendFromDraft = action({
       throw new Error("Pouze vedoucí může odesílat e-maily.");
     }
 
-    // Use troop's OAuth if available
-    const troopRefreshToken = (troop as any).gmailOAuth?.refreshToken;
-    const senderEmail = (troop as any).gmailOAuth?.email || process.env.GMAIL_SENDER;
-    if (!senderEmail) throw new Error("Missing env: GMAIL_SENDER");
+    // Use troop's OAuth only
+    const troopGmail = (troop as any).gmailOAuth;
+    const troopRefreshToken = troopGmail?.refreshToken;
+    const senderEmail = troopGmail?.email;
+    if (!troopRefreshToken || !senderEmail) {
+      throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
+    }
     const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
     const replyTo = troop.infoEmail || troop.contactEmail || undefined;
 
