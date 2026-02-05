@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const GMAIL_CLIENT_ID = process.env.GMAIL_CLIENT_ID;
 const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
 
 /**
@@ -61,12 +62,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch client ID from config endpoint
-    const configUrl = `${req.nextUrl.origin}/api/auth/gmail/config`;
-    const configRes = await fetch(configUrl);
-    const { serverClientId } = await configRes.json();
-
-    if (!serverClientId || !GMAIL_CLIENT_SECRET) {
+    // Use server-side client credentials
+    if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
       console.error('Missing Gmail configuration');
       return NextResponse.redirect(
         new URL(
@@ -81,7 +78,7 @@ export async function GET(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: serverClientId,
+        client_id: GMAIL_CLIENT_ID,
         client_secret: GMAIL_CLIENT_SECRET,
         code,
         grant_type: 'authorization_code',
