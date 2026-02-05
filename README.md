@@ -29,8 +29,8 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [ ] **Uctenky k vypravam**
 - [ ] **Fotky** odkaz a videni alba na odkazech na prihlaseni po vyprave
 - [ ] **Managment** kdo zaplatil vypravu a kdo ne s uležením toho komu zaplatil
-- [ ] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
-- [ ] **Rada managment** zapisy z rad a bot kterej je posle na discord
+- [x] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
+- [x] **Rada managment** zapisy z rad a bot kterej je posle na discord
 - [ ] **Git kontrola** kdyz rover edituje casti veci musi bit accpnuty vedoucimy
 
 ## Jak aplikaci spustit
