@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+# Secrets scanning configuration
+# NEXT_PUBLIC_GMAIL_CLIENT_ID is intentionally public (OAuth 2.0 public client ID)
+# and should not be treated as a secret
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_GMAIL_CLIENT_ID"
