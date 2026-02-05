@@ -130,6 +130,43 @@ export const getDashboard = query({
     },
 });
 
+export const ensureParticipations = mutation({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        const trip = await ctx.db.get(args.tripId);
+        if (!trip) throw new Error("Trip not found");
+
+        const members = await ctx.db
+            .query("members")
+            .withIndex("by_troop", (q) => q.eq("troopId", trip.troopId))
+            .collect();
+
+        const participations = await ctx.db
+            .query("participations")
+            .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
+            .collect();
+
+        const existingMemberIds = new Set(participations.map((p) => p.memberId));
+        let createdCount = 0;
+
+        for (const member of members) {
+            if (existingMemberIds.has(member._id)) continue;
+
+            const accessKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            await ctx.db.insert("participations", {
+                tripId: args.tripId,
+                memberId: member._id,
+                status: "pending",
+                accessKey,
+                responses: {},
+            });
+            createdCount++;
+        }
+
+        return { createdCount };
+    },
+});
+
 export const list = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {

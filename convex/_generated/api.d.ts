@@ -10,8 +10,10 @@
 
 import type * as bases from "../bases.js";
 import type * as editorPresence from "../editorPresence.js";
+import type * as emailDrafts from "../emailDrafts.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
+import type * as mailer from "../mailer.js";
 import type * as meetingFiles from "../meetingFiles.js";
 import type * as meetings from "../meetings.js";
 import type * as members from "../members.js";
@@ -35,8 +37,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   bases: typeof bases;
   editorPresence: typeof editorPresence;
+  emailDrafts: typeof emailDrafts;
   files: typeof files;
   http: typeof http;
+  mailer: typeof mailer;
   meetingFiles: typeof meetingFiles;
   meetings: typeof meetings;
   members: typeof members;

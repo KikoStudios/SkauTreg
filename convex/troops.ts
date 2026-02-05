@@ -10,6 +10,7 @@ export const create = mutation({
         logo: v.optional(v.string()),
         accentColor: v.optional(v.string()),
         contactEmail: v.optional(v.string()),
+        infoEmail: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -37,6 +38,7 @@ export const create = mutation({
             logo: args.logo,
             accentColor: args.accentColor,
             contactEmail: args.contactEmail,
+            infoEmail: args.infoEmail,
         });
 
         return troopId;
@@ -53,6 +55,7 @@ export const update = mutation({
         logo: v.optional(v.string()),
         accentColor: v.optional(v.string()),
         contactEmail: v.optional(v.string()),
+        infoEmail: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -378,5 +381,73 @@ export const deleteTroop = mutation({
 
         // 4. Delete Troop
         await ctx.db.delete(args.id);
+    },
+});
+
+// --- Gmail OAuth Integration ---
+
+export const connectGmail = mutation({
+    args: {
+        troopId: v.id("troops"),
+        email: v.string(),
+        refreshToken: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) =>
+                q.eq("tokenIdentifier", identity.tokenIdentifier)
+            )
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop) throw new Error("Troop not found");
+
+        // Only owner or main_leader can connect
+        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
+            throw new Error("Nemáte oprávnění nastavovat Gmail.");
+        }
+
+        await ctx.db.patch(args.troopId, {
+            gmailOAuth: {
+                email: args.email,
+                refreshToken: args.refreshToken,
+                connectedAt: new Date().toISOString(),
+                connectedBy: user._id,
+            },
+        });
+    },
+});
+
+export const disconnectGmail = mutation({
+    args: {
+        troopId: v.id("troops"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) =>
+                q.eq("tokenIdentifier", identity.tokenIdentifier)
+            )
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        // Only owner or main_leader can disconnect
+        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
+            throw new Error("Nemáte oprávnění nastavovat Gmail.");
+        }
+
+        await ctx.db.patch(args.troopId, {
+            gmailOAuth: undefined,
+        });
     },
 });

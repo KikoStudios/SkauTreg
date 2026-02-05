@@ -74,7 +74,7 @@ export default function CollaborativeEditor({
             else if (type === "user") {
                 href = "/members";
             } else if (type === "base" || type === "station") {
-                href = "/tools";
+                href = `/tools?baseId=${node.attrs.id}`;
             }
 
             return [

@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
@@ -8,6 +10,7 @@ import { useState, useCallback, useEffect } from "react";
 import Button from "../../../../components/Button";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
+import GmailSettings from "../../../../components/GmailSettings";
 
 // --- Helpers for Image Upload (Copied/Adapted) ---
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -83,7 +86,7 @@ export default function TroopSettingsPage() {
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
     const deleteTroop = useMutation(api.troops.deleteTroop);
 
-    const [activeTab, setActiveTab] = useState<"general" | "branding" | "danger">("general");
+    const [activeTab, setActiveTab] = useState<"general" | "branding" | "gmail" | "danger">("general");
     const [isSaving, setIsSaving] = useState(false);
 
     // Form State
@@ -93,6 +96,7 @@ export default function TroopSettingsPage() {
         type: "",
         description: "",
         contactEmail: "",
+        infoEmail: "",
         accentColor: ""
     });
 
@@ -112,6 +116,7 @@ export default function TroopSettingsPage() {
                 type: troop.type || "",
                 description: troop.description || "",
                 contactEmail: troop.contactEmail || "",
+                infoEmail: troop.infoEmail || "",
                 accentColor: troop.accentColor || ""
             });
         }
@@ -172,6 +177,7 @@ export default function TroopSettingsPage() {
                 type: formData.type,
                 description: formData.description,
                 contactEmail: formData.contactEmail,
+                infoEmail: formData.infoEmail,
                 accentColor: formData.accentColor,
                 logo: logoStorageId // Only update if new one uploaded
             });
@@ -202,10 +208,22 @@ export default function TroopSettingsPage() {
     if (!troop) return <div>Načítám...</div>;
 
     return (
-        <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto", paddingBottom: "5rem", overflowX: "hidden" }}>
-            <div className="settings-header">
-                <button onClick={() => router.back()} style={{ background: "none", border: "none", fontSize: "2rem", cursor: "pointer" }}>←</button>
-                <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0, wordBreak: "break-word" }}>Nastavení Oddílu</h1>
+        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingBottom: "6rem", overflowX: "visible" }}>
+            <div style={{
+                background: "linear-gradient(140deg, #fef3c7 0%, #e0e7ff 100%)",
+                border: "3px solid #000",
+                borderRadius: "16px",
+                padding: "1.5rem 2rem",
+                marginBottom: "1.5rem",
+                boxShadow: "6px 6px 0 0 #000"
+            }}>
+                <div className="settings-header" style={{ marginBottom: "0.5rem" }}>
+                    <button onClick={() => router.back()} style={{ background: "white", border: "3px solid #000", borderRadius: "10px", width: "44px", height: "44px", cursor: "pointer", fontSize: "1.3rem", fontWeight: "900", boxShadow: "3px 3px 0 0 #000" }}>←</button>
+                    <div>
+                        <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0, wordBreak: "break-word" }}>Nastavení Oddílu</h1>
+                        <div style={{ fontWeight: "700", color: "#374151" }}>Upravte základní informace, vzhled a e‑mailové nastavení.</div>
+                    </div>
+                </div>
             </div>
 
             {/* Tabs */}
@@ -221,6 +239,12 @@ export default function TroopSettingsPage() {
                     style={tabStyle(activeTab === "branding")}
                 >
                     Vzhled & Logo
+                </button>
+                <button
+                    onClick={() => setActiveTab("gmail")}
+                    style={tabStyle(activeTab === "gmail")}
+                >
+                    Gmail & Email
                 </button>
                 <button
                     onClick={() => setActiveTab("danger")}
@@ -240,9 +264,12 @@ export default function TroopSettingsPage() {
                 .tabs-container {
                     display: flex;
                     gap: 1rem;
-                    margin-bottom: 2rem;
-                    border-bottom: 3px solid #000;
-                    padding-bottom: 1rem;
+                    margin-bottom: 1.5rem;
+                    padding: 0.75rem;
+                    background: #fff;
+                    border: 3px solid #000;
+                    border-radius: 12px;
+                    box-shadow: 4px 4px 0 0 #000;
                     flex-wrap: wrap; /* Wrap tabs on small screens */
                 }
 
@@ -269,7 +296,7 @@ export default function TroopSettingsPage() {
             <form onSubmit={handleSave}>
                 {/* GENERAL TAB */}
                 {activeTab === "general" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                    <div style={panelStyle}>
                         <div style={formGroupStyle}>
                             <label style={labelStyle}>Jméno Oddílu</label>
                             <input
@@ -314,12 +341,25 @@ export default function TroopSettingsPage() {
                                 style={inputStyle}
                             />
                         </div>
+                        <div style={formGroupStyle}>
+                            <label style={labelStyle}>Informační Email (pro rozesílání)</label>
+                            <input
+                                type="email"
+                                value={formData.infoEmail}
+                                onChange={e => setFormData({ ...formData, infoEmail: e.target.value })}
+                                style={inputStyle}
+                                placeholder="info@oddil.cz"
+                            />
+                            <span style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600", marginTop: "0.35rem" }}>
+                                Použije se jako odpovědní adresa při hromadných emailech.
+                            </span>
+                        </div>
                     </div>
                 )}
 
                 {/* BRANDING TAB */}
                 {activeTab === "branding" && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+                    <div style={panelStyle}>
                         {/* Logo Section */}
                         <div style={{ textAlign: "center", padding: "2rem", border: "3px dashed #ccc", borderRadius: "12px" }}>
                             <h3 style={{ fontWeight: "900", marginBottom: "1rem" }}>Logo Oddílu</h3>
@@ -405,7 +445,17 @@ export default function TroopSettingsPage() {
                     </div>
                 )}
 
-                {/* Footer Actions (Only for General/Branding) */}
+                {/* GMAIL TAB */}
+                {activeTab === "gmail" && (
+                    <div style={panelStyle}>
+                        <GmailSettings 
+                            troopId={troopId}
+                            isAuthorized={true}
+                        />
+                    </div>
+                )}
+
+                {/* DANGER TAB */}
                 {activeTab !== "danger" && (
                     <div style={{
                         position: "fixed",
@@ -501,15 +551,28 @@ export default function TroopSettingsPage() {
 
 // Styles
 const tabStyle = (active: boolean) => ({
-    padding: "0.75rem 1.5rem",
-    fontWeight: "800",
-    fontSize: "1.1rem",
-    border: "none",
-    background: "none",
+    padding: "0.65rem 1.25rem",
+    fontWeight: "900",
+    fontSize: "0.95rem",
+    border: "3px solid #000",
+    background: active ? "#86efac" : "#f3f4f6",
     cursor: "pointer",
-    borderBottom: active ? "4px solid #000" : "4px solid transparent",
-    opacity: active ? 1 : 0.5
+    borderRadius: "999px",
+    boxShadow: active ? "3px 3px 0 0 #000" : "2px 2px 0 0 #000",
+    opacity: active ? 1 : 0.75,
+    textTransform: "uppercase" as const
 });
+
+const panelStyle = {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "1.5rem",
+    backgroundColor: "white",
+    border: "3px solid #000",
+    borderRadius: "14px",
+    padding: "1.5rem",
+    boxShadow: "6px 6px 0 0 #000"
+};
 
 const formGroupStyle = {
     display: "flex",

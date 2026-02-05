@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -42,7 +43,12 @@ function stripHtmlTags(html: string | undefined): string {
 }
 
 export default function BaseFinder() {
-    const [selectedBaseId, setSelectedBaseId] = useState<Id<"bases"> | null>(null);
+    const searchParams = useSearchParams();
+    const baseIdParam = searchParams?.get('baseId');
+    
+    const [selectedBaseId, setSelectedBaseId] = useState<Id<"bases"> | null>(
+        baseIdParam ? (baseIdParam as Id<"bases">) : null
+    );
     const [activeTab, setActiveTab] = useState<TabType>('info');
     const [isConditionsExpanded, setIsConditionsExpanded] = useState(false);
     const [isEquipmentExpanded, setIsEquipmentExpanded] = useState(false);

@@ -394,7 +394,7 @@ export default function RadyTab() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
             {/* Top Title Bar removed as it's typically handled by the page wrapper or breadcrumbs */}
 
             {/* Controls Row */}

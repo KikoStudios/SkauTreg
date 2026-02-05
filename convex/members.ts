@@ -26,6 +26,23 @@ export const create = mutation({
             email: args.email,
         });
 
+        // Automatically create participation entries for all existing trips in this troop
+        const trips = await ctx.db
+            .query("trips")
+            .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
+            .collect();
+
+        for (const trip of trips) {
+            const accessKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            await ctx.db.insert("participations", {
+                tripId: trip._id,
+                memberId: memberId,
+                status: "pending",
+                accessKey: accessKey,
+                responses: {},
+            });
+        }
+
         return memberId;
     },
 });

@@ -103,7 +103,7 @@ export default function TripsPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "visible" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",

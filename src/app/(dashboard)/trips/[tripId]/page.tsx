@@ -1,14 +1,15 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
+import EmailDraftsTab from "../../../../components/EmailDraftsTab";
 
-type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace';
+type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace' | 'emaily';
 
 export default function TripDashboardPage() {
     const params = useParams();
@@ -19,6 +20,13 @@ export default function TripDashboardPage() {
     const updateTrip = useMutation(api.trips.update);
     const deleteTrip = useMutation(api.trips.remove);
     const unassignBase = useMutation(api.trips.unassignBase);
+    const ensureParticipations = useMutation(api.trips.ensureParticipations);
+    const sendTripEmail = useAction(api.mailer.sendTripEmail);
+
+    const troop = useQuery(
+        api.troops.getById,
+        dashboard ? { id: dashboard.trip.troopId } : "skip"
+    );
 
     const [activeTab, setActiveTab] = useState<TabType>('info');
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -27,6 +35,11 @@ export default function TripDashboardPage() {
     const [viewResponse, setViewResponse] = useState<any | null>(null);
     const [showCreateDoc, setShowCreateDoc] = useState(false);
     const [newDocTitle, setNewDocTitle] = useState("");
+    const [emailSubject, setEmailSubject] = useState("");
+    const [emailBody, setEmailBody] = useState("");
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [emailResult, setEmailResult] = useState<{ sentCount: number; skippedCount: number; total: number; failed: { email: string; error: string }[] } | null>(null);
+    const [didEnsureParticipants, setDidEnsureParticipants] = useState(false);
 
     const tripDocs = useQuery(api.meetings.listByTrip, { tripId });
     const createDoc = useMutation(api.meetings.create);
@@ -143,6 +156,53 @@ export default function TripDashboardPage() {
         return parsed;
     };
 
+    useEffect(() => {
+        if (!dashboard) return;
+        if (!emailSubject) {
+            setEmailSubject(`Pozvánka: ${dashboard.trip.name}`);
+        }
+        if (!emailBody) {
+            const formatDate = (dStr: string) => {
+                if (!dStr) return "";
+                const [y, m, d] = dStr.split("-");
+                return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
+            };
+            const dateLabel = `${formatDate(dashboard.trip.startDate)}${dashboard.trip.endDate ? ` - ${formatDate(dashboard.trip.endDate)}` : ""}`;
+            setEmailBody(`Ahoj!\n\nPosíláme pozvánku na výpravu ${dashboard.trip.name} (${dateLabel}).\n\nProsíme o potvrzení účasti přes tento odkaz: @userlink\n\nDěkujeme!`);
+        }
+    }, [dashboard, emailSubject, emailBody]);
+
+    useEffect(() => {
+        if (!dashboard || didEnsureParticipants) return;
+        setDidEnsureParticipants(true);
+        ensureParticipations({ tripId }).catch((error) => {
+            console.error("Failed to ensure participations", error);
+        });
+    }, [dashboard, didEnsureParticipants, ensureParticipations, tripId]);
+
+    const handleSendEmail = async () => {
+        if (!emailSubject.trim() || !emailBody.trim()) {
+            alert("Vyplňte předmět i text emailu.");
+            return;
+        }
+        setIsSendingEmail(true);
+        setEmailResult(null);
+        try {
+            const result = await sendTripEmail({
+                tripId,
+                subject: emailSubject.trim(),
+                body: emailBody,
+                baseUrl: window.location.origin
+            });
+            setEmailResult(result);
+        } catch (error: any) {
+            console.error(error);
+            alert(error?.message || "Odeslání emailu selhalo.");
+        } finally {
+            setIsSendingEmail(false);
+        }
+    };
+
     if (dashboard === undefined) {
         return <div>Načítám přehled...</div>;
     }
@@ -152,6 +212,7 @@ export default function TripDashboardPage() {
     }
 
     const { trip, participants, base } = dashboard;
+    const participantsWithEmail = participants.filter((p: any) => p.member?.email);
 
     if (isEditing) {
         return (
@@ -396,6 +457,26 @@ export default function TripDashboardPage() {
                         }}
                     >
                         Dokumentace
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('emaily')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'emaily' ? "white" : "#f0f0f0",
+                            border: activeTab === 'emaily' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'emaily' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        E-maily
                     </button>
                 </div>
                 <style jsx>{`
@@ -1427,6 +1508,23 @@ export default function TripDashboardPage() {
                     </div>
                 </div>
             )}
+
+            {/* Tab Content - emaily */}
+            {activeTab === 'emaily' && (
+                <EmailDraftsTab 
+                    tripId={tripId} 
+                    isLeader={
+                        dashboard && troop
+                            ? (() => {
+                                const leaders = dashboard.leaders || [];
+                                const user = dashboard.currentUser;
+                                return leaders.some((l: any) => l?._id === user?._id && (l.role === "owner" || l.role === "main_leader"));
+                            })()
+                            : false
+                    }
+                />
+            )}
+
 
             {/* Responses Modal */}
             {viewResponse && (

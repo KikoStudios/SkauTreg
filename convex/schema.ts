@@ -21,6 +21,15 @@ export default defineSchema({
         logo: v.optional(v.string()), // URL or base64
         accentColor: v.optional(v.string()), // Hex code (pastel preferred)
         contactEmail: v.optional(v.string()),
+        infoEmail: v.optional(v.string()),
+        
+        // Gmail OAuth 2.0 integration
+        gmailOAuth: v.optional(v.object({
+            email: v.string(), // Connected email address
+            refreshToken: v.string(), // OAuth refresh token
+            connectedAt: v.string(), // ISO timestamp
+            connectedBy: v.id("users"), // User who connected
+        })),
     }),
 
     troop_leaders: defineTable({
@@ -249,5 +258,19 @@ export default defineSchema({
     })
         .index("by_page", ["pageId"])
         .index("by_user_page", ["userId", "pageId"]),
+
+    // Email drafts for trips
+    email_drafts: defineTable({
+        tripId: v.id("trips"),
+        subject: v.string(),
+        body: v.string(), // HTML content with smart tags like <user.sign.link>
+        createdBy: v.id("users"),
+        createdAt: v.string(), // ISO timestamp
+        updatedAt: v.string(), // ISO timestamp
+        status: v.string(), // "draft", "sent"
+        sentAt: v.optional(v.string()), // ISO timestamp
+        sentBy: v.optional(v.id("users")),
+        recipientCount: v.optional(v.number()),
+    }).index("by_trip", ["tripId"]),
 
 });
