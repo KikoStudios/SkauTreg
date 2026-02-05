@@ -43,7 +43,7 @@ Pro spuštění aplikace na vašem počítači postupujte následovně:
     ```
 
 2.  **Nastavte prostředí:**
-    Ujistěte se, že máte vytvořený soubor `.env.local` a v něm nastavené klíče pro Clerk a Convex (např. `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CONVEX_DEPLOYMENT` atd.).
+    Ujistěte se, že máte vytvořený soubor `.env.local` se všemi požadovanými environment proměnnými. Viz `.env.example` pro seznam potřebných klíčů.
 
 3.  **Spusťte vývojové prostředí:**
     Aplikace vyžaduje běh dvou procesů současně. Otevřete si dva terminály:

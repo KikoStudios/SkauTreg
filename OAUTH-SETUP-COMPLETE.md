@@ -58,11 +58,9 @@ File: `src/app/api/auth/gmail/callback/route.ts`
 File: `.env.local`
 
 **Added:**
-```env
-# Gmail OAuth 2.0
-NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-```
+Gmail OAuth 2.0 credentials to `.env.local`:
+- `NEXT_PUBLIC_GMAIL_CLIENT_ID` (public, visible in browser)
+- `GMAIL_CLIENT_SECRET` (private, server-side only)
 
 Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`.
 
@@ -123,10 +121,7 @@ Email system ready to use! ✅
 
 ### Local Development (localhost:3000)
 ```bash
-# Ensure .env.local has Gmail OAuth credentials:
-NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-
+# Ensure .env.local has Gmail OAuth credentials configured
 # Start dev server
 npm run dev
 ```

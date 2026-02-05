@@ -31,10 +31,7 @@ Click "Propojit s Gmailu"
 
 ## Environment Variables
 
-```env
-NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-```
+Gmail OAuth credentials must be configured in your `.env.local` or deployment platform.
 
 Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 

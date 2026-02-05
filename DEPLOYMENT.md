@@ -20,11 +20,10 @@
 - [ ] Verify email personalization
 
 ### Environment Variables
-- [ ] Verify `GMAIL_CLIENT_ID` set
-- [ ] Verify `GMAIL_CLIENT_SECRET` set
-- [ ] Verify `GMAIL_REFRESH_TOKEN` set (fallback)
-- [ ] Verify `GMAIL_SENDER` set (fallback email)
-- [ ] Optional: `GMAIL_FROM_NAME` set
+- [ ] Gmail OAuth credentials configured in Netlify
+- [ ] Convex deployment key set
+- [ ] Clerk authentication keys set
+- [ ] All required environment variables validated
 
 ---
 

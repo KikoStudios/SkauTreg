@@ -32,11 +32,9 @@ Your SkautREG email system now has **proper OAuth 2.0 Gmail authentication** ful
 ### Environment Configuration ✅
 - **File**: `.env.local`
 - **Status**: ✅ Configured with credentials
-- **Variables**:
-  - `NEXT_PUBLIC_GMAIL_CLIENT_ID` ✅
-  - `NEXT_PUBLIC_GMAIL_REDIRECT_URI` ✅
-  - `GMAIL_CLIENT_SECRET` ✅
-  - `GMAIL_REDIRECT_URI` ✅
+- **Environment Setup**:
+  - Gmail OAuth credentials configured ✅
+  - Redirect URI set correctly ✅
 
 ### Integration with Email System ✅
 - **Draft Management**: ✅ Ready

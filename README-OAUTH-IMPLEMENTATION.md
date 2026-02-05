@@ -67,11 +67,9 @@ Email system ready!
 **File**: `.env.local`
 
 **Added**:
-```env
-# Gmail OAuth 2.0
-NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-```
+Gmail OAuth 2.0 credentials are configured in `.env.local`:
+- `NEXT_PUBLIC_GMAIL_CLIENT_ID` (public, visible in browser)
+- `GMAIL_CLIENT_SECRET` (private, server-side only)
 
 Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 
@@ -169,10 +167,10 @@ These components were already implemented and work with OAuth:
 
 ### 1. Verify Environment Variables
 ```bash
-# Check .env.local has:
-NEXT_PUBLIC_GMAIL_CLIENT_ID=806370560203-...
+# Check .env.local has Gmail OAuth credentials configured
+NEXT_PUBLIC_GMAIL_CLIENT_ID=<YOUR_CLIENT_ID>
 NEXT_PUBLIC_GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
-GMAIL_CLIENT_SECRET=GOCSPX-...
+GMAIL_CLIENT_SECRET=<YOUR_SECRET>
 GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/gmail/callback
 ```
 

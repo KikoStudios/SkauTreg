@@ -75,11 +75,9 @@ useEffect(() => {
 - Added 4 new environment variables for Gmail OAuth
 
 **Added**:
-```env
-# Gmail OAuth 2.0
-NEXT_PUBLIC_GMAIL_CLIENT_ID=YOUR_GOOGLE_OAUTH_CLIENT_ID
-GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET
-```
+Gmail OAuth 2.0 credentials configuration in `.env.local`:
+- `NEXT_PUBLIC_GMAIL_CLIENT_ID` (public client ID)
+- `GMAIL_CLIENT_SECRET` (private secret, server-side only)
 
 Redirect URI is derived from your site origin: `<APP_ORIGIN>/api/auth/gmail/callback`
 
@@ -179,13 +177,7 @@ If needed to rollback:
 
 1. Restore `src/components/GmailSettings.tsx` from git
 2. Remove lines from `.env.local`:
-   ```
-   # Gmail OAuth 2.0
-   NEXT_PUBLIC_GMAIL_CLIENT_ID=...
-   NEXT_PUBLIC_GMAIL_REDIRECT_URI=...
-   GMAIL_CLIENT_SECRET=...
-   GMAIL_REDIRECT_URI=...
-   ```
+   Gmail OAuth credentials are configured in `.env.local`
 3. Restart dev server
 4. GmailSettings reverts to old UI
 

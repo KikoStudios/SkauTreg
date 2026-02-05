@@ -154,12 +154,10 @@ After successful OAuth:
 **Root Cause**: Invalid client secret or redirect URI
 
 **Fix**:
-1. Verify `.env.local`:
-   - `GMAIL_CLIENT_SECRET=YOUR_GOOGLE_OAUTH_CLIENT_SECRET`
-   - Exactly matches Google credentials
-2. Check redirect URI matches exactly: `<APP_ORIGIN>/api/auth/gmail/callback`
-3. Look at server logs: `npm run dev` output
-4. Should show error details
+1. Verify `.env.local` has Gmail OAuth credentials configured
+2. Credentials must exactly match Google Cloud Console settings
+3. Check redirect URI matches exactly: `<APP_ORIGIN>/api/auth/gmail/callback`
+4. Look at server logs: `npm run dev` output should show error details
 
 ### Issue: "Nepodařilo se získat refresh token"
 
