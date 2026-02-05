@@ -337,7 +337,7 @@ CLIENT (Browser)          TRANSIT                SERVER
 │   └─ PUBLIC: Visible in browser                 │
 │      Must match Google Cloud Console            │
 │                                                   │
-│ GMAIL_CLIENT_SECRET=GOCSPX-j1CMEn9rND9...       │
+│ GMAIL_CLIENT_SECRET=<YOUR_SECRET>               │
 │   └─ SECRET: Server-side only!                  │
 │      Never in browser                           │
 │      Used for token exchange                    │

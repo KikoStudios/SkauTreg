@@ -157,7 +157,7 @@ Check inbox of recipients ✅
 
 ### Error: "Výměna tokenu selhala"
 **Fix**:
-1. Verify `GMAIL_CLIENT_SECRET` is exactly: `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`
+1. Verify `GMAIL_CLIENT_SECRET` is set in environment variables
 2. Check Google credentials in Google Cloud Console
 3. Look at server logs for details
 4. Try with a different Google account
