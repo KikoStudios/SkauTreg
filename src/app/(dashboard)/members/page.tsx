@@ -298,9 +298,6 @@ export default function MembersPage() {
             ],
         });
     };
-            setIsSaving(false);
-        }
-    };
 
     if (troops === undefined) return <div>Načítám...</div>;
 
