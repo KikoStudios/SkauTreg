@@ -6,7 +6,7 @@ import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useFeedback } from "../../../../context/FeedbackContext";
+import { useFeedback } from "@/context/FeedbackContext";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
