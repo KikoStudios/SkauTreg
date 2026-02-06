@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import { useState } from "react";
 import { useFeedback } from "@/context/FeedbackContext";
 import styles from "./page.module.css";
@@ -66,7 +67,7 @@ export default function FeedbackPage() {
         }
     };
 
-    const handleVote = async (requestId: string, vote: number) => {
+    const handleVote = async (requestId: Id<"feature_requests">, vote: number) => {
         try {
             await voteFeature({ requestId, vote });
         } catch (err: any) {
