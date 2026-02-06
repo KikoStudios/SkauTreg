@@ -1,14 +1,14 @@
 "use client";
 
 import { useFeedback } from "@/context/FeedbackContext";
-import { useAction } from "convex/react";
+import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import styles from "./ErrorModal.module.css";
 
 export default function ErrorModal() {
     const { errorConfig, closeError } = useFeedback();
-    const reportError = useAction(api.feedback.createErrorReport);
+    const reportError = useMutation(api.feedback.createErrorReport);
     const [isReporting, setIsReporting] = useState(false);
     const [reportNotes, setReportNotes] = useState("");
 
