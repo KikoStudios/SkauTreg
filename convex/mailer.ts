@@ -243,7 +243,8 @@ export const sendFromDraft = action({
     sentCount: number; 
     skippedCount: number; 
     failed: Array<{ email: string; error: string }>; 
-    total: number 
+    total: number;
+    error?: string;
   }> => {
     try {
       const identity = await ctx.auth.getUserIdentity();
@@ -261,14 +262,20 @@ export const sendFromDraft = action({
       const troop = await ctx.runQuery(api.troops.getById, { id: trip.trip.troopId });
       if (!troop) throw new Error("Troop not found");
 
-      // Check permissions - only main_leader or owner can send
+      // Check permissions - vedoucí (normal leader) and main_leader can send
       const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: trip.trip.troopId });
       const canSend = leaders?.some((l: any) => 
-        l?._id === user._id && (l.role === "owner" || l.role === "main_leader")
+        l?._id === user._id && (l.role === "owner" || l.role === "main_leader" || l.role === "vedouci")
       );
       
       if (!canSend) {
-        throw new Error("Pouze vedoucí může odesílat e-maily.");
+        return {
+          sentCount: 0,
+          skippedCount: 0,
+          failed: [],
+          total: 0,
+          error: "Pouze vedoucí mohou odesílat e-maily. Kontaktujte vedoucího jednotky.",
+        };
       }
 
       // Use troop's OAuth only
