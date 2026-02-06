@@ -19,6 +19,7 @@ const toolsItems = [
 
 const bottomItems = [
     { label: 'Nastavení', icon: <img src="/icons/nastaveni-icon.svg" alt="Nastavení" style={{ width: "24px", height: "auto" }} />, href: '/settings' },
+    { label: 'Nápady & Chyby', icon: <img src="/icons/upload-icon.svg" alt="Nápady" style={{ width: "24px", height: "auto" }} />, href: '/fae' },
 ];
 
 interface SidebarProps {

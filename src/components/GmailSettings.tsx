@@ -6,6 +6,7 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "./Button";
+import { useFeedback } from "../context/FeedbackContext";
 
 interface GmailSettingsProps {
     troopId: Id<"troops">;
@@ -13,6 +14,7 @@ interface GmailSettingsProps {
 }
 
 export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsProps) {
+    const { showError, showSuccess } = useFeedback();
     const troop = useQuery(api.troops.getById, { id: troopId });
     const members = useQuery(api.members.list, { troopId });
     const sentHistory = useQuery(api.emailDrafts.listSentByTroop, { troopId });
@@ -22,7 +24,6 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     const router = useRouter();
 
     const [isConnecting, setIsConnecting] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [paramsProcessed, setParamsProcessed] = useState(false);
     const [showComposer, setShowComposer] = useState(false);
     const [composerSubject, setComposerSubject] = useState("");
@@ -56,7 +57,12 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
         console.log('OAuth callback detected:', { gmailConnected, email, gmailError });
 
         if (gmailError) {
-            setError(decodeURIComponent(gmailError));
+            showError({
+                title: "❌ Chyba OAuth",
+                message: decodeURIComponent(gmailError),
+                icon: "error",
+                canReport: true,
+            });
             window.history.replaceState({}, document.title, window.location.pathname);
             setParamsProcessed(true);
             return;
@@ -73,16 +79,26 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
 
     const handleOAuthCallback = async (email: string, refreshToken: string) => {
         setIsConnecting(true);
-        setError(null);
         try {
             console.log('Saving Gmail connection:', { email });
             const result = await connectGmail({ troopId, email, refreshToken });
             console.log('connectGmail result:', result);
             // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
+            showSuccess({
+                title: "✅ Úspěch",
+                message: `Gmail účet ${email} připojen. Nyní můžete odesílat e-maily z tohoto účtu.`,
+                duration: 4000,
+            });
         } catch (error: any) {
             console.error('connectGmail error:', error);
-            setError(`Chyba při uložení: ${error.message}`);
+            showError({
+                title: "❌ Chyba při uložení",
+                message: "Nepodařilo se uložit Gmail propojení. Zkuste znovu.",
+                icon: "error",
+                details: error?.message || "Unknown error",
+                canReport: true,
+            });
         } finally {
             setIsConnecting(false);
         }
@@ -98,15 +114,40 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
         : "(dynamic)";
 
     const handleDisconnect = async () => {
-        if (!confirm("Opravdu odpojit Gmail účet? E-maily bude třeba odesílat znovu přes globální nastavení.")) {
-            return;
-        }
-
-        try {
-            await disconnectGmail({ troopId });
-        } catch (error: any) {
-            alert(`Chyba při odpojení: ${error.message}`);
-        }
+        showError({
+            title: "⚠️ Potvrzení",
+            message: "Opravdu odpojit Gmail účet? E-maily budou muset být odesílány znovu.",
+            icon: "warning",
+            buttons: [
+                {
+                    label: "Ano, odpojit",
+                    onClick: async () => {
+                        try {
+                            await disconnectGmail({ troopId });
+                            showSuccess({
+                                title: "✅ Odpojeno",
+                                message: "Gmail účet byl úspěšně odpojený.",
+                                duration: 3000,
+                            });
+                        } catch (error: any) {
+                            showError({
+                                title: "❌ Chyba",
+                                message: "Nepodařilo se odpojit Gmail účet.",
+                                icon: "error",
+                                details: error?.message,
+                                canReport: true,
+                            });
+                        }
+                    },
+                    variant: "danger",
+                },
+                {
+                    label: "Zrušit",
+                    onClick: () => {},
+                    variant: "secondary",
+                },
+            ],
+        });
     };
 
     if (!troop) {
@@ -140,21 +181,22 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     const handleCopyBcc = async () => {
         try {
             await navigator.clipboard.writeText(memberEmails.join(", "));
-            alert("Seznam BCC zkopírován.");
+            showSuccess({
+                title: "✅ Zkopírováno",
+                message: `BCC seznam (${memberEmails.length} členů) byl zkopírován.`,
+                duration: 2500,
+            });
         } catch (e) {
-            alert("Nepodařilo se zkopírovat seznam BCC.");
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se zkopírovat seznam BCC.",
+                icon: "error",
+            });
         }
     };
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {error && (
-                <div style={{ backgroundColor: "#fef2f2", border: "2px solid #fecaca", borderRadius: "12px", padding: "1rem", color: "#991b1b", fontWeight: "700" }}>
-                    <div style={{ fontSize: "0.95rem" }}>Chyba</div>
-                    <div style={{ fontSize: "0.9rem", fontWeight: "600" }}>{error}</div>
-                </div>
-            )}
-
             <div style={{
                 background: "linear-gradient(120deg, #eef2ff 0%, #ecfeff 100%)",
                 border: "3px solid #000",

@@ -7,6 +7,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useSidebar } from "../context/SidebarContext";
+import { useFeedback } from "../context/FeedbackContext";
 import styles from './BaseFinder.module.css';
 
 // Dynamically import map to avoid SSR issues
@@ -43,6 +44,7 @@ function stripHtmlTags(html: string | undefined): string {
 }
 
 export default function BaseFinder() {
+    const { showError, showSuccess } = useFeedback();
     const searchParams = useSearchParams();
     const baseIdParam = searchParams?.get('baseId');
     
@@ -130,7 +132,11 @@ export default function BaseFinder() {
     // Fetch trip connections with streaming
     const fetchTrips = async () => {
         if (!selectedStation || !destinationCity) {
-            setTripError('Vyberte stanici a cílové město');
+            showError({
+                title: "⚠️ Chyby ve formuláři",
+                message: "Vyberte prosím stanici a cílové město.",
+                icon: "warning",
+            });
             return;
         }
         
@@ -153,7 +159,7 @@ export default function BaseFinder() {
             const response = await fetch(`/api/idos/connections?${params}`);
             
             if (!response.ok) {
-                throw new Error('Chyba při načítání spojení');
+                throw new Error('Chyba při načítání spojení. Zkuste znovu.');
             }
             
             // Read streaming response
@@ -189,7 +195,15 @@ export default function BaseFinder() {
             }
         } catch (error) {
             console.error('Error fetching trips:', error);
-            setTripError(error instanceof Error ? error.message : 'Chyba při načítání spojení');
+            const errorMessage = error instanceof Error ? error.message : 'Chyba při načítání spojení';
+            setTripError(errorMessage);
+            showError({
+                title: "❌ Chyba",
+                message: errorMessage,
+                icon: "error",
+                details: error instanceof Error ? error.message : undefined,
+                canReport: true,
+            });
         } finally {
             setIsLoadingTrips(false);
         }

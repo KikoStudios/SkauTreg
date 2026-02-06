@@ -273,4 +273,40 @@ export default defineSchema({
         recipientCount: v.optional(v.number()),
     }).index("by_trip", ["tripId"]),
 
+    // Error reports - users can report unexpected errors
+    error_reports: defineTable({
+        userId: v.optional(v.id("users")),
+        errorMessage: v.string(),
+        errorStack: v.optional(v.string()),
+        url: v.optional(v.string()),
+        userAgent: v.optional(v.string()),
+        userNotes: v.optional(v.string()), // User's additional notes
+        status: v.string(), // "new", "investigating", "fixed", "wontfix"
+        reportedAt: v.string(), // ISO timestamp
+        updatedAt: v.optional(v.string()),
+    }).index("by_status", ["status"])
+      .index("by_user", ["userId"]),
+
+    // Feature requests and ideas
+    feature_requests: defineTable({
+        userId: v.id("users"),
+        title: v.string(),
+        description: v.string(),
+        category: v.optional(v.string()), // "bug", "feature", "improvement"
+        votes: v.number(), // Total vote count
+        status: v.string(), // "open", "planned", "completed", "rejected"
+        createdAt: v.string(), // ISO timestamp
+        updatedAt: v.optional(v.string()),
+    }).index("by_user", ["userId"])
+      .index("by_status", ["status"]),
+
+    // Voting on feature requests
+    feature_votes: defineTable({
+        requestId: v.id("feature_requests"),
+        userId: v.id("users"),
+        vote: v.number(), // 1 for upvote, -1 for downvote
+        votedAt: v.string(), // ISO timestamp
+    }).index("by_request_user", ["requestId", "userId"])
+      .index("by_request", ["requestId"]),
+
 });

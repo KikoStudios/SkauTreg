@@ -1,0 +1,390 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.header {
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0 0 1rem 0;
+    color: #000;
+}
+
+.subtitle {
+    font-size: 1.1rem;
+    color: #666;
+    margin: 0;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.tab {
+    padding: 0.75rem 1.5rem;
+    border: 3px solid #000;
+    border-radius: 8px;
+    background: white;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+}
+
+.tab:hover {
+    background: #f9f9f9;
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.tab.active {
+    background: #fcd34d;
+    box-shadow: 4px 4px 0 #000;
+}
+
+.content {
+    background: white;
+    border: 3px solid #000;
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+.filterBar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #eee;
+}
+
+.filterBar label {
+    font-weight: 700;
+}
+
+.select {
+    padding: 0.5rem 1rem;
+    border: 2px solid #000;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    background: white;
+}
+
+.select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(252, 211, 77, 0.3);
+}
+
+.featuresList {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.featureCard {
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    padding: 1.5rem;
+    transition: all 0.2s;
+    background: #fafafa;
+}
+
+.featureCard:hover {
+    border-color: #000;
+    box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.05);
+    background: white;
+}
+
+.featureHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.featureInfo {
+    flex: 1;
+}
+
+.featureTitle {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #000;
+}
+
+.featureMeta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.status {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: white;
+}
+
+.author {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.voteButton {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upvote {
+    background: white;
+    border: 2px solid #000;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.2s;
+}
+
+.upvote:hover {
+    transform: scale(1.1);
+    box-shadow: 2px 2px 0 #000;
+}
+
+.upvote.voted {
+    background: #fcd34d;
+    box-shadow: 2px 2px 0 #000;
+    transform: scale(1.15);
+}
+
+.voteCount {
+    font-weight: 900;
+    font-size: 1.1rem;
+    color: #000;
+}
+
+.featureDesc {
+    color: #333;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.featureFooter {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+    color: #999;
+    font-size: 0.85rem;
+}
+
+.errorsList {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.errorCard {
+    border: 2px solid #fee2e2;
+    border-left: 4px solid #dc2626;
+    border-radius: 10px;
+    padding: 1.5rem;
+    background: #fef2f2;
+}
+
+.errorCard:hover {
+    border-color: #991b1b;
+    background: #fef9f9;
+}
+
+.errorHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.errorTitle {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #000;
+}
+
+.errorStatus {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: white;
+    white-space: nowrap;
+}
+
+.errorBody {
+    margin: 0;
+}
+
+.errorMsg {
+    margin: 0 0 1rem 0;
+    color: #333;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.errorNotes {
+    margin: 0 0 1rem 0;
+    padding: 1rem;
+    background: white;
+    border-left: 3px solid #fcd34d;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.errorUrl {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.errorUrl code {
+    background: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.errorFooter {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+    color: #999;
+    font-size: 0.8rem;
+}
+
+.empty {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #999;
+}
+
+.empty p {
+    font-size: 1.1rem;
+    margin: 0;
+}
+
+.submitForm {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.formGroup {
+    margin-bottom: 1.5rem;
+}
+
+.label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: #000;
+    font-size: 1rem;
+}
+
+.input,
+.textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.input:focus,
+.textarea:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(252, 211, 77, 0.3);
+    border-color: #fcd34d;
+}
+
+.textarea {
+    resize: vertical;
+    min-height: 150px;
+}
+
+.submitBtn {
+    width: 100%;
+    padding: 1rem;
+    background: #fcd34d;
+    border: 3px solid #000;
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.submitBtn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 #000;
+}
+
+.submitBtn:active:not(:disabled) {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0 #000;
+}
+
+.submitBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+
+    .title {
+        font-size: 1.8rem;
+    }
+
+    .featureHeader,
+    .errorHeader {
+        flex-direction: column;
+    }
+
+    .voteButton {
+        flex-direction: row;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    .tabs {
+        flex-direction: column;
+    }
+
+    .tab {
+        width: 100%;
+    }
+}

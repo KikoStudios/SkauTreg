@@ -11,7 +11,7 @@ export const create = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit pro vytvoření konceptu.");
 
         const user = await ctx.db
             .query("users")
@@ -20,10 +20,10 @@ export const create = mutation({
             )
             .unique();
 
-        if (!user) throw new Error("User not found");
+        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen. Zkuste se odhlásit a přihlásit znovu.");
 
         const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("Trip not found");
+        if (!trip) throw new Error("🚗 Výprava nebyla nalezena. Zkuste načíst stránku znovu.");
 
         const now = new Date().toISOString();
 
@@ -50,13 +50,13 @@ export const update = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit pro úpravu konceptu.");
 
         const draft = await ctx.db.get(args.id);
-        if (!draft) throw new Error("Draft not found");
+        if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná byl smazán.");
 
         if (draft.status === "sent") {
-            throw new Error("Cannot edit sent email");
+            throw new Error("📨 Nelze upravit již odeslaný e-mail. Vytvořte nový koncept.");
         }
 
         const { id, ...updates } = args;
@@ -72,7 +72,7 @@ export const remove = mutation({
     args: { id: v.id("email_drafts") },
     handler: async (ctx, args) => {
         const draft = await ctx.db.get(args.id);
-        if (!draft) throw new Error("Draft not found");
+        if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná již byl smazán.");
 
         await ctx.db.delete(args.id);
     },
@@ -130,7 +130,7 @@ export const markAsSent = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit pro označení konceptu jako odeslaného.");
 
         const user = await ctx.db
             .query("users")
@@ -139,7 +139,7 @@ export const markAsSent = mutation({
             )
             .unique();
 
-        if (!user) throw new Error("User not found");
+        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen.");
 
         await ctx.db.patch(args.id, {
             status: "sent",
@@ -155,7 +155,7 @@ export const getRecipients = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
         const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("Trip not found");
+        if (!trip) throw new Error("🚗 Výprava nebyla nalezena.");
 
         const participations = await ctx.db
             .query("participations")

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
 import EmailDraftsTab from "../../../../components/EmailDraftsTab";
+import { useFeedback } from "../../../../context/FeedbackContext";
 
 type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace' | 'emaily';
 
@@ -15,6 +16,7 @@ export default function TripDashboardPage() {
     const params = useParams();
     const router = useRouter();
     const tripId = params.tripId as Id<"trips">;
+    const { showError, showSuccess } = useFeedback();
 
     const dashboard = useQuery(api.trips.getDashboard, tripId ? { tripId } : "skip");
     const updateTrip = useMutation(api.trips.update);
@@ -84,26 +86,61 @@ export default function TripDashboardPage() {
                 customFields: data.customFields
             });
             setIsEditing(false);
-            // Optional: Reload logic not needed as Convex is reactive
-        } catch (error) {
+            showSuccess({
+                title: "✅ Uloženo",
+                message: "Změny byly úspěšně uloženy.",
+                duration: 2000,
+            });
+        } catch (error: any) {
             console.error(error);
-            alert("Chyba při ukládání změn.");
+            showError({
+                title: "❌ Chyba",
+                message: "Změny se nepodařily uložit. Zkuste to znovu.",
+                icon: "error",
+                canReport: true,
+                details: error?.message,
+            });
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDelete = async () => {
-        if (confirm("Opravdu chcete smazat celou výpravu a všechny odpovědi? Tato akce je nevratná.")) {
-            try {
-                await deleteTrip({ id: tripId });
-                router.push("/trips");
-            } catch (error) {
-                console.error(error);
-                alert("Chyba při mazání.");
-            }
-        }
-    }
+        showError({
+            title: "⚠️ Potvrzení",
+            message: "Opravdu chcete smazat celou výpravu a všechny odpovědi? Tuto akci nelze vrátit!",
+            icon: "warning",
+            buttons: [
+                {
+                    label: "Ano, smazat",
+                    onClick: async () => {
+                        try {
+                            await deleteTrip({ id: tripId });
+                            showSuccess({
+                                title: "✅ Smazáno",
+                                message: "Výprava byla smazána.",
+                                duration: 2000,
+                            });
+                            router.push("/trips");
+                        } catch (error: any) {
+                            showError({
+                                title: "❌ Chyba",
+                                message: "Výpravu se nepodařilo smazat.",
+                                icon: "error",
+                                canReport: true,
+                            });
+                        }
+                    },
+                    variant: "danger",
+                },
+                {
+                    label: "Zrušit",
+                    onClick: () => {},
+                    variant: "secondary",
+                },
+            ],
+        });
+    };
 
     const handleOpenTripDocs = async () => {
         if (!trip.troopId) return;
@@ -123,9 +160,14 @@ export default function TripDashboardPage() {
                     category: "documentation"
                 });
                 router.push(`/rady/${meetingId}`);
-            } catch (error) {
+            } catch (error: any) {
                 console.error(error);
-                alert("Chyba při vytváření dokumentu.");
+                showError({
+                    title: "❌ Chyba",
+                    message: "Dokument se nepodařilo vytvořit.",
+                    icon: "error",
+                    canReport: true,
+                });
             }
         }
     };
@@ -182,7 +224,11 @@ export default function TripDashboardPage() {
 
     const handleSendEmail = async () => {
         if (!emailSubject.trim() || !emailBody.trim()) {
-            alert("Vyplňte předmět i text emailu.");
+            showError({
+                title: "⚠️ Vyplňte pole",
+                message: "Musíte vyplnit předmět i text e-mailu.",
+                icon: "warning",
+            });
             return;
         }
         setIsSendingEmail(true);
@@ -195,9 +241,43 @@ export default function TripDashboardPage() {
                 baseUrl: window.location.origin
             });
             setEmailResult(result);
+            
+            // Show result modal
+            const failedCount = result.failed?.length || 0;
+            const successCount = result.sentCount || 0;
+            const skippedCount = result.skippedCount || 0;
+
+            if (failedCount === 0) {
+                showSuccess({
+                    title: "✅ Hotovo!",
+                    message: `Odesláno ${successCount} e-mailů${skippedCount > 0 ? `, ${skippedCount} přeskočeno` : ""}`,
+                    duration: 3000,
+                });
+            } else {
+                showError({
+                    title: "⚠️ Částečné selhání",
+                    message: `✅ ${successCount} odesláno | ⊘ ${skippedCount} přeskočeno | ❌ ${failedCount} selhalo`,
+                    icon: "warning",
+                    details: result.failed?.map(f => `${f.email}: ${f.error}`).join("\n"),
+                });
+            }
         } catch (error: any) {
             console.error(error);
-            alert(error?.message || "Odeslání emailu selhalo.");
+            
+            let errorMsg = error?.message || "Odeslání e-mailu selhalo.";
+            if (errorMsg.includes("Gmail")) {
+                errorMsg = "📧 " + errorMsg;
+            } else {
+                errorMsg = "❌ " + errorMsg;
+            }
+
+            showError({
+                title: "❌ Chyba",
+                message: errorMsg,
+                icon: "error",
+                canReport: true,
+                details: error?.message,
+            });
         } finally {
             setIsSendingEmail(false);
         }

@@ -181,16 +181,16 @@ export const addLeader = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit. Přejít na přihlášení?");
 
         const currentUser = await ctx.db
             .query("users")
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
-        if (!currentUser) throw new Error("User not found");
+        if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst. Zkuste se odhlásit a znovu přihlásit.");
 
         if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("Nemáte oprávnění přidávat vedoucí.");
+            throw new Error("🔐 Pouze majitel nebo hlavní vedoucí může přidávat členy do vedení.");
         }
 
         const userToAdd = await ctx.db
@@ -199,7 +199,7 @@ export const addLeader = mutation({
             .unique();
 
         if (!userToAdd) {
-            throw new Error("Uživatel s tímto e-mailem nebyl nalezen.");
+            throw new Error("👤 Uživatel nebyl nalezen. Vytvořte si účet na skautREG nebo zkuste jiný e-mail.");
         }
 
         // Check if already leader
@@ -208,12 +208,10 @@ export const addLeader = mutation({
             .withIndex("by_user_troop", q => q.eq("userId", userToAdd._id).eq("troopId", args.troopId))
             .unique();
 
-        if (existing) throw new Error("Uživatel už v týmu je.");
+        if (existing) throw new Error("⚠️ Uživatel je již v týmu vedení.");
 
         const troop = await ctx.db.get(args.troopId);
-        if (!troop) throw new Error("Oddíl nenalezen.");
-        // We allow adding the owner now so they can have a specific role
-        // if (troop.ownerId === userToAdd._id) throw new Error("Uživatel je majitelem oddílu.");
+        if (!troop) throw new Error("🎒 Oddíl nenalezen.");
 
         await ctx.db.insert("troop_leaders", {
             troopId: args.troopId,
@@ -231,16 +229,16 @@ export const updateRole = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
         const currentUser = await ctx.db
             .query("users")
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
-        if (!currentUser) throw new Error("User not found");
+        if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
 
         if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("Nemáte oprávnění měnit role.");
+            throw new Error("🔐 Nemáte oprávnění měnit role.");
         }
 
         const leaderRecord = await ctx.db
@@ -248,7 +246,7 @@ export const updateRole = mutation({
             .withIndex("by_user_troop", q => q.eq("userId", args.userId).eq("troopId", args.troopId))
             .unique();
 
-        if (!leaderRecord) throw new Error("Vedoucí nenalezen.");
+        if (!leaderRecord) throw new Error("👤 Vedoucí nebyl nalezen.");
 
         await ctx.db.patch(leaderRecord._id, { role: args.newRole });
     }
@@ -261,16 +259,16 @@ export const removeLeader = mutation({
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
+        if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
         const currentUser = await ctx.db
             .query("users")
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
-        if (!currentUser) throw new Error("User not found");
+        if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
 
         if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("Nemáte oprávnění odebírat vedoucí.");
+            throw new Error("🔐 Nemáte oprávnění odebírat vedoucí.");
         }
 
         const leaderRecord = await ctx.db

@@ -3,6 +3,9 @@ import "./globals.css";
 
 
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { FeedbackProvider } from "../context/FeedbackContext";
+import ErrorModal from "../components/ErrorModal";
+import SuccessModal from "../components/SuccessModal";
 
 export const metadata: Metadata = {
   title: "skautREG",
@@ -22,7 +25,11 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning style={{ margin: 0, padding: 0 }}>
         <ConvexClientProvider>
-          {children}
+          <FeedbackProvider>
+            {children}
+            <ErrorModal />
+            <SuccessModal />
+          </FeedbackProvider>
         </ConvexClientProvider>
       </body>
     </html>

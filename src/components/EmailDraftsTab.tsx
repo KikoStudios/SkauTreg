@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { useFeedback } from "../context/FeedbackContext";
 
 interface EmailDraftsTabProps {
     tripId: Id<"trips">;
@@ -11,6 +12,7 @@ interface EmailDraftsTabProps {
 }
 
 export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps) {
+    const { showError, showSuccess } = useFeedback();
     const drafts = useQuery(api.emailDrafts.listByTrip, { tripId });
     const recipients = useQuery(api.emailDrafts.getRecipients, { tripId });
     const createDraft = useMutation(api.emailDrafts.create);
@@ -61,7 +63,11 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
 
     const handleCreateDraft = async () => {
         if (!subject.trim() || !body.trim()) {
-            alert("Předmět i tělo e-mailu jsou povinné.");
+            showError({
+                title: "⚠️ Chyby ve formuláři",
+                message: "Předmět i tělo e-mailu jsou povinné.",
+                icon: "warning",
+            });
             return;
         }
 
@@ -71,8 +77,19 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
             setSubject("");
             setBody("");
             setShowNewDraft(false);
+            showSuccess({
+                title: "✅ Koncept vytvořen",
+                message: "Nový koncept e-mailu byl uložen.",
+                duration: 2500,
+            });
         } catch (error: any) {
-            alert(`Chyba: ${error.message}`);
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se vytvořit koncept.",
+                icon: "error",
+                details: error?.message,
+                canReport: true,
+            });
         } finally {
             setIsSaving(false);
         }
@@ -81,7 +98,11 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
     const handleUpdateDraft = async () => {
         if (!editingDraft) return;
         if (!subject.trim() || !body.trim()) {
-            alert("Předmět i tělo e-mailu jsou povinné.");
+            showError({
+                title: "⚠️ Chyby ve formuláři",
+                message: "Předmět i tělo e-mailu jsou povinné.",
+                icon: "warning",
+            });
             return;
         }
 
@@ -95,20 +116,59 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
             setEditingDraft(null);
             setSubject("");
             setBody("");
+            showSuccess({
+                title: "✅ Koncept aktualizován",
+                message: "Koncept e-mailu byl uložen.",
+                duration: 2500,
+            });
         } catch (error: any) {
-            alert(`Chyba: ${error.message}`);
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se aktualizovat koncept.",
+                icon: "error",
+                details: error?.message,
+                canReport: true,
+            });
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDeleteDraft = async (draftId: Id<"email_drafts">) => {
-        if (!confirm("Opravdu smazat tento koncept?")) return;
-        try {
-            await removeDraft({ id: draftId });
-        } catch (error: any) {
-            alert(`Chyba: ${error.message}`);
-        }
+        showError({
+            title: "⚠️ Potvrzení",
+            message: "Opravdu smazat tento koncept?",
+            icon: "warning",
+            buttons: [
+                {
+                    label: "Smazat",
+                    onClick: async () => {
+                        try {
+                            await removeDraft({ id: draftId });
+                            showSuccess({
+                                title: "✅ Smazáno",
+                                message: "Koncept byl smazán.",
+                                duration: 2500,
+                            });
+                        } catch (error: any) {
+                            showError({
+                                title: "❌ Chyba",
+                                message: "Nepodařilo se smazat koncept.",
+                                icon: "error",
+                                details: error?.message,
+                                canReport: true,
+                            });
+                        }
+                    },
+                    variant: "danger",
+                },
+                {
+                    label: "Zrušit",
+                    onClick: () => {},
+                    variant: "secondary",
+                },
+            ],
+        });
     };
 
     const handleOpenSendPopup = (draft: any) => {
@@ -135,7 +195,11 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
     const handleSendDraft = async () => {
         if (!sendingDraftId) return;
         if (sendingSelectedMembers.size === 0) {
-            alert("Vyberte alespoň jednoho příjemce.");
+            showError({
+                title: "⚠️ Chyby ve formuláři",
+                message: "Vyberte alespoň jednoho příjemce.",
+                icon: "warning",
+            });
             return;
         }
 
@@ -148,8 +212,35 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
                 memberIds: Array.from(sendingSelectedMembers),
             });
             setSendResult(result);
+            
+            // Show summary
+            const successCount = result.sentCount;
+            const failedCount = result.failed?.length || 0;
+            const skippedCount = result.skippedCount;
+            
+            if (failedCount > 0) {
+                showError({
+                    title: "📧 Částečné selhání",
+                    message: `Odesláno: ${successCount} ✅ | Selhalo: ${failedCount} ❌ | Přeskočeno: ${skippedCount} ⊘`,
+                    icon: "error",
+                    details: failedCount > 0 ? `Nepodařilo se odeslat: ${result.failed.map((f: any) => f.email).join(", ")}` : undefined,
+                    canReport: failedCount > 0,
+                });
+            } else {
+                showSuccess({
+                    title: "✅ Odesláno",
+                    message: `E-maily úspěšně odeslány (${successCount} členů).`,
+                    duration: 4000,
+                });
+            }
         } catch (error: any) {
-            alert(error?.message || "Chyba při odesílání e-mailu.");
+            showError({
+                title: "❌ Chyba",
+                message: error?.message || "Nepodařilo se odeslat e-mail.",
+                icon: "error",
+                details: error?.message,
+                canReport: true,
+            });
         } finally {
             setIsSending(false);
         }

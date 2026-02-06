@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useFeedback } from "../../../../context/FeedbackContext";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -37,6 +38,7 @@ export default function MembersPage() {
     const router = useRouter();
     const pathname = usePathname();
     const troopIdParam = searchParams.get("troopId");
+    const { showError, showSuccess } = useFeedback();
 
     const [selectedTroopId, setSelectedTroopId] = useState<Id<"troops"> | null>(
         troopIdParam ? (troopIdParam as Id<"troops">) : null
@@ -237,25 +239,65 @@ export default function MembersPage() {
                 });
             }
             setShowModal(false);
-        } catch (error) {
+            showSuccess({
+                title: "✅ Uloženo",
+                message: `Člen byl ${editingMemberId ? "aktualizován" : "přidán"}.`,
+                duration: 2000,
+            });
+        } catch (error: any) {
             console.error("Failed to save member:", error);
-            alert("Nepodařilo se uložit člena.");
+            showError({
+                title: "❌ Chyba",
+                message: "Člena se nepodařilo uložit. Zkontrolujte vyplněné údaje.",
+                icon: "error",
+                canReport: true,
+            });
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDelete = async () => {
-        if (!editingMemberId || !confirm("Opravdu chcete smazat tohoto člena?")) return;
+        if (!editingMemberId) return;
 
-        setIsSaving(true);
-        try {
-            await removeMember({ id: editingMemberId });
-            setShowModal(false);
-        } catch (error) {
-            console.error("Failed to delete member:", error);
-            alert("Nepodařilo se smazat člena.");
-        } finally {
+        showError({
+            title: "⚠️ Potvrzení",
+            message: "Opravdu chcete smazat tohoto člena? Tuto akci nelze vrátit.",
+            icon: "warning",
+            buttons: [
+                {
+                    label: "Ano, smazat",
+                    onClick: async () => {
+                        setIsSaving(true);
+                        try {
+                            await removeMember({ id: editingMemberId });
+                            setShowModal(false);
+                            showSuccess({
+                                title: "✅ Smazáno",
+                                message: "Člen byl odstraněn.",
+                                duration: 2000,
+                            });
+                        } catch (error: any) {
+                            showError({
+                                title: "❌ Chyba",
+                                message: "Člena se nepodařilo smazat.",
+                                icon: "error",
+                                canReport: true,
+                            });
+                        } finally {
+                            setIsSaving(false);
+                        }
+                    },
+                    variant: "danger",
+                },
+                {
+                    label: "Zrušit",
+                    onClick: () => {},
+                    variant: "secondary",
+                },
+            ],
+        });
+    };
             setIsSaving(false);
         }
     };

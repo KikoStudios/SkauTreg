@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import Button from "../../../../../components/Button";
 import Select from "../../../../../components/Select";
+import { useFeedback } from "../../../../../context/FeedbackContext";
 
 const ROLES = [
     { value: "main_leader", label: "HL. Vedoucí" },
@@ -41,6 +42,7 @@ export default function TroopLeadersPage() {
     const params = useParams();
     const router = useRouter();
     const troopId = params.troopId as Id<"troops">;
+    const { showError, showSuccess } = useFeedback();
 
     const leaders = useQuery(api.troops.getLeaders, { troopId });
     const addLeader = useMutation(api.troops.addLeader);
@@ -48,7 +50,7 @@ export default function TroopLeadersPage() {
     const updateRole = useMutation(api.troops.updateRole);
 
     const [email, setEmail] = useState("");
-    const [selectedRole, setSelectedRole] = useState("rover"); // Default role
+    const [selectedRole, setSelectedRole] = useState("rover");
     const [isAdding, setIsAdding] = useState(false);
 
     // Permissions check (client side for UI only)
@@ -64,30 +66,94 @@ export default function TroopLeadersPage() {
         try {
             await addLeader({ troopId, email, role: selectedRole });
             setEmail("");
-            alert("Vedoucí byl přidán!");
+            showSuccess({
+                title: "✅ Úspěch",
+                message: "Vedoucí byl přidán do týmu!",
+                duration: 3000,
+            });
         } catch (error: any) {
             console.error(error);
-            alert("Chyba: " + (error.message || "Nepodařilo se přidat vedoucího."));
+            const errorMsg = error?.message || "Nepodařilo se přidat vedoucího";
+            
+            let userMessage = "";
+            let isUserError = false;
+            
+            if (errorMsg.includes("nebyl nalezen")) {
+                userMessage = "👤 Uživatel nebyl nalezen. Vytvořte si účet na skautREG nebo zkuste jiný e-mail.";
+                isUserError = true;
+            } else if (errorMsg.includes("už v týmu")) {
+                userMessage = "⚠️ Uživatel je již v týmu vedení.";
+                isUserError = true;
+            } else if (errorMsg.includes("oprávnění")) {
+                userMessage = "🔐 Pouze majitel nebo hlavní vedoucí může přidávat členy do vedení.";
+                isUserError = true;
+            } else {
+                userMessage = errorMsg;
+            }
+
+            showError({
+                title: "❌ Chyba",
+                message: userMessage,
+                icon: "error",
+                canReport: !isUserError,
+                details: error?.message,
+            });
         } finally {
             setIsAdding(false);
         }
     };
 
     const handleRemove = async (userId: Id<"users">) => {
-        if (confirm("Opravdu chcete odebrat tohoto člena vedení?")) {
-            try {
-                await removeLeader({ troopId, userId });
-            } catch (error: any) {
-                alert("Chyba: " + (error.message || "Nepodařilo se odebrat."));
-            }
-        }
+        showError({
+            title: "⚠️ Potvrzení",
+            message: "Opravdu chcete odebrat tohoto člena z vedení?",
+            icon: "warning",
+            buttons: [
+                {
+                    label: "Ano, odebrat",
+                    onClick: async () => {
+                        try {
+                            await removeLeader({ troopId, userId });
+                            showSuccess({
+                                title: "✅ Úspěch",
+                                message: "Člen byl odstraněn z vedení.",
+                                duration: 2000,
+                            });
+                        } catch (error: any) {
+                            showError({
+                                title: "❌ Chyba",
+                                message: error?.message || "Nepodařilo se odebrat člena.",
+                                icon: "error",
+                                canReport: true,
+                            });
+                        }
+                    },
+                    variant: "danger",
+                },
+                {
+                    label: "Zrušit",
+                    onClick: () => {},
+                    variant: "secondary",
+                },
+            ],
+        });
     };
 
     const handleRoleChange = async (userId: Id<"users">, newRole: string) => {
         try {
             await updateRole({ troopId, userId, newRole });
+            showSuccess({
+                title: "✅ Role změněna",
+                message: "Role byla úspěšně aktualizována.",
+                duration: 2000,
+            });
         } catch (error: any) {
-            alert("Chyba: " + (error.message || "Nepodařilo se změnit roli."));
+            showError({
+                title: "❌ Chyba",
+                message: error?.message || "Nepodařilo se změnit roli.",
+                icon: "error",
+                canReport: true,
+            });
         }
     }
 

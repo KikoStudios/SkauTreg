@@ -178,7 +178,7 @@ export const ensureParticipations = mutation({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
         const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("Trip not found");
+        if (!trip) throw new Error("🚗 Výprava nebyla nalezena. Zkuste načíst stránku znovu.");
 
         const members = await ctx.db
             .query("members")

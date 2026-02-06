@@ -11,6 +11,7 @@
 import type * as bases from "../bases.js";
 import type * as editorPresence from "../editorPresence.js";
 import type * as emailDrafts from "../emailDrafts.js";
+import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as mailer from "../mailer.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   bases: typeof bases;
   editorPresence: typeof editorPresence;
   emailDrafts: typeof emailDrafts;
+  feedback: typeof feedback;
   files: typeof files;
   http: typeof http;
   mailer: typeof mailer;

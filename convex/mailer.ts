@@ -33,9 +33,9 @@ async function getGmailAccessToken(troopRefreshToken?: string) {
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = troopRefreshToken;
 
-  if (!clientId) throw new Error(`Missing env: NEXT_PUBLIC_GMAIL_CLIENT_ID`);
-  if (!clientSecret) throw new Error(`Missing env: GMAIL_CLIENT_SECRET`);
-  if (!refreshToken) throw new Error(`Troop must have Gmail OAuth configured. Please connect Gmail in settings.`);
+  if (!clientId) throw new Error(`⚙️ Chyba serveru: Gmail je špatně nakonfigurován. Kontaktujte správce aplikace.`);
+  if (!clientSecret) throw new Error(`⚙️ Chyba serveru: Gmail je špatně nakonfigurován. Kontaktujte správce aplikace.`);
+  if (!refreshToken) throw new Error(`📧 Gmail účet není připojen. Pro odesílání e-mailů je potřeba připojit Gmail účet. Přejít na nastavení?`);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -52,11 +52,11 @@ async function getGmailAccessToken(troopRefreshToken?: string) {
 
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`Gmail token error: ${errText}`);
+    throw new Error(`❌ Nelze se připojit ke Gmailu. Pokus se znovu připojit v nastavení. Pokud problém přetrvává, odpojte a připojte znovu.`);
   }
 
   const data = await resp.json();
-  if (!data.access_token) throw new Error("Missing access token");
+  if (!data.access_token) throw new Error("❌ Gmail token chyba. Zkuste znovu připojit Gmail.");
   return data.access_token as string;
 }
 
@@ -98,52 +98,31 @@ async function sendGmailMessage(params: {
   ].filter(Boolean) as string[];
 
   // Build multipart body with both plain text and HTML
-  const bodyParts = [
-    `--${boundary}`,
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: quoted-printable",
-    "",
-    plainText.split("\n").map(line => {
-      return line.replace(/[^\x00-\x7F]/g, (char) => {
-        return char
-          .split("")
-          .map(c => "=" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"))
-          .join("");
-      });
-    }).join("\r\n"),
-    "",
-    `--${boundary}`,
-    "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: quoted-printable",
-    "",
-    params.html.split("\n").map(line => {
-      return line.replace(/[^\x00-\x7F]/g, (char) => {
-        return char
-          .split("")
-          .map(c => "=" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"))
-          .join("");
-      });
-    }).join("\r\n"),
-    "",
-    `--${boundary}--`,
-  ].join("\r\n");
+  const body = `${headers.join("\r\n")}\r\n\r\n--${boundary}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${toBase64Url(
+    plainText
+  )}\r\n\r\n--${boundary}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${toBase64Url(
+    params.html
+  )}\r\n\r\n--${boundary}--\r\n`;
 
-  const rawMessage = `${headers.join("\r\n")}\r\n\r\n${bodyParts}`;
-  const raw = toBase64Url(rawMessage);
+  const encodedMessage = toBase64Url(body);
 
-  const resp = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+  const gmailResp = await fetch("https://www.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${params.accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify({
+      raw: encodedMessage,
+    }),
   });
 
-  if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`Gmail send error: ${errText}`);
+  if (!gmailResp.ok) {
+    const errText = await gmailResp.text();
+    throw new Error(`📤 Odeslání e-mailu selhalo. Zkuste znovu nebo kontaktujte podporu.`);
   }
+
+  return true;
 }
 
 export const sendTripEmail = action({
