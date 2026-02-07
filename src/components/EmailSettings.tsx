@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
@@ -67,7 +67,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
     const members = useQuery(api.members.list, { troopId });
     const connectEmailProvider = useMutation(api.troops.connectEmailProvider);
     const disconnectEmailProvider = useMutation(api.troops.disconnectEmailProvider);
-    const fetchGoogleGroupsMembers = useMutation(api.mailer.fetchGoogleGroupsMembers);
+    const fetchGoogleGroupsMembers = useAction(api.mailer.fetchGoogleGroupsMembers);
     const router = useRouter();
 
     const [showProviderSelector, setShowProviderSelector] = useState(false);
