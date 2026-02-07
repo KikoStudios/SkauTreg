@@ -211,6 +211,47 @@ export const sendTripEmail = action({
   },
 });
 
+// Send via SMTP (Seznam, Centrum, etc.)
+async function sendSmtpMessage(params: {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPassword: string;
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+}) {
+  try {
+    // Using require for Node.js environment
+    const nodemailer = require("nodemailer");
+    
+    const transporter = nodemailer.createTransport({
+      host: params.smtpHost,
+      port: params.smtpPort,
+      secure: params.smtpPort === 465,
+      auth: {
+        user: params.smtpUser,
+        pass: params.smtpPassword,
+      },
+    });
+
+    await transporter.sendMail({
+      from: params.from,
+      to: params.to,
+      subject: encodeSubject(params.subject),
+      html: params.html,
+      replyTo: params.replyTo,
+      headers: {
+        "X-Mailer": "SkautREG",
+      },
+    });
+  } catch (error: any) {
+    throw new Error(`SMTP Error: ${error?.message || "Failed to send email"}`);
+  }
+}
+
 // Send email from draft with enhanced smart tags
 export const sendFromDraft = action({
   args: {
@@ -257,17 +298,48 @@ export const sendFromDraft = action({
         };
       }
 
-      // Use troop's OAuth only
+      // Use troop's email provider (new format or legacy Gmail)
+      const emailProvider = (troop as any).emailProvider;
       const troopGmail = (troop as any).gmailOAuth;
-      const troopRefreshToken = troopGmail?.refreshToken;
-      const senderEmail = troopGmail?.email;
-      if (!troopRefreshToken || !senderEmail) {
-        throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
+      
+      // Determine which provider to use
+      let accessToken: string | null = null;
+      let smtpConfig: any = null;
+      
+      if (emailProvider?.provider === "gmail" || (!emailProvider && troopGmail)) {
+        // Gmail OAuth
+        const troopRefreshToken = emailProvider?.refreshToken || troopGmail?.refreshToken;
+        const senderEmail = emailProvider?.email || troopGmail?.email;
+        if (!troopRefreshToken || !senderEmail) {
+          throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
+        }
+        accessToken = await getGmailAccessToken(troopRefreshToken);
+      } else if (emailProvider?.provider === "seznam" || emailProvider?.provider === "centrum") {
+        // SMTP
+        if (!emailProvider?.smtpHost || !emailProvider?.smtpPort || !emailProvider?.smtpPassword) {
+          throw new Error("SMTP není správně nakonfigurován. Zkontrolujte nastavení e-mailu.");
+        }
+        smtpConfig = {
+          smtpHost: emailProvider.smtpHost,
+          smtpPort: emailProvider.smtpPort,
+          smtpUser: emailProvider.email,
+          smtpPassword: emailProvider.smtpPassword,
+        };
+      } else if (emailProvider?.provider === "google-groups") {
+        // Google Groups - use first member's email or fallback to Gmail
+        const troopRefreshToken = emailProvider?.refreshToken || troopGmail?.refreshToken;
+        const senderEmail = emailProvider?.email || troopGmail?.email;
+        if (!troopRefreshToken || !senderEmail) {
+          throw new Error("Google Groups není správně připojen.");
+        }
+        accessToken = await getGmailAccessToken(troopRefreshToken);
+      } else {
+        throw new Error("Žádný e-mailový provider není připojen. Připojte e-mail v nastavení jednotky.");
       }
+      
       const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
       const replyTo = troop.infoEmail || troop.contactEmail || undefined;
-
-      const accessToken = await getGmailAccessToken(troopRefreshToken);
+      const senderEmail = emailProvider?.email || troopGmail?.email;
       const baseUrl = args.baseUrl.replace(/\/$/, "");
 
       let sentCount = 0;
@@ -305,14 +377,27 @@ ${bodyText.replace(/\n/g, "<br/>")}
 </html>`;
 
         try {
-          await sendGmailMessage({
-            accessToken,
-            from: `${fromName} <${senderEmail}>`,
-            to: email,
-            subject: draft.subject,
-            html,
-            replyTo,
-          });
+          if (accessToken) {
+            // Use Gmail
+            await sendGmailMessage({
+              accessToken,
+              from: `${fromName} <${senderEmail}>`,
+              to: email,
+              subject: draft.subject,
+              html,
+              replyTo,
+            });
+          } else if (smtpConfig) {
+            // Use SMTP
+            await sendSmtpMessage({
+              ...smtpConfig,
+              from: `${fromName} <${senderEmail}>`,
+              to: email,
+              subject: draft.subject,
+              html,
+              replyTo,
+            });
+          }
           sentCount++;
         } catch (err: any) {
           failed.push({ email, error: err?.message || "Failed" });
@@ -341,6 +426,44 @@ ${bodyText.replace(/\n/g, "<br/>")}
       });
       const message = err?.message || "Unknown error";
       throw new Error(`[mailer:sendFromDraft] ${message}`);
+    }
+  },
+});
+// Fetch Google Groups members via Google Admin API
+export const fetchGoogleGroupsMembers = action({
+  args: {
+    groupEmail: v.string(), // e.g., "group-name@googlegroups.com"
+    accessToken: v.string(), // Gmail access token with admin scope
+  },
+  handler: async (ctx, args): Promise<Array<{ email: string; name?: string }>> => {
+    try {
+      // Use Google Directory API to list group members
+      const response = await fetch(
+        `https://www.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(args.groupEmail)}/members`,
+        {
+          headers: {
+            Authorization: `Bearer ${args.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Google API Error: ${error?.error?.message || "Failed to fetch group members"}`);
+      }
+
+      const data = await response.json();
+      const members = (data.members || []).map((m: any) => ({
+        email: m.email,
+        name: m.givenName && m.familyName 
+          ? `${m.givenName} ${m.familyName}` 
+          : m.name || m.email,
+      }));
+
+      return members;
+    } catch (error: any) {
+      throw new Error(`Failed to fetch Google Groups members: ${error?.message || "Unknown error"}`);
     }
   },
 });

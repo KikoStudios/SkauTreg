@@ -5,7 +5,7 @@ import { useProfileModal } from "../context/ProfileModalContext";
 import styles from './Sidebar.module.css';
 
 const navItems = [
-    { label: 'Domů', icon: <img src="/icons/home-icon.svg" alt="Domů" style={{ width: "24px", height: "auto" }} />, active: true, href: '/' },
+    { label: 'Domů', icon: <img src="/icons/home-icon.svg" alt="Domů" style={{ width: "24px", height: "auto" }} />, active: true, href: '/home' },
     { label: 'Můj Oddíl', icon: <img src="/icons/oddil-icon.svg" alt="Můj Oddíl" style={{ width: "24px", height: "auto" }} />, href: '/troop' },
     { label: 'Členové', icon: <img src="/icons/clenove-icon.svg" alt="Členové" style={{ width: "24px", height: "auto" }} />, href: '/members' },
     { label: 'Výpravy', icon: <img src="/icons/vypravy-icon.svg" alt="Výpravy" style={{ width: "24px", height: "auto" }} />, href: '/trips' },

@@ -23,12 +23,33 @@ export default defineSchema({
         contactEmail: v.optional(v.string()),
         infoEmail: v.optional(v.string()),
         
-        // Gmail OAuth 2.0 integration
-        gmailOAuth: v.optional(v.object({
+        // Email provider integration (OAuth or SMTP)
+        emailProvider: v.optional(v.object({
+            provider: v.string(), // "gmail", "outlook", "seznam", "centrum", "google-groups"
             email: v.string(), // Connected email address
-            refreshToken: v.string(), // OAuth refresh token
+            // OAuth fields (for Gmail)
+            refreshToken: v.optional(v.string()), // OAuth refresh token
+            // SMTP fields (for Seznam, Centrum, O2)
+            smtpHost: v.optional(v.string()), // e.g., "smtp.seznam.cz"
+            smtpPort: v.optional(v.number()), // e.g., 465
+            smtpPassword: v.optional(v.string()), // Encrypted password
+            // Google Groups integration
+            groupEmail: v.optional(v.string()), // Google Group email address
+            memberMapping: v.optional(v.array(v.object({
+                memberId: v.id("members"),
+                emails: v.array(v.string()), // Multiple emails per member (parent + kid)
+            }))),
+            // Metadata
             connectedAt: v.string(), // ISO timestamp
             connectedBy: v.id("users"), // User who connected
+        })),
+        
+        // Legacy Gmail OAuth (deprecated, keeping for backward compatibility)
+        gmailOAuth: v.optional(v.object({
+            email: v.string(), 
+            refreshToken: v.string(),
+            connectedAt: v.string(),
+            connectedBy: v.id("users"),
         })),
     }),
 

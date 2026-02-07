@@ -10,7 +10,7 @@ import { useState, useCallback, useEffect } from "react";
 import Button from "../../../../components/Button";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
-import GmailSettings from "../../../../components/GmailSettings";
+import EmailSettings from "../../../../components/EmailSettings";
 
 // --- Helpers for Image Upload (Copied/Adapted) ---
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -181,10 +181,9 @@ export default function TroopSettingsPage() {
                 accentColor: formData.accentColor,
                 logo: logoStorageId // Only update if new one uploaded
             });
-            alert("Uloženo!");
+            // Saved silently, no popup
         } catch (error) {
             console.error(error);
-            alert("Chyba při ukládání.");
         } finally {
             setIsSaving(false);
         }
@@ -244,7 +243,7 @@ export default function TroopSettingsPage() {
                     onClick={() => setActiveTab("gmail")}
                     style={tabStyle(activeTab === "gmail")}
                 >
-                    Gmail & Email
+                    E-mailové připojení
                 </button>
                 <button
                     onClick={() => setActiveTab("danger")}
@@ -448,7 +447,7 @@ export default function TroopSettingsPage() {
                 {/* GMAIL TAB */}
                 {activeTab === "gmail" && (
                     <div style={panelStyle}>
-                        <GmailSettings 
+                        <EmailSettings 
                             troopId={troopId}
                             isAuthorized={true}
                         />

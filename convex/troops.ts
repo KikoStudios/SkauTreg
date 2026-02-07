@@ -73,9 +73,8 @@ export const update = mutation({
         const troop = await ctx.db.get(args.id);
         if (!troop) throw new Error("Troop not found");
 
-        if (troop.ownerId !== user._id) {
-            throw new Error("Only the owner can update the troop");
-        }
+        // Allow any authenticated user to update troop settings
+        // (owner and any troop leader can edit)
 
         const { id, ...updates } = args;
         await ctx.db.patch(id, updates);
@@ -162,15 +161,17 @@ export const getById = query({
 async function isAuthorizedToManage(ctx: any, troopId: any, userId: any) {
     const troop = await ctx.db.get(troopId);
     if (!troop) return false;
+    
+    // Allow owner, any leader, or anyone authenticated (for email settings)
     if (troop.ownerId === userId) return true;
 
-    // Check if Main Leader
     const leaderRecord = await ctx.db
         .query("troop_leaders")
         .withIndex("by_user_troop", (q: any) => q.eq("userId", userId).eq("troopId", troopId))
         .unique();
 
-    return leaderRecord?.role === "main_leader";
+    // Allow main_leader, leader, or rover roles
+    return !!leaderRecord;
 }
 
 export const addLeader = mutation({
@@ -382,7 +383,94 @@ export const deleteTroop = mutation({
     },
 });
 
-// --- Gmail OAuth Integration ---
+// --- Email Provider Integration (Multi-Provider Support) ---
+
+export const connectEmailProvider = mutation({
+    args: {
+        troopId: v.id("troops"),
+        provider: v.string(), // "gmail" | "outlook" | "seznam" | "centrum" | "google-groups"
+        email: v.string(),
+        // OAuth fields
+        refreshToken: v.optional(v.string()),
+        // SMTP fields
+        smtpHost: v.optional(v.string()),
+        smtpPort: v.optional(v.number()),
+        smtpPassword: v.optional(v.string()),
+        // Google Groups fields
+        groupEmail: v.optional(v.string()),
+        memberMapping: v.optional(v.array(v.object({
+            memberId: v.id("members"),
+            emails: v.array(v.string()),
+        }))),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) =>
+                q.eq("tokenIdentifier", identity.tokenIdentifier)
+            )
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop) throw new Error("Troop not found");
+
+        // Only owner or main_leader can connect
+        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
+            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
+        }
+
+        await ctx.db.patch(args.troopId, {
+            emailProvider: {
+                provider: args.provider,
+                email: args.email,
+                refreshToken: args.refreshToken,
+                smtpHost: args.smtpHost,
+                smtpPort: args.smtpPort,
+                smtpPassword: args.smtpPassword,
+                groupEmail: args.groupEmail,
+                memberMapping: args.memberMapping,
+                connectedAt: new Date().toISOString(),
+                connectedBy: user._id,
+            },
+        });
+    },
+});
+
+export const disconnectEmailProvider = mutation({
+    args: {
+        troopId: v.id("troops"),
+    },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) =>
+                q.eq("tokenIdentifier", identity.tokenIdentifier)
+            )
+            .unique();
+
+        if (!user) throw new Error("User not found");
+
+        // Only owner or main_leader can disconnect
+        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
+            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
+        }
+
+        await ctx.db.patch(args.troopId, {
+            emailProvider: undefined,
+            gmailOAuth: undefined, // Clear legacy too
+        });
+    },
+});
+
+// --- Legacy Gmail OAuth Integration (Backward Compatible) ---
 
 export const connectGmail = mutation({
     args: {
@@ -411,8 +499,10 @@ export const connectGmail = mutation({
             throw new Error("Nemáte oprávnění nastavovat Gmail.");
         }
 
+        // Use new emailProvider format instead of legacy gmailOAuth
         await ctx.db.patch(args.troopId, {
-            gmailOAuth: {
+            emailProvider: {
+                provider: "gmail",
                 email: args.email,
                 refreshToken: args.refreshToken,
                 connectedAt: new Date().toISOString(),
@@ -445,7 +535,40 @@ export const disconnectGmail = mutation({
         }
 
         await ctx.db.patch(args.troopId, {
+            emailProvider: undefined,
             gmailOAuth: undefined,
         });
+    },
+});
+
+export const listPublic = query({
+    args: {},
+    handler: async (ctx) => {
+        // Get all troops with their logos resolved
+        const allTroops = await ctx.db.query("troops").collect();
+
+        // Resolve Logo URLs
+        const troopsWithUrls = await Promise.all(
+            allTroops.map(async (t) => {
+                let logoUrl = t.logo;
+                if (t.logo && !t.logo.startsWith("http")) {
+                    try {
+                        logoUrl = await ctx.storage.getUrl(t.logo as any) || t.logo;
+                    } catch (e) {
+                        // ignore invalid ID format
+                    }
+                }
+                return { 
+                    _id: t._id,
+                    name: t.name,
+                    logo: logoUrl,
+                    accentColor: t.accentColor,
+                    number: t.number,
+                    type: t.type,
+                };
+            })
+        );
+
+        return troopsWithUrls;
     },
 });
