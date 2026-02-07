@@ -264,62 +264,6 @@ export default function PrivacyPolicy() {
           title: "13. Contact",
           content: `Have questions about privacy?\n\nContact KAO:\n• GitHub Issues: https://github.com/KikoStudios/SkauTreg\n• GitHub Discussions for general questions\n\nPlease keep in mind:\n• We are an open-source community\n• Responses may take longer\n• We are not a law firm - consult a lawyer for legal advice\n\nFor urgent security issues: Report an issue marked "security".`
         }
-      ]    },
-    en: {
-      title: "Privacy Policy",
-      sections: [
-        {
-          title: "1. Introduction",
-          content: `This application is an open-source project created by the kikosutdios community (formerly known as KAO). Welcome to our privacy policy.\n\nBy accepting these policies, you acknowledge that you are using software provided "AS IS" without any warranties.\n\nAs an open-source project, we cannot guarantee absolute data security. You use this application at your own risk.`
-        },
-        {
-          title: "2. Open-Source Statement",
-          content: `This software is an open-source project managed by the kikosutdios community (formerly KAO).\n\nThe application is provided AS IS, without warranty of any kind, express or implied.\n\nThe kikosutdios community is NOT liable for:\n• Security of your data\n• Service availability\n• Data loss\n• Any damages arising from using this application`
-        },
-        {
-          title: "3. What Data We Collect",
-          content: `We collect minimal data necessary for the application to function:\n\nAuthentication data:\n• Email address\n• First and last name\n• Authentication tokens (managed by Clerk)\n\nDashboard data:\n• Troops\n• Bases\n• Members\n• Trips\n• Participations\n\nAll data is stored in Convex database.`
-        },
-        {
-          title: "4. How We Use Your Data",
-          content: `Your data is used exclusively for:\n\n• Operating basic application features\n• Displaying your troops and bases\n• Managing members and trips\n• Authentication and authorization\n\nData is NOT:\n• Sold to third parties\n• Used for marketing\n• Shared without your consent\n• Used for profiling`
-        },
-        {
-          title: "5. Cookies and Local Storage",
-          content: `The application uses:\n\nCookies for:\n• Authentication (Clerk)\n• Session management\n\nLocal Storage for:\n• UI preferences\n• Temporary application state\n\nWe do not use tracking cookies or third-party analytics.`
-        },
-        {
-          title: "6. Data Security",
-          content: `IMPORTANT STATEMENT:\n\nAs an open-source project, we CANNOT guarantee absolute security of your data.\n\nWhile we use standard security practices:\n• Encryption in transit (HTTPS)\n• Secure authentication (Clerk)\n• Convex database security measures\n\nWe cannot be held responsible for:\n• Data breaches\n• Data loss\n• Security incidents\n• Service unavailability\n\nYOU USE AT YOUR OWN RISK.`
-        },
-        {
-          title: "7. Third-Party Data Sharing",
-          content: `Your data is processed by the following services:\n\nClerk (authentication):\n• Manages login\n• Stores authentication data\n• Their own privacy policy applies\n\nConvex (database):\n• Stores all application data\n• Their own privacy policy applies\n\nNetlify (hosting):\n• Hosts the application\n• Their own privacy policy applies\n\nBy using our application, you also agree to the terms of these services.`
-        },
-        {
-          title: "8. Your Rights",
-          content: `You have the right to:\n\n• Access your data (through the app)\n• Correct inaccurate data\n• Delete your data\n• Export your data\n• Withdraw consent\n\nHow to exercise your rights:\n• To delete account, use settings feature\n• To export data, use export feature\n• For other requests, contact kikosutdios team\n\nNote: Some data may remain in backups for up to 30 days.`
-        },
-        {
-          title: "9. Children's Data",
-          content: `This application may be used by scout troops that maintain records of members of various age groups.\n\nFor users under 15:\n• Parental consent is required\n• Children's data is protected like adults' data\n• Parents/guardians have right to access and delete data\n\nAs an open-source project, we cannot fully guarantee GDPR compliance. Responsibility lies with troop administrators.`
-        },
-        {
-          title: "10. Changes to These Policies",
-          content: `These policies may be changed at any time.\n\nYou will be notified of changes:\n• Via in-app notification\n• Via email (if available)\n• On GitHub repository\n\nContinued use of the application after changes means you accept the new policies.\n\nCurrent version: 1.0\nLast updated: January 2025`
-        },
-        {
-          title: "11. Limitation of Liability",
-          content: `THIS IS A KEY SECTION - READ IT CAREFULLY:\n\nAs an open-source project provided by the kikosutdios community (formerly KAO):\n\nWE ARE NOT LIABLE FOR:\n• Loss or breach of your data\n• Service availability or outages\n• Application bugs\n• Damages arising from using the application\n• Non-compliance with GDPR or other regulations\n\nTHE APPLICATION IS PROVIDED "AS IS" without any warranties.\n\nBY USING THIS APPLICATION YOU ACKNOWLEDGE AND ACCEPT THESE RISKS.`
-        },
-        {
-          title: "12. Bug Reporting",
-          content: `Found a bug? Help us!\n\nAs an open-source project, we rely on the community:\n\n• Report bugs on our GitHub repository\n• Open an issue with detailed description\n• If you can, suggest a solution\n• Contribute code\n\nWe appreciate every contribution to improving the app!\n\nGitHub: github.com/kikosutdios\n\nThank you for helping improve SkautREG!`
-        },
-        {
-          title: "13. Contact",
-          content: `Have questions about privacy?\n\nContact kikosutdios team:\n• GitHub Issues: github.com/kikosutdios\n• Discord community (if exists)\n\nPlease keep in mind:\n• We are an open-source community\n• Responses may take longer\n• We are not a law firm - consult a lawyer for legal advice\n\nFor urgent security issues: Report an issue marked "security".`
-        }
       ]
     }
   };
