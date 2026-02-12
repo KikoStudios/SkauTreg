@@ -8,8 +8,12 @@ import ErrorModal from "../components/ErrorModal";
 import SuccessModal from "../components/SuccessModal";
 
 export const metadata: Metadata = {
-  title: "skautREG",
-  description: "Light Green Theme UI Kit",
+  title: "SkauTreg - Správa skautských středisek s mailovým systémem",
+  description: "Kompletní systém pro správu skautských oddílů. Spravujte členy, plánujte výpravy, komunikujte pomocí integrovaného mailového systému (SkautReg Mailing System) a organizujte všechno na jednom místě.",
+  icons: {
+    icon: "/icons/logo-icon.png",
+    apple: "/icons/logo-icon.png",
+  },
 };
 
 export default function RootLayout({

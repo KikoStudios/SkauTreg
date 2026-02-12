@@ -223,7 +223,7 @@ export default function TermsOfService() {
       <div style={styles.header}>
         <div style={styles.headerContent}>
           <Link href="/" style={styles.logo}>
-            <img src="/Logo-light.svg" alt="SkautREG" style={styles.logoImg} />
+            <img src="/logo_skautreg.svg" alt="SkautREG" style={styles.logoImg} />
           </Link>
           <div style={styles.langButtons}>
             <button onClick={() => setLanguage("cs")} style={styles.langButton(language === "cs")}>CS</button>
