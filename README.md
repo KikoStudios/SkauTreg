@@ -9,6 +9,7 @@ Aplikace je navržena jako **serverless** řešení, což znamená, že nemusím
 *   **Next.js** - pro rychlé a interaktivní uživatelské rozhraní.
 *   **Convex** - slouží jako náš backend a realtime databáze.
 *   **Clerk** - zajišťuje bezpečné přihlašování a správu uživatelů.
+*   **Browserless** - atomatizace iDOS integrace **v budoucnu self hostable**
 
 ## Feature Implementation Checklist
 
@@ -32,7 +33,11 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [x] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
 - [x] **Rada managment** zapisy z rad a bot kterej je posle na discord
 - [ ] **Git kontrola** kdyz rover edituje casti veci musi bit accpnuty vedoucimy
+- [ ] **Discord integrace** posilani info po radach a dal do discordu s linkem
 
+## Backend 
+- [ ] **Clerk self host alternativa** Idealne SuperTokens nebo ConvexAuth
+- [ ] **Browserless selfhost** browserless se da self hostnout 
 ## Jak aplikaci spustit
 
 Pro spuštění aplikace na vašem počítači postupujte následovně:
