@@ -36,7 +36,7 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [ ] **Discord integrace** posilani info po radach a dal do discordu s linkem
 
 ## Backend 
-- [ ] **Clerk self host alternativa** Idealne SuperTokens 
+- [ ] **Clerk self host alternativa** Idealne SuperTokens nebo ConvexAuth
 - [ ] **Browserless selfhost** browserless se da self hostnout 
 ## Jak aplikaci spustit
 
