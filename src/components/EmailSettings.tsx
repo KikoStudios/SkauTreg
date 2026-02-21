@@ -6,6 +6,7 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
 import Button from "./Button";
+import ExperimentalGate from "./ExperimentalGate";
 import { useFeedback } from "../context/FeedbackContext";
 
 interface EmailSettingsProps {
@@ -93,19 +94,33 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
     const isConnected = !!emailProvider || !!gmailOAuth;
     const currentProvider = emailProvider?.provider || (gmailOAuth ? "gmail" : null);
 
-    const handleProviderSelect = (provider: EmailProvider) => {
-        setSelectedProvider(provider);
-        setShowProviderSelector(false);
-
+    const startProviderFlow = (provider: EmailProvider) => {
         if (provider === "gmail") {
+            setSelectedProvider(null);
             handleGmailConnect();
-        } else if (provider === "outlook") {
+            return;
+        }
+
+        if (provider === "outlook") {
+            setSelectedProvider(null);
             handleOutlookConnect();
-        } else if (provider === "google-groups") {
+            return;
+        }
+
+        if (provider === "google-groups") {
+            setSelectedProvider(null);
             // For Google Groups, we need Gmail OAuth first
             // Redirect to Gmail OAuth which will come back and allow group access
             handleGmailConnect();
+            return;
         }
+
+        setSelectedProvider(provider);
+    };
+
+    const handleProviderSelect = (provider: EmailProvider) => {
+        setShowProviderSelector(false);
+        startProviderFlow(provider);
     };
 
     const handleGmailConnect = () => {
@@ -393,7 +408,9 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                         </div>
 
                         <div style={{ display: "grid", gap: "1rem" }}>
-                            {Object.entries(PROVIDER_CONFIGS).map(([key, config]) => (
+                            {Object.entries(PROVIDER_CONFIGS)
+                                .filter(([key]) => key === "gmail")
+                                .map(([key, config]) => (
                                 <button
                                     key={key}
                                     onClick={() => handleProviderSelect(key as EmailProvider)}
@@ -429,6 +446,75 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     </div>
                                 </button>
                             ))}
+                            <ExperimentalGate
+                                title="Experimental"
+                                message="Tyto poskytovatele jsou ve vyvoji. Muzou se menit nebo nefungovat spravne."
+                                acknowledgeLabel="Pokracovat"
+                                cancelLabel="Zpet"
+                                badgeText="EXPERIMENTAL"
+                                trigger={
+                                    <button
+                                        style={{
+                                            padding: "1.1rem",
+                                            border: "3px dashed #000",
+                                            borderRadius: "12px",
+                                            backgroundColor: "#fff7ed",
+                                            cursor: "pointer",
+                                            textAlign: "left",
+                                            boxShadow: "3px 3px 0 0 #000",
+                                            width: "100%",
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: "900", fontSize: "1rem", marginBottom: "0.25rem" }}>
+                                            Ostatni poskytovatele (EXPERIMENTAL)
+                                        </div>
+                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
+                                            Outlook, Seznam, Centrum, Google Groups
+                                        </div>
+                                    </button>
+                                }
+                            >
+                                <div style={{ display: "grid", gap: "1rem" }}>
+                                    {Object.entries(PROVIDER_CONFIGS)
+                                        .filter(([key]) => key !== "gmail")
+                                        .map(([key, config]) => (
+                                            <button
+                                                key={key}
+                                                onClick={() => handleProviderSelect(key as EmailProvider)}
+                                                style={{
+                                                    padding: "1.25rem",
+                                                    border: "3px solid #000",
+                                                    borderRadius: "12px",
+                                                    backgroundColor: "white",
+                                                    cursor: "pointer",
+                                                    textAlign: "left",
+                                                    boxShadow: "3px 3px 0 0 #000",
+                                                    transition: "transform 0.1s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = "translate(-2px, -2px)";
+                                                    e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = "translate(0, 0)";
+                                                    e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
+                                                }}
+                                            >
+                                                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                    <div style={{ fontSize: "2.5rem" }}>{config.icon}</div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
+                                                            {config.name}
+                                                        </div>
+                                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
+                                                            {config.description}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                </div>
+                            </ExperimentalGate>
                         </div>
                     </div>
                 </div>
@@ -695,7 +781,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                                     {member.name} {member.nickname && `"${member.nickname}"`}
                                                 </div>
                                                 <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#6b7280", marginBottom: "0.75rem" }}>
-                                                    Rodič: {member.parentName}
+                                                    Zástupce: {member.guardianName}
                                                 </div>
                                                 <select
                                                     multiple

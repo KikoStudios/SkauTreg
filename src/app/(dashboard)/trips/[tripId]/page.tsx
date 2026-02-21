@@ -82,6 +82,8 @@ export default function TripDashboardPage() {
                 location: data.location,
                 startDate: data.startDate,
                 endDate: data.endDate,
+                lastCancellationDate: data.lastCancellationDate,
+                lateCancellationMessage: data.lateCancellationMessage,
                 formType: data.formType,
                 customFields: data.customFields
             });
@@ -292,7 +294,8 @@ export default function TripDashboardPage() {
     }
 
     const { trip, participants, base } = dashboard;
-    const participantsWithEmail = participants.filter((p: any) => p.member?.email);
+    const validParticipants = participants.filter((p: any) => p.member);
+    const participantsWithEmail = validParticipants.filter((p: any) => p.member?.email);
 
     if (isEditing) {
         return (
@@ -342,6 +345,8 @@ export default function TripDashboardPage() {
                             location: trip.location,
                             startDate: trip.startDate,
                             endDate: trip.endDate || "",
+                            lastCancellationDate: trip.lastCancellationDate || "",
+                            lateCancellationMessage: trip.lateCancellationMessage || "",
                             formType: trip.formType || "registration",
                             customFields: trip.customFields || []
                         }}
@@ -361,7 +366,7 @@ export default function TripDashboardPage() {
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
                 padding: "1rem 2rem",
-                margin: "-2rem -2rem 1rem -2rem",
+                margin: "0 -2rem 1rem -2rem",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
@@ -648,7 +653,7 @@ export default function TripDashboardPage() {
 
                     {/* Participants */}
                     <div>
-                        <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({participants.length})</h2>
+                        <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({validParticipants.length})</h2>
 
                         <div style={{
                             overflowX: "auto",
@@ -670,11 +675,11 @@ export default function TripDashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {participants.map((p, index) => (
-                                        <tr key={p._id} style={{ borderBottom: index === participants.length - 1 ? "none" : "2px solid #000" }}>
+                                    {validParticipants.map((p, index) => (
+                                        <tr key={p._id} style={{ borderBottom: index === validParticipants.length - 1 ? "none" : "2px solid #000" }}>
                                             <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                                 <div style={{ fontWeight: "800", fontSize: "1rem" }}>{p.member?.name}</div>
-                                                <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Rodič: {p.member?.parentPhone}</div>
+                                                <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Zástupce: {p.member?.guardianPhone}</div>
                                             </td>
                                             <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                                 <span style={{
@@ -689,6 +694,20 @@ export default function TripDashboardPage() {
                                                 }}>
                                                     {p.status === "pending" ? "Bez reakce" : p.status === "attending" ? "Jede" : "Nejede"}
                                                 </span>
+                                                {p.status === "not_attending" && p.lateCancellation && (
+                                                    <span style={{
+                                                        marginLeft: "0.5rem",
+                                                        padding: "0.2rem 0.6rem",
+                                                        borderRadius: "6px",
+                                                        fontSize: "0.75rem",
+                                                        border: "2px solid #dc2626",
+                                                        color: "#991b1b",
+                                                        fontWeight: "700",
+                                                        backgroundColor: "#fee2e2"
+                                                    }}>
+                                                        Po lhute
+                                                    </span>
+                                                )}
                                             </td>
                                             <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                                 <button
@@ -1131,6 +1150,26 @@ export default function TripDashboardPage() {
                             </button>
                         </div>
 
+                        <div style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.85rem",
+                            padding: "0.9rem 1.1rem",
+                            backgroundColor: "#ffe4e6",
+                            border: "3px solid #c43737",
+                            borderRadius: "12px",
+                            fontWeight: "900",
+                            marginBottom: "1.5rem",
+                            boxShadow: "4px 4px 0 0 #c43737",
+                        }}>
+                            <img
+                                src="/exclamation-icon.svg"
+                                alt=""
+                                style={{ width: "28px", height: "28px" }}
+                            />
+                            <span style={{ color: "#9b1c1c" }}>Tato sekce je ve vyvoji.</span>
+                        </div>
+
                         {/* Route Cards */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                             {/* Example: Travel to destination */}
@@ -1379,7 +1418,7 @@ export default function TripDashboardPage() {
             {/* Tab Content - ÚČASTNÍCI */}
             {activeTab === 'ucastnici' && (
                 <div>
-                    <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({participants.length})</h2>
+                    <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({validParticipants.length})</h2>
 
                     <div style={{
                         overflowX: "auto",
@@ -1401,8 +1440,8 @@ export default function TripDashboardPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {participants.map((p, index) => (
-                                    <tr key={p._id} style={{ borderBottom: index === participants.length - 1 ? "none" : "2px solid #000" }}>
+                                {validParticipants.map((p, index) => (
+                                    <tr key={p._id} style={{ borderBottom: index === validParticipants.length - 1 ? "none" : "2px solid #000" }}>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <div style={{ fontWeight: "800", fontSize: "1rem" }}>{p.member?.name}</div>
                                             <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Rodič: {p.member?.parentPhone}</div>
@@ -1420,6 +1459,20 @@ export default function TripDashboardPage() {
                                             }}>
                                                 {p.status === "pending" ? "Bez reakce" : p.status === "attending" ? "Jede" : "Nejede"}
                                             </span>
+                                            {p.status === "not_attending" && p.lateCancellation && (
+                                                <span style={{
+                                                    marginLeft: "0.5rem",
+                                                    padding: "0.2rem 0.6rem",
+                                                    borderRadius: "6px",
+                                                    fontSize: "0.75rem",
+                                                    border: "2px solid #dc2626",
+                                                    color: "#991b1b",
+                                                    fontWeight: "700",
+                                                    backgroundColor: "#fee2e2"
+                                                }}>
+                                                    Po lhute
+                                                </span>
+                                            )}
                                         </td>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <button

@@ -17,7 +17,7 @@ export default function SignInForm() {
 
     useEffect(() => {
         if (isAuthLoaded && isSignedIn) {
-            router.replace("/");
+            router.replace("/home");
         }
     }, [isAuthLoaded, isSignedIn, router]);
 
@@ -27,7 +27,7 @@ export default function SignInForm() {
         setError("");
 
         if (isAuthLoaded && isSignedIn) {
-            router.replace("/");
+            router.replace("/home");
             return;
         }
 
@@ -43,7 +43,7 @@ export default function SignInForm() {
 
             if (result.status === "complete") {
                 await setActive({ session: result.createdSessionId });
-                router.push("/");
+                router.push("/home");
             } else {
                 console.log("Sign in result:", result);
                 setError("Authentication incomplete. Please try again.");

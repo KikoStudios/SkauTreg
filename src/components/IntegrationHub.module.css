@@ -1,0 +1,107 @@
+.root {
+    width: 100%;
+    transform: translate(var(--hub-offset-x, 0), var(--hub-offset-y, 0));
+}
+
+.welcome {
+    background-color: white;
+    border: 3px solid #000;
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    margin: 0 0 1rem 0;
+    transform: translate(var(--title-offset-x, 0), var(--title-offset-y, 0));
+}
+
+.titleArrows {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 0.6rem;
+    transform: translate(var(--arrows-offset-x, 0), var(--arrows-offset-y, 0));
+}
+
+.arrowsImage {
+    height: var(--arrows-height, 60px);
+    width: auto;
+    display: block;
+}
+
+.subtitle {
+    font-size: 1rem;
+    color: #666;
+    margin: 0;
+    font-weight: 600;
+}
+
+.services {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.serviceButton {
+    background: white;
+    border: 3px solid #000;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.contentGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.sectionTitle {
+    font-size: 1.25rem;
+    font-weight: 900;
+    margin-bottom: 1rem;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.itemButton {
+    background-color: white;
+    border: 3px solid #000;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.itemCard {
+    background-color: white;
+    border: 3px solid #000;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 3px 3px 0 0 #000;
+}
+
+.emptyText {
+    color: #999;
+    font-style: italic;
+}

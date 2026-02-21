@@ -157,6 +157,8 @@ export default function PublicRSVPPage() {
     const [responses, setResponses] = useState<any>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [showLateCancellationWarning, setShowLateCancellationWarning] = useState(false);
+    const [pendingCancellation, setPendingCancellation] = useState(false);
 
     useEffect(() => {
         if (data) {
@@ -220,10 +222,35 @@ export default function PublicRSVPPage() {
         }
     };
 
+    const isAfterCancellationDeadline = (lastCancellationDate: string | undefined) => {
+        if (!lastCancellationDate) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const [y, m, d] = lastCancellationDate.split('-').map(Number);
+        const deadline = new Date(y, m - 1, d);
+        return today > deadline;
+    };
+
+    const handleCancellationClick = () => {
+        const tripLastCancellationDate = (data as any)?.tripLastCancellationDate;
+        if (isAfterCancellationDeadline(tripLastCancellationDate)) {
+            setShowLateCancellationWarning(true);
+            setPendingCancellation(true);
+        } else {
+            handleSubmit("not_attending");
+        }
+    };
+
+    const confirmLateCancellation = async () => {
+        setShowLateCancellationWarning(false);
+        await handleSubmit("not_attending");
+        setPendingCancellation(false);
+    };
+
     if (data === undefined) return <div style={{ padding: "4rem", textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Načítám pozvánku...</div>;
     if (data === null) return <div style={{ padding: "4rem", textAlign: "center", fontFamily: "'Inter', sans-serif" }}>Tento odkaz již není platný nebo neexistuje.</div>;
 
-    const { tripName, tripDescription, tripLocation, tripStartDate, tripEndDate, memberName, customFields: rawCustomFields, formType } = data as any;
+    const { tripName, tripDescription, tripLocation, tripStartDate, tripEndDate, memberName, customFields: rawCustomFields, formType, tripLastCancellationDate, tripLateCancellationMessage } = data as any;
 
     const formatDateCZ = (dateStr: string) => {
         if (!dateStr) return "";
@@ -330,16 +357,30 @@ export default function PublicRSVPPage() {
                 </div>
 
                 <div style={{ padding: "2rem" }}>
-                    <p style={{ fontSize: "1.2rem", marginBottom: "2rem", color: "#18181b", lineHeight: 1.6, fontWeight: "500" }}>
+                    <p style={{ fontSize: "1.2rem", marginBottom: "1.5rem", color: "#18181b", lineHeight: 1.6, fontWeight: "500" }}>
                         Ahoj! <br />
                         Prosíme o potvrzení účasti pro člena <span style={{ textDecoration: "underline", textDecorationThickness: "2px", textDecorationColor: "#86efac" }}>{memberName}</span>.
                     </p>
+
+                    {isAfterCancellationDeadline(tripLastCancellationDate) && (
+                        <div style={{
+                            padding: "1rem",
+                            backgroundColor: "#fff1f2",
+                            border: "2px solid #dc2626",
+                            borderRadius: "8px",
+                            marginBottom: "1.5rem",
+                            color: "#991b1b",
+                            fontWeight: "600"
+                        }}>
+                            Lhuta pro zruseni bez poplatku skoncila. {tripLateCancellationMessage || "Pokud se nyni odhlasite, muze to znamenat dodatecne naklady (napr. nevratne jizdenky)."}
+                        </div>
+                    )}
 
                     {/* Quick Actions */}
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "2rem" }}>
                         <div style={{ flex: 1, minWidth: "140px" }}>
                             <button
-                                onClick={() => handleSubmit("not_attending")}
+                                onClick={handleCancellationClick}
                                 disabled={isSubmitting}
                                 style={secondaryButtonStyle}
                             >
@@ -447,6 +488,74 @@ export default function PublicRSVPPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Late Cancellation Warning Modal */}
+                {showLateCancellationWarning && (
+                    <div style={{
+                        position: "fixed",
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        backgroundColor: "rgba(0, 0, 0, 0.6)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 5000,
+                        padding: "1rem"
+                    }} onClick={() => setShowLateCancellationWarning(false)}>
+                        <div style={{
+                            backgroundColor: "white",
+                            borderRadius: "8px",
+                            border: "3px solid #ff6b6b",
+                            boxShadow: "0 10px 40px rgba(0, 0, 0, 0.2)",
+                            padding: "2rem",
+                            maxWidth: "500px",
+                            width: "100%"
+                        }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
+                                <span style={{ fontSize: "2rem" }}>!</span>
+                                <h2 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0, color: "#ff6b6b" }}>Pozor!</h2>
+                            </div>
+                            
+                            <p style={{ fontSize: "1rem", color: "#333", marginBottom: "1rem", lineHeight: 1.6 }}>
+                                <strong>Lhůta pro zrušení bez poplatku skončila!</strong>
+                            </p>
+                            
+                            <p style={{ fontSize: "0.95rem", color: "#666", marginBottom: "1.5rem", lineHeight: 1.6 }}>
+                                {tripLateCancellationMessage || "Pokud se nyni odhlasite, organizatori budou muset zaplatit za vasi nevratnou letenku nebo jizdenku. Prosim, zvazte tuto skutecnost."}
+                            </p>
+
+                            <div style={{ display: "flex", gap: "1rem" }}>
+                                <button
+                                    onClick={() => {
+                                        setShowLateCancellationWarning(false);
+                                        setPendingCancellation(false);
+                                    }}
+                                    style={{
+                                        ...primaryButtonStyle,
+                                        flex: 1,
+                                        backgroundColor: "#86efac",
+                                        justifyContent: "center"
+                                    }}
+                                >
+                                    Zůstat
+                                </button>
+                                <button
+                                    onClick={confirmLateCancellation}
+                                    disabled={isSubmitting}
+                                    style={{
+                                        ...secondaryButtonStyle,
+                                        flex: 1,
+                                        borderColor: "#ff6b6b",
+                                        color: "#ff6b6b",
+                                        fontWeight: "700",
+                                        justifyContent: "center"
+                                    }}
+                                >
+                                    {isSubmitting ? "Ukládání..." : "Přesto se omluvit"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <style jsx global>{`
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');

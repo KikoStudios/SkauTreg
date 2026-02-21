@@ -63,11 +63,25 @@ export default defineSchema({
 
     members: defineTable({
         troopId: v.id("troops"),
+        // Member info
         name: v.string(),
         nickname: v.optional(v.string()),
         birthDate: v.optional(v.string()),
-        parentName: v.string(),
-        parentPhone: v.string(),
+        // Guardian 1 (optional for backward compatibility)
+        guardianName: v.optional(v.string()),
+        guardianPhone: v.optional(v.string()),
+        guardianEmail: v.optional(v.string()),
+        // Guardian 2
+        guardian2Name: v.optional(v.string()),
+        guardian2Phone: v.optional(v.string()),
+        guardian2Email: v.optional(v.string()),
+        // Additional
+        address: v.optional(v.string()),
+        // Legacy fields (for backward compatibility with existing data)
+        parentName: v.optional(v.string()),
+        parentPhone: v.optional(v.string()),
+        parent2Name: v.optional(v.string()),
+        parent2Phone: v.optional(v.string()),
         email: v.optional(v.string()),
         // Extensible fields
     }).index("by_troop", ["troopId"]),
@@ -81,6 +95,8 @@ export default defineSchema({
         endDate: v.optional(v.string()),
         linkStub: v.optional(v.string()),
         baseId: v.optional(v.id("bases")), // Assigned scout base
+        lastCancellationDate: v.optional(v.string()), // Latest date to cancel without payment
+        lateCancellationMessage: v.optional(v.string()), // Message shown after deadline
 
         // "registration" (Complex form) or "apology" (Simple I'm not coming)
         formType: v.optional(v.string()),
@@ -102,6 +118,8 @@ export default defineSchema({
         status: v.string(), // "attending", "not_attending", "pending"
         accessKey: v.string(), // unique random key for public link
         responses: v.optional(v.any()), // flexible JSON for form answers
+        lateCancellation: v.optional(v.boolean()),
+        lateCancellationAt: v.optional(v.string()),
     })
         .index("by_trip", ["tripId"])
         .index("by_access_key", ["accessKey"]),
@@ -329,5 +347,99 @@ export default defineSchema({
         votedAt: v.string(), // ISO timestamp
     }).index("by_request_user", ["requestId", "userId"])
       .index("by_request", ["requestId"]),
+
+    // Integration Connections (The "Where") - Manage authentication and endpoints for third-party services
+    integrations: defineTable({
+        troopId: v.id("troops"),
+        name: v.string(), // User-defined label (e.g., "Team Discord", "Newsletter Email")
+        serviceType: v.string(), // "discord", "email", "whatsapp", "custom_api"
+        isActive: v.boolean(), // Enable/disable integration
+        
+        // Encrypted configuration payload
+        configPayload: v.string(), // JSON object containing credentials (encrypted in production)
+        
+        // Discord specific
+        webhookUrl: v.optional(v.string()), // Discord webhook URL
+        webhookName: v.optional(v.string()), // Webhook name for reference
+        
+        // Email specific  
+        emailProvider: v.optional(v.string()), // "smtp", "mailgun", "sendgrid"
+        emailAddress: v.optional(v.string()), // Sender email
+        
+        // WhatsApp specific
+        phoneNumber: v.optional(v.string()), // WhatsApp Business Account number
+        
+        // Metadata
+        createdBy: v.id("users"),
+        createdAt: v.string(), // ISO timestamp
+        updatedAt: v.string(), // ISO timestamp
+        testStatus: v.optional(v.string()), // "pending", "success", "failed"
+        testError: v.optional(v.string()), // Error message if test failed
+    })
+        .index("by_troop", ["troopId"])
+        .index("by_service", ["troopId", "serviceType"]),
+
+    // Integration Actions (The "What" & "When") - Event-driven automation rules
+    integration_actions: defineTable({
+        troopId: v.id("troops"),
+        name: v.string(), // User-defined automation name (e.g., "Notify Discord on Late Cancellation")
+        isEnabled: v.boolean(),
+        
+        // Trigger configuration
+        trigger: v.string(), // Event type: "member_unregistered_late", "new_trip_created", "payment_received", "trip_assigned_base"
+        triggerConfig: v.object({
+            // Flexible config based on trigger type
+            conditions: v.optional(v.array(v.object({
+                field: v.string(), // "unit_id", "trip_type", "status"
+                operator: v.string(), // "equals", "contains", "greater_than"
+                value: v.string(), // The value to compare
+            }))),
+        }),
+        
+        // Target integration
+        integrationId: v.id("integrations"),
+        
+        // Message template with dynamic variables
+        messageTemplate: v.string(), // e.g., "Leader {leader_name} reported late cancellation for {trip_title}"
+        messageFormat: v.optional(v.string()), // "plain_text", "markdown", "html"
+        
+        // Additional options
+        includeAttachments: v.optional(v.boolean()),
+        retryOnFailure: v.optional(v.boolean()),
+        maxRetries: v.optional(v.number()),
+        
+        // Metadata
+        createdBy: v.id("users"),
+        createdAt: v.string(),
+        updatedAt: v.string(),
+        lastTriggeredAt: v.optional(v.string()),
+        triggerCount: v.number(), // How many times this action has been triggered
+    })
+        .index("by_troop", ["troopId"])
+        .index("by_trigger", ["troopId", "trigger"])
+        .index("by_integration", ["integrationId"]),
+
+    // Log of integration action executions
+    integration_logs: defineTable({
+        troopId: v.id("troops"),
+        actionId: v.id("integration_actions"),
+        integrationId: v.id("integrations"),
+        
+        // Trigger details
+        triggerEvent: v.string(),
+        triggerData: v.optional(v.string()), // JSON string of what triggered this
+        
+        // Execution details
+        status: v.string(), // "success", "failed", "pending", "skipped"
+        sentMessage: v.optional(v.string()), // The actual message that was sent
+        responseStatus: v.optional(v.number()), // HTTP status if applicable
+        error: v.optional(v.string()), // Error message if failed
+        
+        // Metadata
+        executedAt: v.string(),
+        executionTime: v.optional(v.number()), // milliseconds
+    })
+        .index("by_action", ["actionId"])
+        .index("by_troop_date", ["troopId", "executedAt"]),
 
 });

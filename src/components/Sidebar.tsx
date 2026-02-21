@@ -14,7 +14,8 @@ const navItems = [
 ];
 
 const toolsItems = [
-    { label: 'Vyhledávač Základen', icon: <img src="/icons/wall-light.svg" alt="Vyhledávač" style={{ width: "24px", height: "auto" }} />, href: '/tools' },
+    { label: 'Vyhledávač Základen', icon: <img src="/icons/wall-light.svg" alt="Vyhledávač" style={{ width: "24px", height: "auto" }} />, href: '/tools/basefinder' },
+    { label: 'Integrace', icon: <img src="/icons/webhooks-white.svg" alt="Integrace" style={{ width: "24px", height: "auto" }} />, href: '/tools/integrations' },
 ];
 
 const bottomItems = [

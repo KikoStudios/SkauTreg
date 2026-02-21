@@ -184,6 +184,7 @@ export default function TroopSettingsPage() {
             // Saved silently, no popup
         } catch (error) {
             console.error(error);
+            alert("Chyba při ukládání: " + (error instanceof Error ? error.message : "Neznámá chyba"));
         } finally {
             setIsSaving(false);
         }

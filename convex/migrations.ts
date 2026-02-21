@@ -35,3 +35,29 @@ export const migrateTroops = mutation({
         return "Migration complete";
     },
 });
+
+export const removeIntegrationFields = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const troops = await ctx.db.query("troops").collect();
+        
+        let cleanedCount = 0;
+        
+        for (const troop of troops) {
+            const troopAny = troop as any;
+            
+            // Check if this troop has old integration fields
+            if (troopAny.discordIntegrations || troopAny.integrationActions || troopAny.integrationConnections) {
+                console.log(`Removing integration fields from troop ${troop._id}`);
+                await ctx.db.patch(troop._id, {
+                    discordIntegrations: undefined,
+                    integrationActions: undefined,
+                    integrationConnections: undefined,
+                } as any);
+                cleanedCount++;
+            }
+        }
+        
+        return `Migration complete: cleaned ${cleanedCount} troops`;
+    }
+});

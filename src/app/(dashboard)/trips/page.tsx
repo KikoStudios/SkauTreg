@@ -66,6 +66,7 @@ export default function TripsPage() {
     const [isCreating, setIsCreating] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
+    const [activeTab, setActiveTab] = useState<"upcoming" | "old">("upcoming");
 
     const handleCreate = async (data: TripFormData) => {
         if (!selectedTroopId) return;
@@ -102,13 +103,29 @@ export default function TripsPage() {
         (t.location && t.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    // Helper function to check if trip is upcoming or old
+    const isUpcomingTrip = (trip: any) => {
+        if (!trip.startDate) return true;
+        const [y, m, d] = trip.startDate.split("-").map(Number);
+        const tripStart = new Date(y, m - 1, d);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return tripStart >= today;
+    };
+
+    // Filter by tab
+    const tabFilteredTrips = filteredTrips?.filter((t: any) => {
+        const isUpcoming = isUpcomingTrip(t);
+        return activeTab === "upcoming" ? isUpcoming : !isUpcoming;
+    });
+
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
-                padding: "1rem",
+                padding: "1rem 2rem",
                 margin: "0 -2rem 2rem -2rem", // Break out to full width
                 width: "calc(100% + 4rem)",
                 display: "flex",
@@ -153,6 +170,22 @@ export default function TripsPage() {
                         onChange={e => setSearchTerm(e.target.value)}
                         className="search-input"
                     />
+                </div>
+
+                {/* Tabs */}
+                <div className="tabs-switcher">
+                    <button
+                        onClick={() => setActiveTab("upcoming")}
+                        className={`tab-button ${activeTab === "upcoming" ? "active" : ""}`}
+                    >
+                        Nadcházející
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("old")}
+                        className={`tab-button ${activeTab === "old" ? "active" : ""}`}
+                    >
+                        Archiv
+                    </button>
                 </div>
 
                 {/* ADD Button */}
@@ -212,6 +245,27 @@ export default function TripsPage() {
                     min-width: 300px;
                     margin: 0 1rem;
                 }
+                .tabs-switcher {
+                    display: flex;
+                    gap: 0.75rem;
+                    align-items: center;
+                }
+                .tab-button {
+                    padding: 0.6rem 1.25rem;
+                    border-radius: 8px;
+                    border: 2px solid #000;
+                    background-color: #fff;
+                    font-weight: 800;
+                    font-size: 0.95rem;
+                    cursor: pointer;
+                    transition: transform 0.1s, box-shadow 0.1s, background-color 0.1s;
+                    box-shadow: 3px 3px 0 0 #000;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .tab-button.active {
+                    background-color: #86efac;
+                }
                 .search-input {
                     width: 100%;
                     padding: 0.75rem 1.5rem;
@@ -257,6 +311,10 @@ export default function TripsPage() {
                         width: 100%;
                         max-width: none;
                     }
+                    .tabs-switcher {
+                        width: 100%;
+                        justify-content: center;
+                    }
                     .add-button {
                         width: 100%;
                         justify-content: center;
@@ -268,7 +326,7 @@ export default function TripsPage() {
             <div>
                 {!trips ? (
                     <div>Načítám výpravy...</div>
-                ) : filteredTrips.length === 0 ? (
+                ) : tabFilteredTrips.length === 0 ? (
                     <div style={{
                         padding: "3rem",
                         textAlign: "center",
@@ -281,7 +339,7 @@ export default function TripsPage() {
                     </div>
                 ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2rem", padding: "0.5rem" }}>
-                        {filteredTrips.map((trip: any) => (
+                        {tabFilteredTrips.map((trip: any) => (
                             <Link key={trip._id} href={`/trips/${trip._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                                 <div style={{
                                     backgroundColor: 'white',
@@ -302,13 +360,29 @@ export default function TripsPage() {
                                             fontSize: "0.9rem",
                                             fontWeight: "800",
                                             textTransform: "uppercase",
-                                            color: "#666"
+                                            color: "#666",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center"
                                         }}>
-                                            {(() => {
-                                                if (!trip.startDate) return "";
-                                                const [y, m, d] = trip.startDate.split("-");
-                                                return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-                                            })()}
+                                            <span>
+                                                {(() => {
+                                                    if (!trip.startDate) return "";
+                                                    const [y, m, d] = trip.startDate.split("-");
+                                                    return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
+                                                })()}
+                                            </span>
+                                            <span style={{
+                                                padding: "0.3rem 0.75rem",
+                                                borderRadius: "6px",
+                                                fontSize: "0.75rem",
+                                                fontWeight: "700",
+                                                backgroundColor: isUpcomingTrip(trip) ? "#dbeafe" : "#fecaca",
+                                                color: isUpcomingTrip(trip) ? "#075985" : "#991b1b",
+                                                border: "1px solid " + (isUpcomingTrip(trip) ? "#0284c7" : "#dc2626")
+                                            }}>
+                                                {isUpcomingTrip(trip) ? "BUDE" : "SKONCILO"}
+                                            </span>
                                         </div>
                                         <h3 style={{
                                             fontWeight: "900",

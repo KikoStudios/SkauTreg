@@ -34,7 +34,7 @@ export default function CalendarPage() {
             <div style={{
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
-                padding: "1rem",
+                padding: "1rem 2rem",
                 margin: "0 -2rem 2rem -2rem", // Break out to full width
                 width: "calc(100% + 4rem)",
                 display: "flex",

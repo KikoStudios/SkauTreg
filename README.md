@@ -31,9 +31,8 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [ ] **Fotky** odkaz a videni alba na odkazech na prihlaseni po vyprave
 - [ ] **Managment** kdo zaplatil vypravu a kdo ne s uležením toho komu zaplatil
 - [x] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
-- [x] **Rada managment** zapisy z rad a bot kterej je posle na discord
+- [x] **Rada managment** zapisy z rad
 - [ ] **Git kontrola** kdyz rover edituje casti veci musi bit accpnuty vedoucimy
-- [ ] **Discord integrace** posilani info po radach a dal do discordu s linkem
 
 ## Backend 
 - [ ] **Clerk self host alternativa** Idealne SuperTokens nebo ConvexAuth

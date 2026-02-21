@@ -168,9 +168,9 @@ export const getRecipients = query({
                 return {
                     memberId: member?._id,
                     name: member?.name,
-                    email: member?.email,
+                    email: member?.guardianEmail,
                     accessKey: p.accessKey,
-                    hasEmail: !!member?.email,
+                    hasEmail: !!member?.guardianEmail,
                 };
             })
         );

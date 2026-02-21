@@ -9,6 +9,8 @@ export const create = mutation({
         location: v.string(),
         startDate: v.string(),
         endDate: v.optional(v.string()),
+        lastCancellationDate: v.optional(v.string()), // Latest date to cancel without payment
+        lateCancellationMessage: v.optional(v.string()),
 
         formType: v.optional(v.string()), // "registration" or "apology"
         customFields: v.optional(v.array(v.object({
@@ -29,6 +31,8 @@ export const create = mutation({
             location: args.location,
             startDate: args.startDate,
             endDate: args.endDate,
+            lastCancellationDate: args.lastCancellationDate,
+            lateCancellationMessage: args.lateCancellationMessage,
             formType: args.formType,
             customFields: args.customFields,
         });
@@ -62,6 +66,8 @@ export const update = mutation({
         location: v.optional(v.string()),
         startDate: v.optional(v.string()),
         endDate: v.optional(v.string()),
+        lastCancellationDate: v.optional(v.string()),
+        lateCancellationMessage: v.optional(v.string()),
         formType: v.optional(v.string()),
         customFields: v.optional(v.array(v.object({
             label: v.string(),

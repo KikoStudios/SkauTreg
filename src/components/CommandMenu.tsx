@@ -98,7 +98,7 @@ export function CommandMenu() {
                             <Item icon="/icons/clenove-icon-dark.svg" onSelect={() => runCommand(() => router.push("/members"))}>Členové</Item>
                             <Item icon="/icons/vypravy-icon-dark.svg" onSelect={() => runCommand(() => router.push("/trips"))}>Výpravy</Item>
                             <Item icon="/icons/rady-icon.svg" onSelect={() => runCommand(() => router.push("/rady"))}>Rady</Item>
-                            <Item icon="/icons/wall-dark.svg" onSelect={() => runCommand(() => router.push("/tools"))}>Vyhledávač základen</Item>
+                            <Item icon="/icons/wall-dark.svg" onSelect={() => runCommand(() => router.push("/tools/basefinder"))}>Vyhledávač základen</Item>
                             <Item icon="/icons/kalendar-icon-dark.svg" onSelect={() => runCommand(() => router.push("/calendar"))}>Kalendář</Item>
                             <Item icon="/icons/nastaveni-icon-dark.svg" onSelect={() => runCommand(() => router.push("/settings"))}>Nastavení</Item>
                         </Group>
@@ -318,7 +318,7 @@ const MemberItem = ({ member, onSelect }: any) => {
     return (
         <Command.Item
             onSelect={onSelect}
-            value={`${member.name} ${member.nickname || ""} ${member.parentName || ""} ${member.email || ""}`}
+            value={`${member.name} ${member.nickname || ""} ${member.guardianName || ""} ${member.guardianEmail || ""}`}
             style={{
                 padding: "0.75rem",
                 borderRadius: "6px",
@@ -352,7 +352,7 @@ const MemberItem = ({ member, onSelect }: any) => {
                 </div>
                 <div style={{ fontSize: "0.85rem", color: "#666" }}>
                     {member.troopName && <span>{member.troopName}</span>}
-                    {member.parentName && <span> • Rodič: {member.parentName}</span>}
+                    {member.guardianName && <span> • Zástupce: {member.guardianName}</span>}
                 </div>
             </div>
         </Command.Item>

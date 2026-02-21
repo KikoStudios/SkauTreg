@@ -34,6 +34,8 @@ export const getByAccessKey = query({
             tripLocation: trip.location,
             tripStartDate: trip.startDate,
             tripEndDate: trip.endDate,
+            tripLastCancellationDate: trip.lastCancellationDate,
+            tripLateCancellationMessage: trip.lateCancellationMessage,
             customFields: trip.customFields,
             memberName: member.name, // Personalization
             memberNickname: member.nickname,
@@ -61,10 +63,29 @@ export const submit = mutation({
             throw new Error("Invalid access key");
         }
 
+        const trip = await ctx.db.get(participation.tripId);
+        if (!trip) {
+            throw new Error("Trip not found");
+        }
+
+        const isAfterDeadline = (lastCancellationDate: string | undefined) => {
+            if (!lastCancellationDate) return false;
+            const [y, m, d] = lastCancellationDate.split("-").map(Number);
+            const deadline = new Date(y, m - 1, d);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return today > deadline;
+        };
+
+        const lateCancellation = args.status === "not_attending" && isAfterDeadline(trip.lastCancellationDate);
+        const lateCancellationAt = lateCancellation ? new Date().toISOString() : undefined;
+
         // 2. Update status and responses
         await ctx.db.patch(participation._id, {
             status: args.status,
             responses: args.responses,
+            lateCancellation,
+            lateCancellationAt,
         });
 
         return { success: true };

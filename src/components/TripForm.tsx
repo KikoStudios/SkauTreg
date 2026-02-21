@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "./Button";
 import Select from "./Select";
 
@@ -17,6 +17,8 @@ export type TripFormData = {
     location: string;
     startDate: string;
     endDate: string;
+    lastCancellationDate?: string;
+    lateCancellationMessage?: string;
     formType: string;
     customFields: any[];
 };
@@ -35,12 +37,30 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
         location: initialData?.location || "",
         startDate: initialData?.startDate || "",
         endDate: initialData?.endDate || "",
+        lastCancellationDate: initialData?.lastCancellationDate || "",
+        lateCancellationMessage: initialData?.lateCancellationMessage || "",
         formType: initialData?.formType || "registration",
         customFields: initialData?.customFields || []
     });
 
     const [customFields, setCustomFields] = useState<any[]>(initialData?.customFields || []);
     const [activeTab, setActiveTab] = useState<'basic' | 'fields'>('basic');
+
+    useEffect(() => {
+        if (!initialData) return;
+        setFormData({
+            name: initialData?.name || "",
+            description: initialData?.description || "",
+            location: initialData?.location || "",
+            startDate: initialData?.startDate || "",
+            endDate: initialData?.endDate || "",
+            lastCancellationDate: initialData?.lastCancellationDate || "",
+            lateCancellationMessage: initialData?.lateCancellationMessage || "",
+            formType: initialData?.formType || "registration",
+            customFields: initialData?.customFields || []
+        });
+        setCustomFields(initialData?.customFields || []);
+    }, [initialData]);
 
     // Add style tag for input focus effects
     const inputFocusStyles = `
@@ -127,6 +147,9 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
         e.preventDefault();
         await onSubmit({
             ...formData,
+            endDate: formData.endDate || "",
+            lastCancellationDate: formData.lastCancellationDate || "",
+            lateCancellationMessage: formData.lateCancellationMessage || "",
             customFields: formData.formType === 'registration' ? customFields : []
         });
     };
@@ -193,6 +216,34 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <input required type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} style={inputStyle} />
                 <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} style={inputStyle} />
+            </div>
+
+            <div style={{ backgroundColor: "#fff3cd", border: "2px solid #ffc107", borderRadius: "8px", padding: "1rem", marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "700", fontSize: "0.95rem" }}>
+                    Poslední den zrušení bez poplatku
+                    <span style={{ display: "inline-block", marginLeft: "0.5rem", fontSize: "0.8rem", color: "#666" }}>(volitelné)</span>
+                </label>
+                <input 
+                    type="date" 
+                    value={formData.lastCancellationDate || ""} 
+                    onChange={e => setFormData({ ...formData, lastCancellationDate: e.target.value })} 
+                    style={inputStyle}
+                    placeholder="Nastavte datum, po kterém se zrušení účasti bude zpoplatňovat"
+                />
+                <p style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.5rem", marginBottom: 0 }}>Po tomto datu se zobrazí varování při zrušení účasti (např. kvůli nezvratným lístkům).</p>
+            </div>
+
+            <div style={{ backgroundColor: "#eef2ff", border: "2px solid #6366f1", borderRadius: "8px", padding: "1rem", marginBottom: "1rem" }}>
+                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: "700", fontSize: "0.95rem" }}>
+                    Text upozorneni po lhute
+                    <span style={{ display: "inline-block", marginLeft: "0.5rem", fontSize: "0.8rem", color: "#666" }}>(volitelne)</span>
+                </label>
+                <textarea
+                    value={formData.lateCancellationMessage || ""}
+                    onChange={e => setFormData({ ...formData, lateCancellationMessage: e.target.value })}
+                    style={{ ...inputStyle, minHeight: "80px" }}
+                    placeholder="Napiste kratke upozorneni, ktere se zobrazi po uplynuti lhuty"
+                />
             </div>
 
             {/* Form Type Selection Box */}

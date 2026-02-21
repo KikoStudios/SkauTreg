@@ -7,9 +7,13 @@ export const create = mutation({
         name: v.string(),
         nickname: v.optional(v.string()),
         birthDate: v.optional(v.string()),
-        parentName: v.string(),
-        parentPhone: v.string(),
-        email: v.optional(v.string()),
+        guardianName: v.optional(v.string()),
+        guardianPhone: v.optional(v.string()),
+        guardianEmail: v.optional(v.string()),
+        guardian2Name: v.optional(v.string()),
+        guardian2Phone: v.optional(v.string()),
+        guardian2Email: v.optional(v.string()),
+        address: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         // In a real app, verify the user has access to this troop
@@ -21,9 +25,13 @@ export const create = mutation({
             name: args.name,
             nickname: args.nickname,
             birthDate: args.birthDate,
-            parentName: args.parentName,
-            parentPhone: args.parentPhone,
-            email: args.email,
+            guardianName: args.guardianName,
+            guardianPhone: args.guardianPhone,
+            guardianEmail: args.guardianEmail,
+            guardian2Name: args.guardian2Name,
+            guardian2Phone: args.guardian2Phone,
+            guardian2Email: args.guardian2Email,
+            address: args.address,
         });
 
         // Automatically create participation entries for all existing trips in this troop
@@ -67,9 +75,13 @@ export const update = mutation({
         name: v.optional(v.string()),
         nickname: v.optional(v.string()),
         birthDate: v.optional(v.string()),
-        parentName: v.optional(v.string()),
-        parentPhone: v.optional(v.string()),
-        email: v.optional(v.string()),
+        guardianName: v.optional(v.string()),
+        guardianPhone: v.optional(v.string()),
+        guardianEmail: v.optional(v.string()),
+        guardian2Name: v.optional(v.string()),
+        guardian2Phone: v.optional(v.string()),
+        guardian2Email: v.optional(v.string()),
+        address: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { id, ...fields } = args;

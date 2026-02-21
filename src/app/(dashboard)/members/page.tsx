@@ -78,21 +78,32 @@ export default function MembersPage() {
         name: "",
         nickname: "",
         birthDate: "",
-        parentName: "",
-        parentPhone: "",
-        email: ""
+        guardianName: "",
+        guardianPhone: "",
+        guardianEmail: "",
+        guardian2Name: "",
+        guardian2Phone: "",
+        guardian2Email: "",
+        address: ""
     });
     const [isImporting, setIsImporting] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const importFileInputRef = useRef<HTMLInputElement>(null);
 
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<any>(null);
+
     const [formData, setFormData] = useState({
         name: "",
         nickname: "",
         birthDate: "",
-        parentName: "",
-        parentPhone: "",
-        email: ""
+        guardianName: "",
+        guardianPhone: "",
+        guardianEmail: "",
+        guardian2Name: "",
+        guardian2Phone: "",
+        guardian2Email: "",
+        address: ""
     });
 
     const openAddModal = () => {
@@ -101,9 +112,13 @@ export default function MembersPage() {
             name: "",
             nickname: "",
             birthDate: "",
-            parentName: "",
-            parentPhone: "",
-            email: ""
+            guardianName: "",
+            guardianPhone: "",
+            guardianEmail: "",
+            guardian2Name: "",
+            guardian2Phone: "",
+            guardian2Email: "",
+            address: ""
         });
         setShowModal(true);
     };
@@ -114,9 +129,13 @@ export default function MembersPage() {
             name: member.name,
             nickname: member.nickname || "",
             birthDate: member.birthDate || "",
-            parentName: member.parentName,
-            parentPhone: member.parentPhone,
-            email: member.email || ""
+            guardianName: member.guardianName,
+            guardianPhone: member.guardianPhone,
+            guardianEmail: member.guardianEmail || "",
+            guardian2Name: member.guardian2Name || "",
+            guardian2Phone: member.guardian2Phone || "",
+            guardian2Email: member.guardian2Email || "",
+            address: member.address || ""
         });
         setShowModal(true);
     };
@@ -130,10 +149,14 @@ export default function MembersPage() {
         return {
             name: pick([/jméno/, /name/]),
             nickname: pick([/přezdív/, /nick/]),
-            birthDate: pick([/rok/, /birth/, /naro/]),
-            parentName: pick([/rodič/, /parent/]),
-            parentPhone: pick([/telefon/, /phone/, /tel/]),
-            email: pick([/email/])
+            birthDate: pick([/datum.*narožení/, /birth|narožení/i]),
+            guardianName: pick([/zástupce|rodič.*jméno|parent.*name|guardian.*name/i]),
+            guardianPhone: pick([/zástupce.*tel|rodič.*tel|parent.*phone|guardian.*phone/i, /telefon/]),
+            guardianEmail: pick([/zástupce.*email|rodič.*email|parent.*email|guardian.*email/i]),
+            guardian2Name: pick([/zástupce.?2|rodič.?2|parent.?2|guardian.?2/i]),
+            guardian2Phone: pick([/zástupce.?2.*tel|rodič.?2.*tel|telefon.?2|phone.?2/i]),
+            guardian2Email: pick([/zástupce.?2.*email|rodič.?2.*email|email.?2/i]),
+            address: pick([/adresa/, /address/])
         };
     };
 
@@ -142,11 +165,66 @@ export default function MembersPage() {
         const file = files[0];
         setImportError(null);
         try {
-            const buffer = await file.arrayBuffer();
-            const workbook = XLSX.read(buffer, { type: "array" });
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
+            const isCSV = file.name.toLowerCase().endsWith('.csv');
+            let rows: string[][] = [];
+            
+            if (isCSV) {
+                // CSV: Use FileReader to properly handle UTF-8 encoding
+                const text = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target?.result as string);
+                    reader.onerror = () => reject(new Error("Failed to read file"));
+                    reader.readAsText(file, 'UTF-8');
+                });
+                
+                // Simple CSV parser handling quoted fields and commas within quotes
+                rows = text.split('\n').map(line => {
+                    if (!line.trim()) return [];
+                    const fields: string[] = [];
+                    let current = '';
+                    let inQuotes = false;
+                    
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        const nextChar = line[i + 1];
+                        
+                        if (char === '"') {
+                            if (inQuotes && nextChar === '"') {
+                                current += '"';
+                                i++;
+                            } else {
+                                inQuotes = !inQuotes;
+                            }
+                        } else if (char === ',' && !inQuotes) {
+                            fields.push(current.trim());
+                            current = '';
+                        } else {
+                            current += char;
+                        }
+                    }
+                    fields.push(current.trim());
+                    return fields;
+                }).filter(row => row.some(cell => cell.length > 0));
+            } else {
+                // Excel: Use XLSX library
+                const buffer = await file.arrayBuffer();
+                const workbook = XLSX.read(buffer, { type: "array" });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                
+                // Force all cells to be read as text to prevent date/number conversion
+                for (const cellRef in sheet) {
+                    if (cellRef !== "!ref" && cellRef !== "!margins") {
+                        const cell = sheet[cellRef];
+                        if (cell && typeof cell.v !== 'string') {
+                            cell.t = 's'; // Force string type
+                            cell.v = String(cell.v);
+                        }
+                    }
+                }
+                
+                rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
+            }
 
             if (!rows || rows.length === 0) {
                 setImportError("Soubor je prázdný.");
@@ -188,8 +266,8 @@ export default function MembersPage() {
 
     const handleConfirmImport = async () => {
         if (!selectedTroopId) return;
-        if (!importMapping.name || !importMapping.parentName || !importMapping.parentPhone) {
-            setImportError("Vyberte sloupce pro Jméno, Rodič a Telefon.");
+        if (!importMapping.name || !importMapping.guardianName || !importMapping.guardianPhone) {
+            setImportError("Vyberte sloupce pro Jméno, Zástupce a Telefon.");
             return;
         }
 
@@ -200,10 +278,14 @@ export default function MembersPage() {
                 name: row[importMapping.name] || "",
                 nickname: importMapping.nickname ? (row[importMapping.nickname] || "") : "",
                 birthDate: importMapping.birthDate ? (row[importMapping.birthDate] || "") : "",
-                parentName: row[importMapping.parentName] || "",
-                parentPhone: row[importMapping.parentPhone] || "",
-                email: importMapping.email ? (row[importMapping.email] || "") : ""
-            })).filter(r => r.name && r.parentName && r.parentPhone);
+                guardianName: row[importMapping.guardianName] || "",
+                guardianPhone: row[importMapping.guardianPhone] || "",
+                guardianEmail: importMapping.guardianEmail ? (row[importMapping.guardianEmail] || "") : "",
+                guardian2Name: importMapping.guardian2Name ? (row[importMapping.guardian2Name] || "") : "",
+                guardian2Phone: importMapping.guardian2Phone ? (row[importMapping.guardian2Phone] || "") : "",
+                guardian2Email: importMapping.guardian2Email ? (row[importMapping.guardian2Email] || "") : "",
+                address: importMapping.address ? (row[importMapping.address] || "") : ""
+            })).filter(r => r.name && r.guardianName && r.guardianPhone);
 
             for (const row of rowsToImport) {
                 await createMember({
@@ -400,7 +482,6 @@ export default function MembersPage() {
             <style jsx>{`
                 .controls-row {
                     display: flex;
-                    justify-content: space-between;
                     align-items: center;
                     margin-bottom: 2rem;
                     flex-wrap: wrap;
@@ -441,7 +522,7 @@ export default function MembersPage() {
                     flex: 1;
                     max-width: 500px;
                     min-width: 300px;
-                    margin: 0 1rem;
+                    margin: 0 auto;
                 }
                 .search-input {
                     width: 100%;
@@ -467,6 +548,10 @@ export default function MembersPage() {
                     gap: 0.5rem;
                     white-space: nowrap;
                     transition: transform 0.1s;
+                    flex-shrink: 0;
+                }
+                .add-button:first-of-type {
+                    margin-left: auto;
                 }
 
                 @media (max-width: 768px) {
@@ -512,25 +597,22 @@ export default function MembersPage() {
                             <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Jméno</th>
                             <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Přezdívka</th>
                             <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Rok Narození</th>
-                            <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Rodič</th>
-                            <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Telefon</th>
-                            <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", fontSize: "1.1rem" }}>Email</th>
+                            <th style={{ padding: "1rem", textAlign: "left", fontWeight: "900", borderRight: "3px solid #000", fontSize: "1.1rem" }}>Zástupce</th>
+                            <th style={{ padding: "1rem", textAlign: "center", fontWeight: "900", fontSize: "1.1rem" }}>Akce</th>
                         </tr>
                     </thead>
                     <tbody>
                         {!members ? (
-                            <tr><td colSpan={6} style={{ padding: "2rem", textAlign: "center" }}>Načítám seznam...</td></tr>
+                            <tr><td colSpan={5} style={{ padding: "2rem", textAlign: "center" }}>Načítám seznam...</td></tr>
                         ) : filteredMembers?.length === 0 ? (
-                            <tr><td colSpan={6} style={{ padding: "2rem", textAlign: "center", fontStyle: "italic" }}>Žádní členové nalezeni.</td></tr>
+                            <tr><td colSpan={5} style={{ padding: "2rem", textAlign: "center", fontStyle: "italic" }}>Žádní členové nalezeni.</td></tr>
                         ) : (
                             filteredMembers?.map((member, index) => (
                                 <tr
                                     key={member._id}
-                                    onClick={() => openEditModal(member)}
                                     style={{
                                         borderBottom: index === filteredMembers.length - 1 ? "none" : "2px solid #000",
                                         fontWeight: "600",
-                                        cursor: "pointer",
                                     }}
                                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0fdf4"}
                                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
@@ -538,14 +620,27 @@ export default function MembersPage() {
                                     <td style={{ padding: "1rem", borderRight: "3px solid #000", fontWeight: "800" }}>{member.name}</td>
                                     <td style={{ padding: "1rem", borderRight: "3px solid #000" }}>{member.nickname || "-"}</td>
                                     <td style={{ padding: "1rem", borderRight: "3px solid #000" }}>{member.birthDate || "-"}</td>
-                                    <td style={{ padding: "1rem", borderRight: "3px solid #000" }}>{member.parentName}</td>
-                                    <td style={{ padding: "1rem", borderRight: "3px solid #000" }}>{member.parentPhone}</td>
-                                    <td style={{ padding: "1rem" }}>
-                                        {member.email ? (
-                                            <a href={`mailto:${member.email}`} style={{ color: "blue", textDecoration: "underline" }} onClick={e => e.stopPropagation()}>
-                                                {member.email}
-                                            </a>
-                                        ) : "-"}
+                                    <td style={{ padding: "1rem", borderRight: "3px solid #000" }}>{member.guardianName || member.parentName || "-"}</td>
+                                    <td style={{ padding: "1rem", textAlign: "center" }}>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedMemberForDetail(member);
+                                                setShowDetailModal(true);
+                                            }}
+                                            style={{
+                                                backgroundColor: "white",
+                                                color: "black",
+                                                padding: "0.5rem 1.2rem",
+                                                borderRadius: "6px",
+                                                border: "2px solid #000",
+                                                fontWeight: "900",
+                                                cursor: "pointer",
+                                                fontSize: "0.9rem",
+                                                boxShadow: "3px 3px 0 0 #000"
+                                            }}
+                                        >
+                                            Zobrazit
+                                        </button>
                                     </td>
                                 </tr>
                             ))
@@ -599,64 +694,124 @@ export default function MembersPage() {
                             )}
                         </div>
 
-                        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                            {/* Member Info */}
                             <div>
-                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Celé Jméno</label>
-                                <input
-                                    required
-                                    value={formData.name}
-                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                />
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", padding: "0.5rem" }}>
-                                <div>
-                                    <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Přezdívka</label>
-                                    <input
-                                        value={formData.nickname}
-                                        onChange={e => setFormData({ ...formData, nickname: e.target.value })}
-                                        style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Rok</label>
-                                    <input
-                                        value={formData.birthDate}
-                                        onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
-                                        style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                        placeholder="2012"
-                                    />
+                                <h3 style={{ fontSize: "0.95rem", fontWeight: "900", marginBottom: "1rem", textTransform: "uppercase", color: "#666" }}>Údaje člena</h3>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    <div>
+                                        <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Jméno a Příjmení</label>
+                                        <input
+                                            required
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                            style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                        />
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Přezdívka</label>
+                                            <input
+                                                value={formData.nickname}
+                                                onChange={e => setFormData({ ...formData, nickname: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Datum Narození</label>
+                                            <input
+                                                value={formData.birthDate}
+                                                onChange={e => setFormData({ ...formData, birthDate: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                                placeholder="1.1.2012"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
+                            {/* Guardian 1 */}
                             <div>
-                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Email</label>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                    style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                    placeholder="email@example.com"
-                                />
+                                <h3 style={{ fontSize: "0.95rem", fontWeight: "900", marginBottom: "1rem", textTransform: "uppercase", color: "#666" }}>Zástupce 1</h3>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    <div>
+                                        <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Jméno Zástupce</label>
+                                        <input
+                                            required
+                                            value={formData.guardianName}
+                                            onChange={e => setFormData({ ...formData, guardianName: e.target.value })}
+                                            style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                        />
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Číslo Zástupce</label>
+                                            <input
+                                                required
+                                                type="tel"
+                                                value={formData.guardianPhone}
+                                                onChange={e => setFormData({ ...formData, guardianPhone: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Email Zástupce</label>
+                                            <input
+                                                type="email"
+                                                value={formData.guardianEmail}
+                                                onChange={e => setFormData({ ...formData, guardianEmail: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
+                            {/* Guardian 2 (optional) */}
+                            <details>
+                                <summary style={{ fontWeight: "900", fontSize: "0.95rem", cursor: "pointer", textTransform: "uppercase", padding: "0.5rem", backgroundColor: "#f3f4f6", borderRadius: "6px", marginBottom: "1rem", border: "2px solid #e5e7eb", color: "#666" }}>
+                                    ▼ Přidat druhého zástupce
+                                </summary>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", paddingTop: "1rem" }}>
+                                    <div>
+                                        <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Jméno 2. Zástupce</label>
+                                        <input
+                                            value={formData.guardian2Name}
+                                            onChange={e => setFormData({ ...formData, guardian2Name: e.target.value })}
+                                            style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                        />
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Číslo 2</label>
+                                            <input
+                                                type="tel"
+                                                value={formData.guardian2Phone}
+                                                onChange={e => setFormData({ ...formData, guardian2Phone: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Email 2</label>
+                                            <input
+                                                type="email"
+                                                value={formData.guardian2Email}
+                                                onChange={e => setFormData({ ...formData, guardian2Email: e.target.value })}
+                                                style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                            {/* Address */}
                             <div>
-                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Rodič</label>
+                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Adresa</label>
                                 <input
-                                    required
-                                    value={formData.parentName}
-                                    onChange={e => setFormData({ ...formData, parentName: e.target.value })}
+                                    value={formData.address}
+                                    onChange={e => setFormData({ ...formData, address: e.target.value })}
                                     style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>Telefon</label>
-                                <input
-                                    required
-                                    type="tel"
-                                    value={formData.parentPhone}
-                                    onChange={e => setFormData({ ...formData, parentPhone: e.target.value })}
-                                    style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
+                                    placeholder="Ulice, číslo, město"
                                 />
                             </div>
 
@@ -700,82 +855,246 @@ export default function MembersPage() {
                         border: "3px solid #000",
                         borderRadius: "16px",
                         boxShadow: "8px 8px 0 0 #000",
-                        width: "100%",
-                        maxWidth: "700px",
+                        width: "95%",
+                        maxWidth: "1000px",
                         maxHeight: "90vh",
-                        overflowY: "auto"
+                        overflowY: "auto",
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "2rem"
                     }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Import členů</h2>
-                            <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{importFileName}</span>
-                        </div>
-
-                        <p style={{ marginTop: 0, fontWeight: "600" }}>Vyberte, který sloupec odpovídá kterému poli.</p>
-
-                        {importError && (
-                            <div style={{ backgroundColor: "#fef2f2", border: "2px solid #fecaca", borderRadius: "12px", padding: "0.75rem", color: "#991b1b", fontWeight: "700", marginBottom: "1rem" }}>
-                                {importError}
+                        {/* LEFT: Field Mapping */}
+                        <div>
+                            <div style={{ marginBottom: "1.5rem" }}>
+                                <h2 style={{ fontSize: "1.3rem", fontWeight: "900", margin: "0 0 0.5rem 0" }}>Import členů</h2>
+                                <span style={{ fontWeight: "700", fontSize: "0.85rem", color: "#666" }}>Soubor: {importFileName}</span>
                             </div>
-                        )}
 
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", padding: "0.5rem" }}>
-                            {([
-                                { key: "name", label: "Jméno" },
-                                { key: "nickname", label: "Přezdívka" },
-                                { key: "birthDate", label: "Rok narození" },
-                                { key: "parentName", label: "Rodič" },
-                                { key: "parentPhone", label: "Telefon" },
-                                { key: "email", label: "Email" }
-                            ] as const).map(field => (
-                                <div key={field.key}>
-                                    <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem" }}>{field.label}</label>
-                                    <select
-                                        value={importMapping[field.key]}
-                                        onChange={(e) => setImportMapping({ ...importMapping, [field.key]: e.target.value })}
-                                        style={{ width: "100%", padding: "0.6rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "4px 4px 0 0 #000", outline: "none", fontWeight: "600" }}
-                                    >
-                                        <option value="">— Neimportovat —</option>
-                                        {importHeaders.map(h => (
-                                            <option key={h} value={h}>{h}</option>
-                                        ))}
-                                    </select>
+                            {importError && (
+                                <div style={{ backgroundColor: "#fef2f2", border: "2px solid #fecaca", borderRadius: "12px", padding: "0.75rem", color: "#991b1b", fontWeight: "700", marginBottom: "1rem" }}>
+                                    {importError}
                                 </div>
-                            ))}
-                        </div>
+                            )}
 
-                        <div style={{ marginTop: "1.5rem" }}>
-                            <h3 style={{ fontSize: "1.1rem", fontWeight: "900" }}>Náhled (prvních 5 řádků)</h3>
-                            <div style={{ border: "2px solid #000", borderRadius: "12px", overflow: "hidden" }}>
-                                <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                    <thead style={{ backgroundColor: "#f3f4f6" }}>
-                                        <tr>
-                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Jméno</th>
-                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Přezdívka</th>
-                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Rok</th>
-                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Rodič</th>
-                                            <th style={{ padding: "0.5rem", textAlign: "left", borderRight: "2px solid #000" }}>Telefon</th>
-                                            <th style={{ padding: "0.5rem", textAlign: "left" }}>Email</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {importRows.slice(0, 5).map((row, idx) => (
-                                            <tr key={idx}>
-                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.name ? row[importMapping.name] : ""}</td>
-                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.nickname ? row[importMapping.nickname] : ""}</td>
-                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.birthDate ? row[importMapping.birthDate] : ""}</td>
-                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.parentName ? row[importMapping.parentName] : ""}</td>
-                                                <td style={{ padding: "0.5rem", borderRight: "2px solid #000" }}>{importMapping.parentPhone ? row[importMapping.parentPhone] : ""}</td>
-                                                <td style={{ padding: "0.5rem" }}>{importMapping.email ? row[importMapping.email] : ""}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <p style={{ marginTop: 0, fontWeight: "600", marginBottom: "1rem" }}>Vyberte, který sloupec odpovídá kterému poli.</p>
+
+                            {/* Base Fields */}
+                            <div style={{ marginBottom: "1.5rem" }}>
+                                <h3 style={{ fontSize: "0.95rem", fontWeight: "900", marginBottom: "0.75rem", textTransform: "uppercase" }}>Základní údaje</h3>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem" }}>
+                                    {([
+                                        { key: "name", label: "Jméno a Příjmení" },
+                                        { key: "guardianName", label: "Zástupce - Jméno" },
+                                        { key: "guardianPhone", label: "Zástupce - Telefon" }
+                                    ] as const).map(field => (
+                                        <div key={field.key}>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem", fontSize: "0.9rem" }}>{field.label}</label>
+                                            <select
+                                                value={importMapping[field.key]}
+                                                onChange={(e) => setImportMapping({ ...importMapping, [field.key]: e.target.value })}
+                                                style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "3px 3px 0 0 #000", outline: "none", fontWeight: "600", fontSize: "0.9rem" }}
+                                            >
+                                                <option value="">— Neimportovat —</option>
+                                                {importHeaders.map(h => (
+                                                    <option key={h} value={h}>{h}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
+
+                            {/* Optional Fields */}
+                            <div style={{ marginBottom: "1.5rem" }}>
+                                <h3 style={{ fontSize: "0.95rem", fontWeight: "900", marginBottom: "0.75rem", textTransform: "uppercase" }}>Další údaje</h3>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem" }}>
+                                    {([
+                                        { key: "nickname", label: "Přezdívka" },
+                                        { key: "birthDate", label: "Datum Narození" },
+                                        { key: "guardianEmail", label: "Zástupce - Email" }
+                                    ] as const).map(field => (
+                                        <div key={field.key}>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem", fontSize: "0.9rem" }}>{field.label}</label>
+                                            <select
+                                                value={importMapping[field.key]}
+                                                onChange={(e) => setImportMapping({ ...importMapping, [field.key]: e.target.value })}
+                                                style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "3px 3px 0 0 #000", outline: "none", fontWeight: "600", fontSize: "0.9rem" }}
+                                            >
+                                                <option value="">— Neimportovat —</option>
+                                                {importHeaders.map(h => (
+                                                    <option key={h} value={h}>{h}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* More Info Expandable */}
+                            <details style={{ marginBottom: "1.5rem" }}>
+                                <summary style={{ fontWeight: "900", fontSize: "0.95rem", cursor: "pointer", textTransform: "uppercase", padding: "0.5rem", backgroundColor: "#f3f4f6", borderRadius: "6px", marginBottom: "0.75rem", border: "2px solid #e5e7eb" }}>
+                                    ▼ Další kontakty a informace
+                                </summary>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem", paddingTop: "1rem" }}>
+                                    {([
+                                        { key: "guardian2Name", label: "Zástupce 2 - Jméno" },
+                                        { key: "guardian2Phone", label: "Zástupce 2 - Telefon" },
+                                        { key: "guardian2Email", label: "Zástupce 2 - Email" },
+                                        { key: "address", label: "Adresa" }
+                                    ] as const).map(field => (
+                                        <div key={field.key}>
+                                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.25rem", fontSize: "0.9rem" }}>{field.label}</label>
+                                            <select
+                                                value={importMapping[field.key]}
+                                                onChange={(e) => setImportMapping({ ...importMapping, [field.key]: e.target.value })}
+                                                style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", boxShadow: "3px 3px 0 0 #000", outline: "none", fontWeight: "600", fontSize: "0.9rem" }}
+                                            >
+                                                <option value="">— Neimportovat —</option>
+                                                {importHeaders.map(h => (
+                                                    <option key={h} value={h}>{h}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    ))}
+                                </div>
+                            </details>
                         </div>
 
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1.5rem" }}>
+                        {/* RIGHT: Data Preview - Card Based */}
+                        <div>
+                            <h3 style={{ fontSize: "1rem", fontWeight: "900", marginBottom: "1rem" }}>Náhled členů k importu</h3>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem", maxHeight: "500px", overflowY: "auto" }}>
+                                {importRows.slice(0, 10).map((row, idx) => {
+                                    const memberName = importMapping.name ? row[importMapping.name] : "—";
+                                    const guardianName = importMapping.guardianName ? row[importMapping.guardianName] : "—";
+                                    const guardianEmail = importMapping.guardianEmail ? row[importMapping.guardianEmail] : "—";
+                                    const guardian2Name = importMapping.guardian2Name ? row[importMapping.guardian2Name] : "";
+                                    const guardian2Email = importMapping.guardian2Email ? row[importMapping.guardian2Email] : "";
+                                    
+                                    return (
+                                        <div
+                                            key={idx}
+                                            style={{
+                                                border: "2px solid #000",
+                                                borderRadius: "8px",
+                                                padding: "1rem",
+                                                backgroundColor: "#f9fafb",
+                                                cursor: "pointer",
+                                                transition: "all 0.2s"
+                                            }}
+                                            onClick={() => {
+                                                setImportRows(importRows.map((r, i) =>
+                                                    i === idx ? { ...r, _expandedDetail: !(r as any)._expandedDetail } : r
+                                                ));
+                                            }}
+                                        >
+                                            {/* Summary Row */}
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                <div>
+                                                    <div style={{ fontWeight: "900", fontSize: "0.95rem" }}>{memberName}</div>
+                                                    <div style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: "0.25rem" }}>
+                                                        {guardianName} - {guardianEmail}
+                                                    </div>
+                                                </div>
+                                                <div style={{ fontSize: "1.2rem" }}>▼</div>
+                                            </div>
+
+                                            {/* Expandable Details */}
+                                            {(importRows[idx] as any)?._expandedDetail && (
+                                                <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "2px solid #e5e7eb" }}>
+                                                    {/* Member Info */}
+                                                    <div style={{ marginBottom: "1rem" }}>
+                                                        <div style={{ fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "0.5rem" }}>Člen</div>
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                                                            <div>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Jméno</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{memberName}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Přezdívka</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.nickname ? row[importMapping.nickname] : "—"}</div>
+                                                            </div>
+                                                            <div style={{ gridColumn: "1 / -1" }}>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Rok narození</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.birthDate ? row[importMapping.birthDate] : "—"}</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Guardian 1 */}
+                                                    <div style={{ marginBottom: "1rem" }}>
+                                                        <div style={{ fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "0.5rem" }}>Zástupce 1</div>
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                                                            <div>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Jméno</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{guardianName}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Telefon</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.guardianPhone ? row[importMapping.guardianPhone] : "—"}</div>
+                                                            </div>
+                                                            <div style={{ gridColumn: "1 / -1" }}>
+                                                                <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Email</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{guardianEmail}</div>
+                                                            </div>
+                                                        </div>
+                                                        <label style={{ display: "flex", alignItems: "center", marginTop: "0.75rem", gap: "0.5rem", cursor: "pointer" }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                defaultChecked={true}
+                                                                onChange={(e) => {
+                                                                    setImportRows(importRows.map((r, i) =>
+                                                                        i === idx ? { ...r, _emailGuardian1: e.target.checked } : r
+                                                                    ));
+                                                                }}
+                                                                style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                                                            />
+                                                            <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>Poslat maily na tento email</span>
+                                                        </label>
+                                                    </div>
+
+                                                    {/* Guardian 2 (if exists) */}
+                                                    {guardian2Name && (
+                                                        <div style={{ marginBottom: "1rem", paddingTop: "1rem", borderTop: "2px solid #e5e7eb" }}>
+                                                            <div style={{ fontWeight: "800", fontSize: "0.85rem", textTransform: "uppercase", marginBottom: "0.5rem" }}>Zástupce 2</div>
+                                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                                                                <div>
+                                                                    <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Jméno</div>
+                                                                    <div style={{ fontSize: "0.9rem" }}>{guardian2Name}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Telefon</div>
+                                                                    <div style={{ fontSize: "0.9rem" }}>{importMapping.guardian2Phone ? row[importMapping.guardian2Phone] : "—"}</div>
+                                                                </div>
+                                                                <div style={{ gridColumn: "1 / -1" }}>
+                                                                    <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Email</div>
+                                                                    <div style={{ fontSize: "0.9rem" }}>{guardian2Email}</div>
+                                                                </div>
+                                                            </div>
+                                                            <label style={{ display: "flex", alignItems: "center", marginTop: "0.75rem", gap: "0.5rem", cursor: "pointer" }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    onChange={(e) => {
+                                                                        setImportRows(importRows.map((r, i) =>
+                                                                            i === idx ? { ...r, _emailGuardian2: e.target.checked } : r
+                                                                        ));
+                                                                    }}
+                                                                    style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                                                                />
+                                                                <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>Poslat maily i na tento email</span>
+                                                            </label>
+                                                        </div>
+                                                    )}
+                                                </div>
+                            )}
+                                    </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* BUTTONS: Full width at bottom */}
+                        <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "1rem" }}>
                             <button
                                 onClick={() => setShowImportModal(false)}
                                 style={{
@@ -808,6 +1127,165 @@ export default function MembersPage() {
                                 {isImporting ? "Importuji..." : "Importovat"}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Member Detail Popup */}
+            {showDetailModal && selectedMemberForDetail && (
+                <div style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: "rgba(0, 0, 0, 0.3)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 3000,
+                    padding: "2rem"
+                }} onClick={() => setShowDetailModal(false)}>
+                    <div style={{
+                        backgroundColor: "white",
+                        border: "2px solid var(--border-color)",
+                        borderRadius: "8px",
+                        boxShadow: "6px 6px 0 0 #000",
+                        padding: "2rem",
+                        maxWidth: "600px",
+                        width: "100%",
+                        maxHeight: "90vh",
+                        overflowY: "auto"
+                    }} onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+                            <h2 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>{selectedMemberForDetail.name}</h2>
+                            <button
+                                onClick={() => setShowDetailModal(false)}
+                                style={{
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    fontSize: "1.5rem",
+                                    cursor: "pointer",
+                                    fontWeight: "900",
+                                    padding: 0,
+                                    width: "32px",
+                                    height: "32px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Member Info */}
+                        <div style={{ marginBottom: "2rem", paddingBottom: "1.5rem", borderBottom: "2px solid #e5e7eb" }}>
+                            <h3 style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "1rem", letterSpacing: "0.05em" }}>Údaje člena</h3>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                                <div>
+                                    <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Jméno a Příjmení</div>
+                                    <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.name}</div>
+                                </div>
+                                {selectedMemberForDetail.nickname && (
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Přezdívka</div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.nickname}</div>
+                                    </div>
+                                )}
+                                {selectedMemberForDetail.birthDate && (
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Rok narození</div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.birthDate}</div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Guardian 1 */}
+                        <div style={{ marginBottom: "2rem", paddingBottom: "1.5rem", borderBottom: "2px solid #e5e7eb" }}>
+                            <h3 style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "1rem", letterSpacing: "0.05em" }}>Zástupce 1</h3>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
+                                {(selectedMemberForDetail.guardianName || selectedMemberForDetail.parentName) && (
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Jméno</div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.guardianName || selectedMemberForDetail.parentName}</div>
+                                    </div>
+                                )}
+                                {(selectedMemberForDetail.guardianPhone || selectedMemberForDetail.parentPhone) && (
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Telefon</div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.guardianPhone || selectedMemberForDetail.parentPhone}</div>
+                                    </div>
+                                )}
+                                {(selectedMemberForDetail.guardianEmail || selectedMemberForDetail.email) && (
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Email</div>
+                                        <a href={`mailto:${selectedMemberForDetail.guardianEmail || selectedMemberForDetail.email}`} style={{ fontSize: "0.95rem", fontWeight: "700", color: "#2563eb", textDecoration: "none", borderBottom: "2px solid #2563eb" }}>
+                                            {selectedMemberForDetail.guardianEmail || selectedMemberForDetail.email}
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Guardian 2 (if exists) */}
+                        {(selectedMemberForDetail.guardian2Name || selectedMemberForDetail.parent2Name) && (
+                            <div style={{ marginBottom: "2rem", paddingBottom: "1.5rem", borderBottom: "2px solid #e5e7eb" }}>
+                                <h3 style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "1rem", letterSpacing: "0.05em" }}>Zástupce 2</h3>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
+                                    <div>
+                                        <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Jméno</div>
+                                        <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.guardian2Name || selectedMemberForDetail.parent2Name}</div>
+                                    </div>
+                                    {(selectedMemberForDetail.guardian2Phone || selectedMemberForDetail.parent2Phone) && (
+                                        <div>
+                                            <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Telefon</div>
+                                            <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.guardian2Phone || selectedMemberForDetail.parent2Phone}</div>
+                                        </div>
+                                    )}
+                                    {selectedMemberForDetail.guardian2Email && (
+                                        <div>
+                                            <div style={{ fontSize: "0.75rem", fontWeight: "800", color: "#6b7280", marginBottom: "0.5rem", textTransform: "uppercase" }}>Email</div>
+                                            <a href={`mailto:${selectedMemberForDetail.guardian2Email}`} style={{ fontSize: "0.95rem", fontWeight: "700", color: "#2563eb", textDecoration: "none", borderBottom: "2px solid #2563eb" }}>
+                                                {selectedMemberForDetail.guardian2Email}
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Address */}
+                        {selectedMemberForDetail.address && (
+                            <div style={{ marginBottom: "2rem" }}>
+                                <h3 style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "1rem", letterSpacing: "0.05em" }}>Adresa</h3>
+                                <div style={{ fontSize: "0.95rem", fontWeight: "700" }}>{selectedMemberForDetail.address}</div>
+                            </div>
+                        )}
+
+                        {/* Edit Button */}
+                        <button
+                            onClick={() => {
+                                openEditModal(selectedMemberForDetail);
+                                setShowDetailModal(false);
+                            }}
+                            style={{
+                                width: "100%",
+                                backgroundColor: "#fbbf24",
+                                color: "#000",
+                                padding: "0.8rem 1rem",
+                                borderRadius: "6px",
+                                border: "2px solid #000",
+                                fontWeight: "900",
+                                boxShadow: "4px 4px 0 0 #000",
+                                cursor: "pointer",
+                                marginTop: "0.5rem"
+                            }}
+                        >
+                            Upravit člena
+                        </button>
                     </div>
                 </div>
             )}
