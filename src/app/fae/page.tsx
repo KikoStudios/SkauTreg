@@ -213,55 +213,89 @@ export default function FeedbackPage() {
                             </div>
                         ) : supernotesCards.length > 0 ? (
                             <div className={styles.notesGrid}>
-                                {supernotesCards
-                                    .filter(card => {
-                                        if (selectedCategory === "all") return true;
-                                        return card.name.startsWith(`${selectedCategory}:`);
-                                    })
-                                    .map((card) => {
-                                        const categoryMatch = card.name.match(/^(REF|FEAT|FIX):/);
-                                        const category = categoryMatch ? categoryMatch[1] : "OTHER";
-                                        const categoryColors: Record<string, string> = {
-                                            REF: "#3b82f6",
-                                            FEAT: "#10b981",
-                                            FIX: "#f59e0b",
-                                            OTHER: "#6b7280",
-                                        };
+                                {supernotesCards.map((card) => {
+                                    // Parse card name to extract category and status
+                                    // Format: CATEGORY:STATUS:Title or CATEGORY:Title
+                                    const nameParts = card.name.split(':');
+                                    let category = 'OTHER';
+                                    let status = '';
+                                    let displayName = card.name;
 
-                                        return (
-                                            <div 
-                                                key={card.id} 
-                                                className={styles.noteCard}
-                                                style={{ borderLeftColor: categoryColors[category] }}
-                                            >
-                                                <div className={styles.noteHeader}>
+                                    if (nameParts.length >= 2) {
+                                        category = nameParts[0].trim().toUpperCase();
+                                        
+                                        // Check if second part is a status
+                                        const secondPart = nameParts[1].trim().toUpperCase();
+                                        const statusKeywords = ['PROBIHA', 'DONE', 'TODO', 'IN_PROGRESS', 'PENDING', 'BLOCKED'];
+                                        
+                                        if (statusKeywords.includes(secondPart)) {
+                                            status = secondPart;
+                                            displayName = nameParts.slice(2).join(':').trim();
+                                        } else {
+                                            displayName = nameParts.slice(1).join(':').trim();
+                                        }
+                                    }
+
+                                    const categoryColors: Record<string, string> = {
+                                        REF: '#3b82f6',
+                                        FEAT: '#10b981',
+                                        FIX: '#f59e0b',
+                                        OTHER: '#6b7280',
+                                    };
+
+                                    const statusColors: Record<string, string> = {
+                                        PROBIHA: '#ec4899',
+                                        DONE: '#10b981',
+                                        TODO: '#6b7280',
+                                        IN_PROGRESS: '#f59e0b',
+                                        PENDING: '#f59e0b',
+                                        BLOCKED: '#ef4444',
+                                    };
+
+                                    return (
+                                        <div 
+                                            key={card.id} 
+                                            className={styles.noteCard}
+                                            style={{ borderLeftColor: categoryColors[category] || categoryColors['OTHER'] }}
+                                        >
+                                            <div className={styles.noteHeader}>
+                                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
                                                     <span 
                                                         className={styles.noteCategory}
-                                                        style={{ backgroundColor: categoryColors[category] }}
+                                                        style={{ backgroundColor: categoryColors[category] || categoryColors['OTHER'] }}
                                                     >
                                                         {category}
                                                     </span>
-                                                    <span className={styles.noteDate}>
-                                                        {new Date(card.created_when).toLocaleDateString("cs-CZ")}
-                                                    </span>
+                                                    {status && (
+                                                        <span 
+                                                            className={styles.noteStatus}
+                                                            style={{ backgroundColor: statusColors[status] || '#8b5cf6' }}
+                                                        >
+                                                            {status}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <h3 className={styles.noteTitle}>{card.name}</h3>
-                                                <div 
-                                                    className={styles.noteContent}
-                                                    dangerouslySetInnerHTML={{ __html: card.html || card.markup }}
-                                                />
-                                                {card.tags && card.tags.length > 0 && (
-                                                    <div className={styles.noteTags}>
-                                                        {card.tags.map((tag, idx) => (
-                                                            <span key={idx} className={styles.noteTag}>
-                                                                #{tag}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                <span className={styles.noteDate}>
+                                                    {new Date(card.created_when).toLocaleDateString("cs-CZ")}
+                                                </span>
                                             </div>
-                                        );
-                                    })}
+                                            <h3 className={styles.noteTitle}>{displayName}</h3>
+                                            <div 
+                                                className={styles.noteContent}
+                                                dangerouslySetInnerHTML={{ __html: card.html || card.markup }}
+                                            />
+                                            {card.tags && card.tags.length > 0 && (
+                                                <div className={styles.noteTags}>
+                                                    {card.tags.map((tag, idx) => (
+                                                        <span key={idx} className={styles.noteTag}>
+                                                            #{tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className={styles.empty}>
