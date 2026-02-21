@@ -3,16 +3,23 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useFeedback } from "@/context/FeedbackContext";
 import styles from "./page.module.css";
+import { SupernotesCard } from "@/lib/supernotes";
 
-type Tab = "errors" | "features" | "submit";
+type Tab = "errors" | "features" | "submit" | "notes";
 type Status = "all" | "open" | "planned" | "completed" | "rejected";
 
 export default function FeedbackPage() {
     const [activeTab, setActiveTab] = useState<Tab>("features");
     const [selectedStatus, setSelectedStatus] = useState<Status>("open");
+
+    // Supernotes state
+    const [supernotesCards, setSupernotesCards] = useState<SupernotesCard[]>([]);
+    const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+    const [notesError, setNotesError] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
     // Queries
     const errorReports = useQuery(api.feedback.getErrorReports, {});
@@ -30,6 +37,33 @@ export default function FeedbackPage() {
     const [isSubmittingFeature, setIsSubmittingFeature] = useState(false);
 
     const { showSuccess, showError } = useFeedback();
+
+    // Fetch Supernotes cards when Notes tab is active
+    useEffect(() => {
+        if (activeTab === "notes") {
+            fetchSupernotesCards();
+        }
+    }, [activeTab]);
+
+    const fetchSupernotesCards = async () => {
+        setIsLoadingNotes(true);
+        setNotesError(null);
+        try {
+            // Fetch all cards (excluding junk/tasks/thoughts)
+            const response = await fetch('/api/supernotes');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch notes`);
+            }
+            const data = await response.json();
+            setSupernotesCards(data.cards || []);
+        } catch (error: any) {
+            setNotesError(error.message || 'Failed to load notes');
+            console.error('Error fetching Supernotes:', error);
+        } finally {
+            setIsLoadingNotes(false);
+        }
+    };
 
     const handleSubmitFeature = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,6 +150,12 @@ export default function FeedbackPage() {
             {/* Tabs */}
             <div className={styles.tabs}>
                 <button
+                    className={`${styles.tab} ${activeTab === "notes" ? styles.active : ""}`}
+                    onClick={() => setActiveTab("notes")}
+                >
+                    📝 Moje poznámky
+                </button>
+                <button
                     className={`${styles.tab} ${activeTab === "features" ? styles.active : ""}`}
                     onClick={() => setActiveTab("features")}
                 >
@@ -137,6 +177,108 @@ export default function FeedbackPage() {
 
             {/* Content */}
             <div className={styles.content}>
+                {/* Notes Tab */}
+                {activeTab === "notes" && (
+                    <div>
+                        <div className={styles.notesHeader}>
+                            <h2>📝 Moje Supernotes poznámky</h2>
+                            <div className={styles.filterBar}>
+                                <label>Kategorie:</label>
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className={styles.select}
+                                >
+                                    <option value="all">Všechny</option>
+                                    <option value="REF">REF: Refaktoring</option>
+                                    <option value="FEAT">FEAT: Nové funkce</option>
+                                    <option value="FIX">FIX: Opravy</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {isLoadingNotes ? (
+                            <div className={styles.loading}>
+                                <p>Načítám poznámky ze Supernotes...</p>
+                            </div>
+                        ) : notesError ? (
+                            <div className={styles.error}>
+                                <p>❌ Chyba: {notesError}</p>
+                                <button 
+                                    onClick={fetchSupernotesCards}
+                                    className={styles.retryBtn}
+                                >
+                                    🔄 Zkusit znovu
+                                </button>
+                            </div>
+                        ) : supernotesCards.length > 0 ? (
+                            <div className={styles.notesGrid}>
+                                {supernotesCards
+                                    .filter(card => {
+                                        if (selectedCategory === "all") return true;
+                                        return card.name.startsWith(`${selectedCategory}:`);
+                                    })
+                                    .map((card) => {
+                                        const categoryMatch = card.name.match(/^(REF|FEAT|FIX):/);
+                                        const category = categoryMatch ? categoryMatch[1] : "OTHER";
+                                        const categoryColors: Record<string, string> = {
+                                            REF: "#3b82f6",
+                                            FEAT: "#10b981",
+                                            FIX: "#f59e0b",
+                                            OTHER: "#6b7280",
+                                        };
+
+                                        return (
+                                            <div 
+                                                key={card.id} 
+                                                className={styles.noteCard}
+                                                style={{ borderLeftColor: categoryColors[category] }}
+                                            >
+                                                <div className={styles.noteHeader}>
+                                                    <span 
+                                                        className={styles.noteCategory}
+                                                        style={{ backgroundColor: categoryColors[category] }}
+                                                    >
+                                                        {category}
+                                                    </span>
+                                                    <span className={styles.noteDate}>
+                                                        {new Date(card.created_when).toLocaleDateString("cs-CZ")}
+                                                    </span>
+                                                </div>
+                                                <h3 className={styles.noteTitle}>{card.name}</h3>
+                                                <div 
+                                                    className={styles.noteContent}
+                                                    dangerouslySetInnerHTML={{ __html: card.html || card.markup }}
+                                                />
+                                                {card.tags && card.tags.length > 0 && (
+                                                    <div className={styles.noteTags}>
+                                                        {card.tags.map((tag, idx) => (
+                                                            <span key={idx} className={styles.noteTag}>
+                                                                #{tag}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        ) : (
+                            <div className={styles.empty}>
+                                <p>Žádné poznámky v Supernotes.</p>
+                                <a 
+                                    href="https://help.supernotes.app/en/articles/5257176-api-access#h_b00b107a04"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.helpLink}
+                                >
+                                    📚 Návod na API
+                                </a>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Features Tab */}
                 {activeTab === "features" && (
                     <div>
