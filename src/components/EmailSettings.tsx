@@ -6,16 +6,15 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "./Button";
-import ExperimentalGate from "./ExperimentalGate";
 import { useFeedback } from "../context/FeedbackContext";
-import { GmailIcon, SeznamIcon, CentrumIcon, GoogleGroupsIcon } from "./EmailProviderIcons";
+import { GmailIcon, SeznamIcon, CentrumIcon } from "./EmailProviderIcons";
 
 interface EmailSettingsProps {
     troopId: Id<"troops">;
     isAuthorized: boolean;
 }
 
-type EmailProvider = "gmail" | "outlook" | "seznam" | "centrum" | "google-groups";
+type EmailProvider = "gmail" | "seznam" | "centrum";
 
 const PROVIDER_CONFIGS = {
     gmail: {
@@ -23,13 +22,6 @@ const PROVIDER_CONFIGS = {
         icon: GmailIcon,
         description: "Používat Gmail přes OAuth 2.0 (bez hesla)",
         color: "#4285f4",
-        authType: "oauth",
-    },
-    outlook: {
-        name: "Outlook / Microsoft 365",
-        icon: "📧",
-        description: "Používat Outlook přes OAuth 2.0 (bez hesla)",
-        color: "#0078d4",
         authType: "oauth",
     },
     seznam: {
@@ -54,13 +46,6 @@ const PROVIDER_CONFIGS = {
         imapHost: "imap.centrum.cz",
         imapPort: 993,
     },
-    "google-groups": {
-        name: "Google Groups",
-        icon: GoogleGroupsIcon,
-        description: "Import členů z Google Groups",
-        color: "#16a34a",
-        authType: "oauth",
-    },
 } as const;
 
 export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsProps) {
@@ -84,15 +69,25 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
 
 
 
-    // Check if returning from Gmail OAuth
+    // Check if returning from OAuth providers
     useEffect(() => {
         const gmailConnected = searchParams?.get("gmail_connected");
         const refreshToken = searchParams?.get("refresh_token");
         const email = searchParams?.get("email");
+        const gmailError = searchParams?.get("gmail_error");
 
-        // If Gmail OAuth callback happened
+        let shouldCleanUrl = false;
+
+        if (gmailError) {
+            showError({
+                title: "Gmail OAuth error",
+                message: decodeURIComponent(gmailError),
+            });
+            shouldCleanUrl = true;
+        }
+
+
         if (gmailConnected === "true" && refreshToken && email) {
-            // Save Gmail connection
             const saveGmailConnection = async () => {
                 try {
                     await connectEmailProvider({
@@ -103,14 +98,17 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     });
                 } catch (error: any) {
                     showError({
-                        title: "Chyba při připojení",
-                        message: error?.message || "Nepodařilo se připojit Gmail.",
+                        title: "Gmail connect error",
+                        message: error?.message || "Failed to connect Gmail.",
                     });
                 }
             };
 
             saveGmailConnection();
-            // Clean up URL
+            shouldCleanUrl = true;
+        }
+
+        if (shouldCleanUrl) {
             router.replace(`/settings/${troopId}`);
         }
     }, [searchParams, troopId, connectEmailProvider, router, showError]);
@@ -131,19 +129,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
             return;
         }
 
-        if (provider === "outlook") {
-            setSelectedProvider(null);
-            handleOutlookConnect();
-            return;
-        }
-
-        if (provider === "google-groups") {
-            setSelectedProvider(null);
-            // Redirect to Gmail connect with a flag to open groups import after OAuth
-            handleGmailConnect("groups-import");
-            return;
-        }
-
         setSelectedProvider(provider);
     };
 
@@ -158,12 +143,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
             ? `/settings/${troopId}/gmail-connect?returnAction=${returnAction}`
             : `/settings/${troopId}/gmail-connect`;
         router.push(url);
-    };
-
-    const handleOutlookConnect = () => {
-        setIsConnecting(true);
-        // TODO: Create Outlook OAuth redirect similar to Gmail
-        router.push(`/settings/${troopId}/outlook-connect`);
     };
 
     const handleSmtpConnect = async () => {
@@ -185,8 +164,8 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                 smtpPassword: smtpPassword,
             });
             showSuccess({
-                title: "Ã¢Å“â€¦ ÃƒÅ¡spÃ„â€ºch",
-                message: `${config.name} byl ÃƒÂºspÃ„â€ºÃ…Â¡nÃ„â€º pÃ…â„¢ipojen.`,
+                title: "✅ Úspěch",
+                message: `${config.name} byl úspěšně připojen.`,
             });
             // Close modal silently after connection
             setSelectedProvider(null);
@@ -194,8 +173,8 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
             setSmtpPassword("");
         } catch (error: any) {
             showError({
-                title: "Ã¢ÂÅ’ Chyba",
-                message: "NepodaÃ…â„¢ilo se pÃ…â„¢ipojit e-mailovÃƒÂ½ ÃƒÂºÃ„Âet.",
+                title: "❌ Chyba",
+                message: "Nepodařilo se připojit e-mailový účet.",
                 details: error?.message,
                 canReport: true,
             });
@@ -259,8 +238,8 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
 
     const handleDisconnect = async () => {
         showError({
-            title: "Ã¢Å¡Â Ã¯Â¸Â PotvrzenÃƒÂ­",
-            message: "Opravdu odpojit e-mailovÃƒÂ½ ÃƒÂºÃ„Âet?",
+            title: "⚠️ Potvrzení",
+            message: "Opravdu odpojit e-mailový účet?",
             icon: "warning",
             buttons: [
                 {
@@ -271,8 +250,8 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             // Disconnected silently, UI will update automatically
                         } catch (error: any) {
                             showError({
-                                title: "Ã¢ÂÅ’ Chyba",
-                                message: "NepodaÃ…â„¢ilo se odpojit ÃƒÂºÃ„Âet.",
+                                title: "❌ Chyba",
+                                message: "Nepodařilo se odpojit účet.",
                                 icon: "error",
                                 details: error?.message,
                                 canReport: true,
@@ -314,7 +293,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     </span>
                 </div>
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
-                    Propojte e-mailového poskytovatele pro odesílání zpráv členům. Podporujeme Gmail, Outlook, Seznam, Centrum a Google Groups.
+                    Propojte e-mailového poskytovatele pro odesílání zpráv členům. Podporujeme Gmail, Seznam a Centrum.
                 </p>
             </div>
 
@@ -425,7 +404,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
 
                         <div style={{ display: "grid", gap: "1rem" }}>
                             {Object.entries(PROVIDER_CONFIGS)
-                                .filter(([key]) => !["google-groups", "outlook"].includes(key))
                                 .map(([key, config]) => {
                                     const IconComponent = typeof config.icon === 'function' ? config.icon : null;
                                     return (
@@ -467,80 +445,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                         </button>
                                     );
                                 })}
-                            <ExperimentalGate
-                                title="Experimental"
-                                message="Tyto poskytovatele jsou ve vyvoji. Muzou se menit nebo nefungovat spravne."
-                                acknowledgeLabel="Pokracovat"
-                                cancelLabel="Zpet"
-                                badgeText="EXPERIMENTAL"
-                                trigger={
-                                    <button
-                                        style={{
-                                            padding: "1.1rem",
-                                            border: "3px dashed #000",
-                                            borderRadius: "12px",
-                                            backgroundColor: "#fff7ed",
-                                            cursor: "pointer",
-                                            textAlign: "left",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            width: "100%",
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: "900", fontSize: "1rem", marginBottom: "0.25rem" }}>
-                                            Outlook & Google Groups (EXPERIMENTAL)
-                                        </div>
-                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                            Outlook, Google Groups
-                                        </div>
-                                    </button>
-                                }
-                            >
-                                <div style={{ display: "grid", gap: "1rem" }}>
-                                    {Object.entries(PROVIDER_CONFIGS)
-                                        .filter(([key]) => key === "google-groups" || key === "outlook")
-                                        .map(([key, config]) => {
-                                            const IconComponent = typeof config.icon === 'function' ? config.icon : null;
-                                            return (
-                                                <button
-                                                    key={key}
-                                                    onClick={() => handleProviderSelect(key as EmailProvider)}
-                                                    style={{
-                                                        padding: "1.25rem",
-                                                        border: "3px solid #000",
-                                                        borderRadius: "12px",
-                                                        backgroundColor: "white",
-                                                        cursor: "pointer",
-                                                        textAlign: "left",
-                                                        boxShadow: "3px 3px 0 0 #000",
-                                                        transition: "transform 0.1s",
-                                                    }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.transform = "translate(-2px, -2px)";
-                                                        e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.transform = "translate(0, 0)";
-                                                        e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
-                                                    }}
-                                                >
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                                        <div style={{ fontSize: "2.5rem", width: "2.5rem", height: "2.5rem" }}>
-                                                            {IconComponent ? <IconComponent /> : config.icon}
-                                                        </div>
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
-                                                                {config.name}
-                                                            </div>
-                                                            <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                                                {config.description}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-                                </div>
-                            </ExperimentalGate>
                         </div>
                     </div>
                 </div>
@@ -588,7 +492,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     boxShadow: "3px 3px 0 0 #000"
                                 }}
                             >
-                                Ã¢Å“â€¢
+                                ✕
                             </button>
                         </div>
 
@@ -627,7 +531,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     type="password"
                                     value={smtpPassword}
                                     onChange={(e) => setSmtpPassword(e.target.value)}
-                                    placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢"
+                                    placeholder="••••••••"
                                     autoComplete="off"
                                     data-form-type="other"
                                     data-lpignore="true"
@@ -644,7 +548,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     }}
                                 />
                                 <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#6b7280", marginTop: "0.5rem" }}>
-                                    PouÃ…Â¾ijte heslo aplikace, ne bÃ„â€ºÃ…Â¾nÃƒÂ© heslo k ÃƒÂºÃ„Âtu.
+                                    Použijte heslo aplikace, ne běžné heslo k účtu.
                                 </div>
                             </div>
 
@@ -707,7 +611,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     fontWeight: "600",
                     color: "#4b5563"
                 }}>
-                    Pouze vlastnÃƒÂ­k nebo hlavnÃƒÂ­ vedoucÃƒÂ­ mÃ…Â¯Ã…Â¾e spravovat e-mailovÃƒÂ© pÃ…â„¢ipojenÃƒÂ­.
+                    Pouze vlastník nebo hlavní vedoucí může spravovat e-mailové připojení.
                 </div>
             )}
         </div>
