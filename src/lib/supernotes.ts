@@ -95,23 +95,28 @@ export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCa
     console.log('[Supernotes] Received data structure:', Object.keys(data).length, 'cards');
     
     // API returns object with card IDs as keys, convert to array
-    let cardsArray = Object.values(data).map((item: any) => ({
+    let cardsArray: SupernotesCard[] = Object.values(data).map((item: any) => {
+      const rawTags = Array.isArray(item.data.tags) ? item.data.tags : [];
+      const tags = rawTags.filter((tag: unknown): tag is string => typeof tag === "string");
+
+      return {
       id: item.data.id,
       name: item.data.name,
       markup: item.data.markup,
       html: item.data.html,
       created_when: item.data.created_when,
       modified_when: item.data.modified_when,
-      tags: item.data.tags || [],
+      tags,
       color: item.data.color,
-    }));
+      };
+    });
     
     // Log all cards with their tags for debugging
     console.log('[Supernotes] All cards:', cardsArray.map(c => ({ name: c.name, tags: c.tags })));
     
     // Only exclude junk/tasks/thoughts - show everything else
     cardsArray = cardsArray.filter(card => {
-      const isJunk = card.tags.some(tag => 
+      const isJunk = (card.tags ?? []).some((tag: string) => 
         tag.toLowerCase() === 'junk' || 
         tag.toLowerCase() === 'tasks' ||
         tag.toLowerCase() === 'thoughts'
