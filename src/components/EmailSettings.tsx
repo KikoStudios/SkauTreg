@@ -405,7 +405,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                         <div style={{ display: "grid", gap: "1rem" }}>
                             {Object.entries(PROVIDER_CONFIGS)
                                 .map(([key, config]) => {
-                                    const IconComponent = typeof config.icon === 'function' ? config.icon : null;
+                                    const iconNode = typeof config.icon === "function" ? config.icon() : config.icon;
                                     return (
                                         <button
                                             key={key}
@@ -431,7 +431,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                         >
                                             <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                                                 <div style={{ fontSize: "2.5rem", width: "2.5rem", height: "2.5rem" }}>
-                                                    {IconComponent ? <IconComponent /> : config.icon}
+                                                    {iconNode}
                                                 </div>
                                                 <div style={{ flex: 1 }}>
                                                     <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
