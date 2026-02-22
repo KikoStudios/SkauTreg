@@ -72,8 +72,9 @@ export default function MembersPage() {
 
     const [showImportModal, setShowImportModal] = useState(false);
     const [importFileName, setImportFileName] = useState<string | null>(null);
+    type ImportRow = Record<string, string | boolean>;
     const [importHeaders, setImportHeaders] = useState<string[]>([]);
-    const [importRows, setImportRows] = useState<Record<string, string>[]>([]);
+    const [importRows, setImportRows] = useState<ImportRow[]>([]);
     const [importMapping, setImportMapping] = useState({
         name: "",
         nickname: "",
@@ -89,6 +90,11 @@ export default function MembersPage() {
     const [isImporting, setIsImporting] = useState(false);
     const [importError, setImportError] = useState<string | null>(null);
     const importFileInputRef = useRef<HTMLInputElement>(null);
+
+    const getImportValue = (row: ImportRow, key: string) => {
+        const value = row[key];
+        return typeof value === "string" ? value : "";
+    };
 
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<any>(null);
@@ -443,7 +449,7 @@ export default function MembersPage() {
                 return;
             }
 
-            const mappedRows: Record<string, string>[] = dataRows
+            const mappedRows: ImportRow[] = dataRows
                 .map(row => {
                     const obj: Record<string, string> = {};
                     headers.forEach((h, i) => {
@@ -479,16 +485,16 @@ export default function MembersPage() {
         setImportError(null);
         try {
             const rowsToImport = importRows.map((row) => ({
-                name: row[importMapping.name] || "",
-                nickname: importMapping.nickname ? (row[importMapping.nickname] || "") : "",
-                birthDate: importMapping.birthDate ? (row[importMapping.birthDate] || "") : "",
-                guardianName: row[importMapping.guardianName] || "",
-                guardianPhone: row[importMapping.guardianPhone] || "",
-                guardianEmail: importMapping.guardianEmail ? (row[importMapping.guardianEmail] || "") : "",
-                guardian2Name: importMapping.guardian2Name ? (row[importMapping.guardian2Name] || "") : "",
-                guardian2Phone: importMapping.guardian2Phone ? (row[importMapping.guardian2Phone] || "") : "",
-                guardian2Email: importMapping.guardian2Email ? (row[importMapping.guardian2Email] || "") : "",
-                address: importMapping.address ? (row[importMapping.address] || "") : ""
+                name: getImportValue(row, importMapping.name),
+                nickname: importMapping.nickname ? getImportValue(row, importMapping.nickname) : "",
+                birthDate: importMapping.birthDate ? getImportValue(row, importMapping.birthDate) : "",
+                guardianName: getImportValue(row, importMapping.guardianName),
+                guardianPhone: getImportValue(row, importMapping.guardianPhone),
+                guardianEmail: importMapping.guardianEmail ? getImportValue(row, importMapping.guardianEmail) : "",
+                guardian2Name: importMapping.guardian2Name ? getImportValue(row, importMapping.guardian2Name) : "",
+                guardian2Phone: importMapping.guardian2Phone ? getImportValue(row, importMapping.guardian2Phone) : "",
+                guardian2Email: importMapping.guardian2Email ? getImportValue(row, importMapping.guardian2Email) : "",
+                address: importMapping.address ? getImportValue(row, importMapping.address) : ""
             })).filter(r => r.name && r.guardianName && r.guardianPhone);
 
             for (const row of rowsToImport) {
@@ -1187,11 +1193,11 @@ export default function MembersPage() {
                             <h3 style={{ fontSize: "1rem", fontWeight: "900", marginBottom: "1rem" }}>Náhled členů k importu</h3>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "0.75rem", maxHeight: "500px", overflowY: "auto" }}>
                                 {importRows.slice(0, 10).map((row, idx) => {
-                                    const memberName = importMapping.name ? row[importMapping.name] : "—";
-                                    const guardianName = importMapping.guardianName ? row[importMapping.guardianName] : "—";
-                                    const guardianEmail = importMapping.guardianEmail ? row[importMapping.guardianEmail] : "—";
-                                    const guardian2Name = importMapping.guardian2Name ? row[importMapping.guardian2Name] : "";
-                                    const guardian2Email = importMapping.guardian2Email ? row[importMapping.guardian2Email] : "";
+                                    const memberName = importMapping.name ? getImportValue(row, importMapping.name) : "—";
+                                    const guardianName = importMapping.guardianName ? getImportValue(row, importMapping.guardianName) : "—";
+                                    const guardianEmail = importMapping.guardianEmail ? getImportValue(row, importMapping.guardianEmail) : "—";
+                                    const guardian2Name = importMapping.guardian2Name ? getImportValue(row, importMapping.guardian2Name) : "";
+                                    const guardian2Email = importMapping.guardian2Email ? getImportValue(row, importMapping.guardian2Email) : "";
                                     
                                     return (
                                         <div
@@ -1206,7 +1212,7 @@ export default function MembersPage() {
                                             }}
                                             onClick={() => {
                                                 setImportRows(importRows.map((r, i) =>
-                                                    i === idx ? { ...r, _expandedDetail: !(r as any)._expandedDetail } : r
+                                                    i === idx ? { ...r, _expandedDetail: !(r._expandedDetail === true) } : r
                                                 ));
                                             }}
                                         >
@@ -1222,7 +1228,7 @@ export default function MembersPage() {
                                             </div>
 
                                             {/* Expandable Details */}
-                                            {(importRows[idx] as any)?._expandedDetail && (
+                                            {importRows[idx]._expandedDetail === true && (
                                                 <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "2px solid #e5e7eb" }}>
                                                     {/* Member Info */}
                                                     <div style={{ marginBottom: "1rem" }}>
@@ -1234,11 +1240,11 @@ export default function MembersPage() {
                                                             </div>
                                                             <div>
                                                                 <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Přezdívka</div>
-                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.nickname ? row[importMapping.nickname] : "—"}</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.nickname ? getImportValue(row, importMapping.nickname) : "—"}</div>
                                                             </div>
                                                             <div style={{ gridColumn: "1 / -1" }}>
                                                                 <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Rok narození</div>
-                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.birthDate ? row[importMapping.birthDate] : "—"}</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.birthDate ? getImportValue(row, importMapping.birthDate) : "—"}</div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1253,7 +1259,7 @@ export default function MembersPage() {
                                                             </div>
                                                             <div>
                                                                 <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Telefon</div>
-                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.guardianPhone ? row[importMapping.guardianPhone] : "—"}</div>
+                                                                <div style={{ fontSize: "0.9rem" }}>{importMapping.guardianPhone ? getImportValue(row, importMapping.guardianPhone) : "—"}</div>
                                                             </div>
                                                             <div style={{ gridColumn: "1 / -1" }}>
                                                                 <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Email</div>
@@ -1286,7 +1292,7 @@ export default function MembersPage() {
                                                                 </div>
                                                                 <div>
                                                                     <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Telefon</div>
-                                                                    <div style={{ fontSize: "0.9rem" }}>{importMapping.guardian2Phone ? row[importMapping.guardian2Phone] : "—"}</div>
+                                                                    <div style={{ fontSize: "0.9rem" }}>{importMapping.guardian2Phone ? getImportValue(row, importMapping.guardian2Phone) : "—"}</div>
                                                                 </div>
                                                                 <div style={{ gridColumn: "1 / -1" }}>
                                                                     <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#6b7280" }}>Email</div>
