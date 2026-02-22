@@ -39,6 +39,7 @@ export default defineSchema({
                 memberId: v.id("members"),
                 emails: v.array(v.string()), // Multiple emails per member (parent + kid)
             }))),
+            matchedMemberIds: v.optional(v.array(v.id("members"))), // Members matched from Google Groups import
             // Metadata
             connectedAt: v.string(), // ISO timestamp
             connectedBy: v.id("users"), // User who connected

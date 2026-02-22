@@ -402,6 +402,12 @@ export const connectEmailProvider = mutation({
             memberId: v.id("members"),
             emails: v.array(v.string()),
         }))),
+        // New Google Groups import format
+        matchedMemberIds: v.optional(v.array(v.id("members"))),
+        newMembers: v.optional(v.array(v.object({
+            email: v.string(),
+            name: v.string(),
+        }))),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -424,6 +430,17 @@ export const connectEmailProvider = mutation({
             throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
         }
 
+        // Handle new Google Groups members creation
+        if (args.newMembers && args.newMembers.length > 0) {
+            for (const newMember of args.newMembers) {
+                await ctx.db.insert("members", {
+                    troopId: args.troopId,
+                    name: newMember.name,
+                    guardianEmail: newMember.email,
+                });
+            }
+        }
+
         await ctx.db.patch(args.troopId, {
             emailProvider: {
                 provider: args.provider,
@@ -434,6 +451,7 @@ export const connectEmailProvider = mutation({
                 smtpPassword: args.smtpPassword,
                 groupEmail: args.groupEmail,
                 memberMapping: args.memberMapping,
+                matchedMemberIds: args.matchedMemberIds,
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
             },

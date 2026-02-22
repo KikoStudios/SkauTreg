@@ -4,36 +4,29 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "./Button";
-import ExperimentalGate from "./ExperimentalGate";
 import { useFeedback } from "../context/FeedbackContext";
+import { GmailIcon, SeznamIcon, CentrumIcon } from "./EmailProviderIcons";
 
 interface EmailSettingsProps {
     troopId: Id<"troops">;
     isAuthorized: boolean;
 }
 
-type EmailProvider = "gmail" | "outlook" | "seznam" | "centrum" | "google-groups";
+type EmailProvider = "gmail" | "seznam" | "centrum";
 
 const PROVIDER_CONFIGS = {
     gmail: {
         name: "Gmail",
-        icon: "📧",
-        description: "Použít Gmail přes OAuth 2.0 (bez hesla)",
+        icon: GmailIcon,
+        description: "Používat Gmail přes OAuth 2.0 (bez hesla)",
         color: "#4285f4",
-        authType: "oauth",
-    },
-    outlook: {
-        name: "Outlook / Microsoft 365",
-        icon: "📨",
-        description: "Použít Outlook přes OAuth 2.0 (bez hesla)",
-        color: "#0078d4",
         authType: "oauth",
     },
     seznam: {
         name: "Seznam.cz",
-        icon: "📬",
+        icon: SeznamIcon,
         description: "IMAP/SMTP: imap.seznam.cz",
         color: "#e74c3c",
         authType: "smtp",
@@ -44,7 +37,7 @@ const PROVIDER_CONFIGS = {
     },
     centrum: {
         name: "Centrum.cz",
-        icon: "📮",
+        icon: CentrumIcon,
         description: "IMAP/SMTP: imap.centrum.cz",
         color: "#f39c12",
         authType: "smtp",
@@ -53,40 +46,75 @@ const PROVIDER_CONFIGS = {
         imapHost: "imap.centrum.cz",
         imapPort: 993,
     },
-    "google-groups": {
-        name: "Google Groups",
-        icon: "👥",
-        description: "Import členů z Google Groups",
-        color: "#16a34a",
-        authType: "oauth",
-    },
 } as const;
 
 export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsProps) {
     const { showError, showSuccess } = useFeedback();
+    const searchParams = useSearchParams();
     const troop = useQuery(api.troops.getById, { id: troopId });
     const members = useQuery(api.members.list, { troopId });
     const connectEmailProvider = useMutation(api.troops.connectEmailProvider);
     const disconnectEmailProvider = useMutation(api.troops.disconnectEmailProvider);
-    const fetchGoogleGroupsMembers = useAction(api.mailer.fetchGoogleGroupsMembers);
+    const testEmailConnection = useAction(api.mailer.testEmailConnection);
     const router = useRouter();
 
     const [showProviderSelector, setShowProviderSelector] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<EmailProvider | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
 
     // SMTP form state
     const [smtpEmail, setSmtpEmail] = useState("");
     const [smtpPassword, setSmtpPassword] = useState("");
 
-    // Google Groups state
-    const [showGroupsImport, setShowGroupsImport] = useState(false);
-    const [groupEmail, setGroupEmail] = useState("");
-    const [groupMembers, setGroupMembers] = useState<Array<{ email: string; name?: string }>>([]);
-    const [memberMapping, setMemberMapping] = useState<Record<string, string[]>>({});
+
+
+    // Check if returning from OAuth providers
+    useEffect(() => {
+        const gmailConnected = searchParams?.get("gmail_connected");
+        const refreshToken = searchParams?.get("refresh_token");
+        const email = searchParams?.get("email");
+        const gmailError = searchParams?.get("gmail_error");
+
+        let shouldCleanUrl = false;
+
+        if (gmailError) {
+            showError({
+                title: "Gmail OAuth error",
+                message: decodeURIComponent(gmailError),
+            });
+            shouldCleanUrl = true;
+        }
+
+
+        if (gmailConnected === "true" && refreshToken && email) {
+            const saveGmailConnection = async () => {
+                try {
+                    await connectEmailProvider({
+                        troopId,
+                        provider: "gmail",
+                        email,
+                        refreshToken,
+                    });
+                } catch (error: any) {
+                    showError({
+                        title: "Gmail connect error",
+                        message: error?.message || "Failed to connect Gmail.",
+                    });
+                }
+            };
+
+            saveGmailConnection();
+            shouldCleanUrl = true;
+        }
+
+        if (shouldCleanUrl) {
+            router.replace(`/settings/${troopId}`);
+        }
+    }, [searchParams, troopId, connectEmailProvider, router, showError]);
 
     if (!troop) {
-        return <div>Načítání...</div>;
+        return <div>Načítání...</div>
     }
 
     const emailProvider = (troop as any).emailProvider;
@@ -101,20 +129,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
             return;
         }
 
-        if (provider === "outlook") {
-            setSelectedProvider(null);
-            handleOutlookConnect();
-            return;
-        }
-
-        if (provider === "google-groups") {
-            setSelectedProvider(null);
-            // For Google Groups, we need Gmail OAuth first
-            // Redirect to Gmail OAuth which will come back and allow group access
-            handleGmailConnect();
-            return;
-        }
-
         setSelectedProvider(provider);
     };
 
@@ -123,15 +137,12 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
         startProviderFlow(provider);
     };
 
-    const handleGmailConnect = () => {
+    const handleGmailConnect = (returnAction?: string) => {
         setIsConnecting(true);
-        router.push(`/settings/${troopId}/gmail-connect`);
-    };
-
-    const handleOutlookConnect = () => {
-        setIsConnecting(true);
-        // TODO: Create Outlook OAuth redirect similar to Gmail
-        router.push(`/settings/${troopId}/outlook-connect`);
+        const url = returnAction 
+            ? `/settings/${troopId}/gmail-connect?returnAction=${returnAction}`
+            : `/settings/${troopId}/gmail-connect`;
+        router.push(url);
     };
 
     const handleSmtpConnect = async () => {
@@ -152,60 +163,77 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                 smtpPort: config.smtpPort,
                 smtpPassword: smtpPassword,
             });
+            showSuccess({
+                title: "✅ Úspěch",
+                message: `${config.name} byl úspěšně připojen.`,
+            });
             // Close modal silently after connection
             setSelectedProvider(null);
             setSmtpEmail("");
             setSmtpPassword("");
         } catch (error: any) {
-            console.error(error);
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se připojit e-mailový účet.",
+                details: error?.message,
+                canReport: true,
+            });
         } finally {
             setIsConnecting(false);
         }
     };
 
-    const handleGoogleGroupsImport = async () => {
-        if (!groupEmail) {
+    const handleTestConnection = async () => {
+        if (!selectedProvider || !smtpEmail || !smtpPassword) {
             return;
         }
 
-        setIsConnecting(true);
+        setIsTesting(true);
         try {
-            // Append @googlegroups.com to the group name
-            const fullGroupEmail = `${groupEmail}@googlegroups.com`;
-            
-            // Get Gmail access token first
-            const emailProvider = (troop as any).emailProvider;
-            const gmailOAuth = (troop as any).gmailOAuth;
-            const refreshToken = emailProvider?.refreshToken || gmailOAuth?.refreshToken;
-            
-            if (!refreshToken) {
-                console.error("No Gmail refresh token available");
-                setIsConnecting(false);
-                return;
-            }
-            
-            // Fetch real Google Groups members from the group email
-            const groupMembers = await fetchGoogleGroupsMembers({
-                groupEmail: fullGroupEmail,
-                accessToken: refreshToken, // Will be exchanged for access token by the action
+            const results = await testEmailConnection({
+                provider: selectedProvider,
+                email: smtpEmail,
+                password: smtpPassword,
             });
-            
-            setGroupMembers(groupMembers);
-            // Initialize member mapping with empty arrays
-            const mapping: Record<string, string[]> = {};
-            groupMembers.forEach((m: any, idx: number) => {
-                mapping[idx.toString()] = [];
-            });
-            setMemberMapping(mapping);
-        } catch (error: any) {
-            console.error(error);
-        } finally {
-            setIsConnecting(false);
-        }
-    };
 
-    const handleMemberEmailMapping = (memberId: string, emails: string[]) => {
-        setMemberMapping(prev => ({ ...prev, [memberId]: emails }));
+            let message = '';
+            let allGood = true;
+
+            if (results.smtp.success) {
+                message += '✓ SMTP: Připojeno\n';
+            } else {
+                message += '✗ SMTP: Chyba\n';
+                allGood = false;
+            }
+
+            if (results.imap.success) {
+                message += '✓ IMAP: Připojeno\n';
+            } else {
+                message += '✗ IMAP: Chyba\n';
+                allGood = false;
+            }
+
+            if (allGood) {
+                showSuccess({
+                    title: "✓ Test úspěšný",
+                    message: "E-mailové připojení funguje správně!\n\n" + message,
+                });
+            } else {
+                showError({
+                    title: "⚠️ Test selhal",
+                    message: message + "\n\nZkontrolujte své přihlašovací údaje.",
+                    details: results.smtp.error || results.imap.error,
+                });
+            }
+        } catch (error: any) {
+            showError({
+                title: "✗ Chyba při testování",
+                message: "Nepodařilo se otestovat připojení.",
+                details: error?.message,
+            });
+        } finally {
+            setIsTesting(false);
+        }
     };
 
     const handleDisconnect = async () => {
@@ -265,7 +293,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     </span>
                 </div>
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
-                    Propojte e-mailového poskytovatele pro odesílání zpráv členům. Podporujeme Gmail, Outlook, Seznam, Centrum a Google Groups.
+                    Propojte e-mailového poskytovatele pro odesílání zpráv členům. Podporujeme Gmail, Seznam a Centrum.
                 </p>
             </div>
 
@@ -300,39 +328,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             Odpojit
                         </Button>
                     )}
-                </div>
-            )}
-
-            {/* Google Groups Import Button (only show when Gmail is connected) */}
-            {isConnected && (currentProvider === "gmail" || gmailOAuth) && isAuthorized && (
-                <div style={{
-                    backgroundColor: "#eff6ff",
-                    border: "3px solid #000",
-                    borderRadius: "12px",
-                    padding: "1rem 1.25rem",
-                    boxShadow: "4px 4px 0 0 #000"
-                }}>
-                    <div style={{ fontWeight: "900", fontSize: "1rem", marginBottom: "0.5rem" }}>
-                        📧 Import z Google Groups
-                    </div>
-                    <p style={{ fontSize: "0.9rem", fontWeight: "600", color: "#374151", marginBottom: "1rem" }}>
-                        Importujte e-maily z Google Groups seznamu pro rozesílání.
-                    </p>
-                    <button
-                        onClick={() => setShowGroupsImport(true)}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            backgroundColor: "#3b82f6",
-                            color: "white",
-                            border: "3px solid #000",
-                            borderRadius: "10px",
-                            fontWeight: "900",
-                            cursor: "pointer",
-                            boxShadow: "3px 3px 0 0 #000"
-                        }}
-                    >
-                        Importovat Google Groups
-                    </button>
                 </div>
             )}
 
@@ -409,112 +404,47 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
 
                         <div style={{ display: "grid", gap: "1rem" }}>
                             {Object.entries(PROVIDER_CONFIGS)
-                                .filter(([key]) => key === "gmail")
-                                .map(([key, config]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => handleProviderSelect(key as EmailProvider)}
-                                    style={{
-                                        padding: "1.25rem",
-                                        border: "3px solid #000",
-                                        borderRadius: "12px",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                        textAlign: "left",
-                                        boxShadow: "3px 3px 0 0 #000",
-                                        transition: "transform 0.1s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = "translate(-2px, -2px)";
-                                        e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = "translate(0, 0)";
-                                        e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
-                                    }}
-                                >
-                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                        <div style={{ fontSize: "2.5rem" }}>{config.icon}</div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
-                                                {config.name}
-                                            </div>
-                                            <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                                {config.description}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
-                            <ExperimentalGate
-                                title="Experimental"
-                                message="Tyto poskytovatele jsou ve vyvoji. Muzou se menit nebo nefungovat spravne."
-                                acknowledgeLabel="Pokracovat"
-                                cancelLabel="Zpet"
-                                badgeText="EXPERIMENTAL"
-                                trigger={
-                                    <button
-                                        style={{
-                                            padding: "1.1rem",
-                                            border: "3px dashed #000",
-                                            borderRadius: "12px",
-                                            backgroundColor: "#fff7ed",
-                                            cursor: "pointer",
-                                            textAlign: "left",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            width: "100%",
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: "900", fontSize: "1rem", marginBottom: "0.25rem" }}>
-                                            Ostatni poskytovatele (EXPERIMENTAL)
-                                        </div>
-                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                            Outlook, Seznam, Centrum, Google Groups
-                                        </div>
-                                    </button>
-                                }
-                            >
-                                <div style={{ display: "grid", gap: "1rem" }}>
-                                    {Object.entries(PROVIDER_CONFIGS)
-                                        .filter(([key]) => key !== "gmail")
-                                        .map(([key, config]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => handleProviderSelect(key as EmailProvider)}
-                                                style={{
-                                                    padding: "1.25rem",
-                                                    border: "3px solid #000",
-                                                    borderRadius: "12px",
-                                                    backgroundColor: "white",
-                                                    cursor: "pointer",
-                                                    textAlign: "left",
-                                                    boxShadow: "3px 3px 0 0 #000",
-                                                    transition: "transform 0.1s",
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = "translate(-2px, -2px)";
-                                                    e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = "translate(0, 0)";
-                                                    e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
-                                                }}
-                                            >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                                    <div style={{ fontSize: "2.5rem" }}>{config.icon}</div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
-                                                            {config.name}
-                                                        </div>
-                                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                                            {config.description}
-                                                        </div>
+                                .map(([key, config]) => {
+                                    const IconComponent = typeof config.icon === 'function' ? config.icon : null;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => handleProviderSelect(key as EmailProvider)}
+                                            style={{
+                                                padding: "1.25rem",
+                                                border: "3px solid #000",
+                                                borderRadius: "12px",
+                                                backgroundColor: "white",
+                                                cursor: "pointer",
+                                                textAlign: "left",
+                                                boxShadow: "3px 3px 0 0 #000",
+                                                transition: "transform 0.1s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = "translate(-2px, -2px)";
+                                                e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = "translate(0, 0)";
+                                                e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                <div style={{ fontSize: "2.5rem", width: "2.5rem", height: "2.5rem" }}>
+                                                    {IconComponent ? <IconComponent /> : config.icon}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
+                                                        {config.name}
+                                                    </div>
+                                                    <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
+                                                        {config.description}
                                                     </div>
                                                 </div>
-                                            </button>
-                                        ))}
-                                </div>
-                            </ExperimentalGate>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                         </div>
                     </div>
                 </div>
@@ -636,6 +566,22 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             </div>
 
                             <button
+                                onClick={handleTestConnection}
+                                disabled={isTesting || !smtpEmail || !smtpPassword}
+                                style={{
+                                    padding: "0.85rem",
+                                    backgroundColor: isTesting || !smtpEmail || !smtpPassword ? "#e5e7eb" : "#fef08a",
+                                    border: "3px solid #000",
+                                    borderRadius: "10px",
+                                    fontWeight: "900",
+                                    cursor: isTesting || !smtpEmail || !smtpPassword ? "not-allowed" : "pointer",
+                                    boxShadow: "3px 3px 0 0 #000"
+                                }}
+                            >
+                                {isTesting ? "Testuji..." : "Otestovat připojení"}
+                            </button>
+
+                            <button
                                 onClick={handleSmtpConnect}
                                 disabled={isConnecting || !smtpEmail || !smtpPassword}
                                 style={{
@@ -650,208 +596,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             >
                                 {isConnecting ? "Připojuji..." : "Připojit"}
                             </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Google Groups Import Modal */}
-            {showGroupsImport && (
-                <div style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: "rgba(0,0,0,0.6)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 3001,
-                    padding: "1.5rem",
-                    overflowY: "auto"
-                }}>
-                    <div style={{
-                        width: "100%",
-                        maxWidth: "700px",
-                        backgroundColor: "white",
-                        border: "3px solid #000",
-                        borderRadius: "16px",
-                        boxShadow: "8px 8px 0 0 #000",
-                        padding: "1.5rem",
-                        maxHeight: "90vh",
-                        overflowY: "auto",
-                        position: "relative",
-                        zIndex: 3002
-                    }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1.5rem" }}>
-                            <div style={{ fontWeight: "900", fontSize: "1.2rem" }}>Import z Google Groups</div>
-                            <button
-                                onClick={() => {
-                                    setShowGroupsImport(false);
-                                    setGroupEmail("");
-                                    setGroupMembers([]);
-                                }}
-                                style={{
-                                    border: "3px solid #000",
-                                    borderRadius: "10px",
-                                    backgroundColor: "#e5e7eb",
-                                    padding: "0.35rem 0.75rem",
-                                    fontWeight: "900",
-                                    cursor: "pointer",
-                                    boxShadow: "3px 3px 0 0 #000"
-                                }}
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div style={{ display: "grid", gap: "1.5rem" }}>
-                            {/* Step 1: Enter Group Email */}
-                            <div>
-                                <label style={{ display: "block", fontWeight: "800", marginBottom: "0.5rem" }}>
-                                    Název Google Groups
-                                </label>
-                                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                                    <input
-                                        type="text"
-                                        value={groupEmail}
-                                        onChange={(e) => setGroupEmail(e.target.value)}
-                                        placeholder="nazev-skupiny"
-                                        autoComplete="off"
-                                        style={{
-                                            flex: 1,
-                                            padding: "0.75rem",
-                                            border: "3px solid #000",
-                                            borderRadius: "8px",
-                                            fontSize: "0.95rem",
-                                            outline: "none",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            fontWeight: "600"
-                                        }}
-                                    />
-                                    <span style={{ fontWeight: "800", fontSize: "0.95rem" }}>@googlegroups.com</span>
-                                    <button
-                                        onClick={handleGoogleGroupsImport}
-                                        disabled={isConnecting || !groupEmail}
-                                        style={{
-                                            padding: "0.75rem 1.25rem",
-                                            backgroundColor: isConnecting || !groupEmail ? "#e5e7eb" : "#3b82f6",
-                                            color: "white",
-                                            border: "3px solid #000",
-                                            borderRadius: "8px",
-                                            fontWeight: "900",
-                                            cursor: isConnecting || !groupEmail ? "not-allowed" : "pointer",
-                                            boxShadow: "3px 3px 0 0 #000"
-                                        }}
-                                    >
-                                        {isConnecting ? "Načítám..." : "Načíst"}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Step 2: Member Mapping */}
-                            {groupMembers.length > 0 && members && (
-                                <div>
-                                    <div style={{ fontWeight: "900", fontSize: "1.05rem", marginBottom: "1rem" }}>
-                                        Přiřaďte e-maily členům
-                                    </div>
-                                    <div style={{
-                                        border: "3px solid #000",
-                                        borderRadius: "10px",
-                                        padding: "1rem",
-                                        backgroundColor: "#fef3c7",
-                                        marginBottom: "1rem"
-                                    }}>
-                                        <div style={{ fontWeight: "800", marginBottom: "0.5rem" }}>💡 Tip</div>
-                                        <div style={{ fontSize: "0.9rem", fontWeight: "600" }}>
-                                            Můžete přiřadit více e-mailů k jednomu členovi (např. rodič + dítě).
-                                        </div>
-                                    </div>
-
-                                    <div style={{ display: "grid", gap: "1rem", maxHeight: "400px", overflowY: "auto", padding: "0.5rem" }}>
-                                        {members.map((member: any) => (
-                                            <div key={member._id} style={{
-                                                border: "2px solid #000",
-                                                borderRadius: "10px",
-                                                padding: "1rem",
-                                                backgroundColor: "white"
-                                            }}>
-                                                <div style={{ fontWeight: "900", marginBottom: "0.5rem" }}>
-                                                    {member.name} {member.nickname && `"${member.nickname}"`}
-                                                </div>
-                                                <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#6b7280", marginBottom: "0.75rem" }}>
-                                                    Zástupce: {member.guardianName}
-                                                </div>
-                                                <select
-                                                    multiple
-                                                    value={memberMapping[member._id] || []}
-                                                    onChange={(e) => {
-                                                        const selected = Array.from(e.target.selectedOptions).map(o => o.value);
-                                                        handleMemberEmailMapping(member._id, selected);
-                                                    }}
-                                                    style={{
-                                                        width: "100%",
-                                                        padding: "0.5rem",
-                                                        border: "2px solid #000",
-                                                        borderRadius: "6px",
-                                                        fontSize: "0.9rem",
-                                                        fontWeight: "600",
-                                                        minHeight: "80px"
-                                                    }}
-                                                >
-                                                    {groupMembers.map((gm, idx) => (
-                                                        <option key={idx} value={gm.email}>
-                                                            {gm.name || gm.email}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#6b7280", marginTop: "0.5rem" }}>
-                                                    Podržte Ctrl/Cmd pro výběr více e-mailů
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                const fullGroupEmail = `${groupEmail}@googlegroups.com`;
-                                                
-                                                // Convert memberMapping to the format expected by the mutation
-                                                const mappingArray = Object.entries(memberMapping).map(([memberId, emails]) => ({
-                                                    memberId: memberId as Id<"members">,
-                                                    emails,
-                                                }));
-                                                
-                                                await connectEmailProvider({
-                                                    troopId,
-                                                    provider: "google-groups",
-                                                    email: fullGroupEmail,
-                                                    groupEmail: fullGroupEmail,
-                                                    memberMapping: mappingArray.length > 0 ? mappingArray : undefined,
-                                                });
-                                                setShowGroupsImport(false);
-                                            } catch (error: any) {
-                                                console.error(error);
-                                            }
-                                        }}
-                                        style={{
-                                            padding: "0.85rem",
-                                            backgroundColor: "#86efac",
-                                            border: "3px solid #000",
-                                            borderRadius: "10px",
-                                            fontWeight: "900",
-                                            cursor: "pointer",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            width: "100%",
-                                            marginTop: "1rem"
-                                        }}
-                                    >
-                                        Uložit mapování
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
