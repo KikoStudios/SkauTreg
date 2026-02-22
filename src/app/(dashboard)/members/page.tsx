@@ -93,6 +93,19 @@ export default function MembersPage() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<any>(null);
 
+    // Google Groups CSV Import State
+    const [showGoogleGroupsCSVModal, setShowGoogleGroupsCSVModal] = useState(false);
+    const [googleGroupsCSVFile, setGoogleGroupsCSVFile] = useState<File | null>(null);
+    const [googleGroupsCSVMatched, setGoogleGroupsCSVMatched] = useState<Array<{ email: string; memberName: string; memberId: Id<"members">; currentEmail?: string }>>([]);
+    const [googleGroupsCSVUnmatched, setGoogleGroupsCSVUnmatched] = useState<Array<{ email: string }>>([]);
+    const [googleGroupsCSVEmailsToUpdate, setGoogleGroupsCSVEmailsToUpdate] = useState<Record<string, boolean>>({});
+    const [googleGroupsCSVEmailFieldSelection, setGoogleGroupsCSVEmailFieldSelection] = useState<Record<string, "member" | "parent1" | "parent2">>({});
+    const [googleGroupsCSVManualAssignments, setGoogleGroupsCSVManualAssignments] = useState<Record<string, Id<"members"> | "">>({});
+    const [googleGroupsCSVManualFieldSelection, setGoogleGroupsCSVManualFieldSelection] = useState<Record<string, "member" | "parent1" | "parent2">>({});
+    const [googleGroupsCSVError, setGoogleGroupsCSVError] = useState<string | null>(null);
+    const [googleGroupsCSVLoading, setGoogleGroupsCSVLoading] = useState(false);
+    const googleGroupsFileInputRef = useRef<HTMLInputElement>(null);
+
     const [formData, setFormData] = useState({
         name: "",
         nickname: "",
@@ -158,6 +171,197 @@ export default function MembersPage() {
             guardian2Email: pick([/zástupce.?2.*email|rodič.?2.*email|email.?2/i]),
             address: pick([/adresa/, /address/])
         };
+    };
+
+    // Handle Google Groups CSV Import
+    const handleGoogleGroupsCSVFileChange = async (files: FileList | null) => {
+        if (!files || files.length === 0) return;
+        const file = files[0];
+        
+        setGoogleGroupsCSVFile(file);
+        setGoogleGroupsCSVError(null);
+        setGoogleGroupsCSVLoading(true);
+
+        try {
+            const text = await file.text();
+            const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+            
+            if (lines.length === 0) {
+                setGoogleGroupsCSVError("Soubor je prázdný.");
+                setGoogleGroupsCSVLoading(false);
+                return;
+            }
+
+            // Parse CSV - extract email addresses
+            const emails: string[] = [];
+            for (const line of lines) {
+                // Split by comma and find email-like patterns
+                const parts = line.split(",").map(p => p.trim());
+                for (const part of parts) {
+                    if (part.includes("@")) {
+                        emails.push(part.toLowerCase());
+                        break; // Only take first email per line
+                    }
+                }
+            }
+
+            if (emails.length === 0) {
+                setGoogleGroupsCSVError("V souboru nebyly nalezeny žádné e-mailové adresy.");
+                setGoogleGroupsCSVLoading(false);
+                return;
+            }
+
+            // Match against existing members by name matching
+            const matched: typeof googleGroupsCSVMatched = [];
+            const unmatched: typeof googleGroupsCSVUnmatched = [];
+            const updateMap: Record<string, boolean> = {};
+
+            for (const email of emails) {
+                // Try to match by guardianEmail, guardian2Email, or member name similarity
+                let found = false;
+                
+                for (const member of members || []) {
+                    // Check if email already assigned
+                    if (member.guardianEmail?.toLowerCase() === email || 
+                        member.guardian2Email?.toLowerCase() === email) {
+                        found = true;
+                        break;
+                    }
+                    
+                    // Check if member name matches email prefix (e.g., jan.novak@gmail.com matches "Jan Novák")
+                    const emailPrefix = email.split("@")[0].toLowerCase().replace(/[._-]/g, " ");
+                    const memberNameNorm = member.name.toLowerCase().replace(/[._-]/g, " ");
+                    const guardianNameNorm = member.guardianName?.toLowerCase().replace(/[._-]/g, " ") || "";
+                    const guardian2NameNorm = member.guardian2Name?.toLowerCase().replace(/[._-]/g, " ") || "";
+                    
+                    if (emailPrefix.includes(memberNameNorm.split(" ")[0]) || 
+                        emailPrefix.includes(memberNameNorm.split(" ").slice(-1)[0]) ||
+                        (guardianNameNorm && emailPrefix.includes(guardianNameNorm.split(" ")[0])) ||
+                        (guardian2NameNorm && emailPrefix.includes(guardian2NameNorm.split(" ")[0]))) {
+                        
+                        matched.push({
+                            email,
+                            memberName: member.name,
+                            memberId: member._id,
+                            currentEmail: member.guardianEmail || member.guardian2Email
+                        });
+                        updateMap[member._id] = true;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    unmatched.push({ email });
+                }
+            }
+
+            setGoogleGroupsCSVMatched(matched);
+            setGoogleGroupsCSVUnmatched(unmatched);
+            setGoogleGroupsCSVEmailsToUpdate(updateMap);
+            // Initialize field selections to parent1 by default
+            const fieldSelectionMap: Record<string, "member" | "parent1" | "parent2"> = {};
+            matched.forEach(m => { fieldSelectionMap[m.memberId] = "parent1"; });
+            setGoogleGroupsCSVEmailFieldSelection(fieldSelectionMap);
+            // Initialize manual assignments to empty
+            const manualMap: Record<string, Id<"members"> | ""> = {};
+            const manualFieldMap: Record<string, "member" | "parent1" | "parent2"> = {};
+            unmatched.forEach(u => { 
+                manualMap[u.email] = ""; 
+                manualFieldMap[u.email] = "parent1";
+            });
+            setGoogleGroupsCSVManualAssignments(manualMap);
+            setGoogleGroupsCSVManualFieldSelection(manualFieldMap);
+            setShowGoogleGroupsCSVModal(true);
+        } catch (error) {
+            console.error("CSV parse error:", error);
+            setGoogleGroupsCSVError("Nepodařilo se načíst soubor. Zkontrolujte formát.");
+        } finally {
+            setGoogleGroupsCSVLoading(false);
+            if (googleGroupsFileInputRef.current) {
+                googleGroupsFileInputRef.current.value = "";
+            }
+        }
+    };
+
+    const handleGoogleGroupsCSVConfirm = async () => {
+        if (!selectedTroopId) return;
+
+        setGoogleGroupsCSVLoading(true);
+        setGoogleGroupsCSVError(null);
+
+        try {
+            let updatedCount = 0;
+            
+            // Update emails for selected auto-matched members
+            for (const match of googleGroupsCSVMatched) {
+                if (googleGroupsCSVEmailsToUpdate[match.memberId]) {
+                    const member = members?.find(m => m._id === match.memberId);
+                    if (!member) continue;
+                    
+                    const fieldType = googleGroupsCSVEmailFieldSelection[match.memberId] || "parent1";
+                    const updateData: any = { id: match.memberId };
+                    
+                    if (fieldType === "member") {
+                        updateData.email = match.email;
+                    } else if (fieldType === "parent1") {
+                        updateData.guardianEmail = match.email;
+                    } else if (fieldType === "parent2") {
+                        updateData.guardian2Email = match.email;
+                    }
+                    
+                    await updateMember(updateData);
+                    updatedCount++;
+                }
+            }
+
+            // Update emails for manually assigned members
+            for (const [email, memberId] of Object.entries(googleGroupsCSVManualAssignments)) {
+                if (memberId && memberId !== "") {
+                    const member = members?.find(m => m._id === memberId);
+                    if (!member) continue;
+                    
+                    const fieldType = googleGroupsCSVManualFieldSelection[email] || "parent1";
+                    const updateData: any = { id: memberId };
+                    
+                    if (fieldType === "member") {
+                        updateData.email = email;
+                    } else if (fieldType === "parent1") {
+                        updateData.guardianEmail = email;
+                    } else if (fieldType === "parent2") {
+                        updateData.guardian2Email = email;
+                    }
+                    
+                    await updateMember(updateData);
+                    updatedCount++;
+                }
+            }
+
+            const manualCount = Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length;
+            const totalUnassigned = googleGroupsCSVUnmatched.length - manualCount;
+
+            showSuccess({
+                title: "✅ Import uspěl",
+                message: `Aktualizováno ${updatedCount} e-mailových adres.${totalUnassigned > 0 ? ` ${totalUnassigned} e-mailů zůstalo nepřiřazeno.` : ""}`,
+            });
+
+            setShowGoogleGroupsCSVModal(false);
+            setGoogleGroupsCSVFile(null);
+            setGoogleGroupsCSVMatched([]);
+            setGoogleGroupsCSVUnmatched([]);
+            setGoogleGroupsCSVEmailsToUpdate({});
+            setGoogleGroupsCSVEmailFieldSelection({});
+            setGoogleGroupsCSVManualAssignments({});
+            setGoogleGroupsCSVManualFieldSelection({});
+        } catch (error: any) {
+            console.error("Google Groups CSV import failed:", error);
+            showError({
+                title: "❌ Chyba při importu",
+                message: error?.message || "Nepodařilo se aktualizovat e-maily.",
+            });
+        } finally {
+            setGoogleGroupsCSVLoading(false);
+        }
     };
 
     const handleImportFileChange = async (files: FileList | null) => {
@@ -470,12 +674,30 @@ export default function MembersPage() {
                 >
                     IMPORT
                 </button>
+
+                {/* GOOGLE GROUPS CSV Button */}
+                <button
+                    onClick={() => googleGroupsFileInputRef.current?.click()}
+                    className="add-button"
+                    onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
+                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                >
+                    G GROUPS
+                </button>
+
                 <input
                     ref={importFileInputRef}
                     type="file"
                     accept=".csv,.xlsx,.xls"
                     style={{ display: "none" }}
                     onChange={(e) => handleImportFileChange(e.target.files)}
+                />
+                <input
+                    ref={googleGroupsFileInputRef}
+                    type="file"
+                    accept=".csv"
+                    style={{ display: "none" }}
+                    onChange={(e) => handleGoogleGroupsCSVFileChange(e.target.files)}
                 />
             </div>
 
@@ -1286,6 +1508,366 @@ export default function MembersPage() {
                         >
                             Upravit člena
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Google Groups CSV Import Modal */}
+            {showGoogleGroupsCSVModal && (
+                <div style={{
+                    position: "fixed",
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    zIndex: 2000,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "2rem"
+                }} onClick={() => setShowGoogleGroupsCSVModal(false)}>
+                    <div style={{
+                        backgroundColor: "white",
+                        padding: "2rem",
+                        border: "3px solid #000",
+                        borderRadius: "16px",
+                        boxShadow: "8px 8px 0 0 #000",
+                        width: "95%",
+                        maxWidth: "800px",
+                        maxHeight: "90vh",
+                        overflowY: "auto",
+                        display: "grid",
+                        gridTemplateColumns: "1fr"
+                    }} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                            <h2 style={{ fontSize: "1.3rem", fontWeight: "900", margin: 0 }}>Import z Google Groups</h2>
+                            <button
+                                onClick={() => setShowGoogleGroupsCSVModal(false)}
+                                style={{
+                                    backgroundColor: "transparent",
+                                    border: "none",
+                                    fontSize: "1.5rem",
+                                    cursor: "pointer",
+                                    fontWeight: "900",
+                                    padding: 0,
+                                    width: "32px",
+                                    height: "32px"
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* File Info */}
+                        {googleGroupsCSVFile && (
+                            <div style={{
+                                border: "2px solid #10b981",
+                                borderRadius: "10px",
+                                padding: "1rem",
+                                backgroundColor: "#ecfdf5",
+                                marginBottom: "1.5rem"
+                            }}>
+                                <div style={{ fontWeight: "800", marginBottom: "0.5rem", fontSize: "0.95rem" }}>📄 Soubor: {googleGroupsCSVFile.name}</div>
+                                <div style={{ fontWeight: "600", fontSize: "0.85rem", color: "#047857" }}>Nalezeno {googleGroupsCSVMatched.length + googleGroupsCSVUnmatched.length} e-mailů</div>
+                            </div>
+                        )}
+
+                        {/* Error Message */}
+                        {googleGroupsCSVError && (
+                            <div style={{
+                                backgroundColor: "#fee2e2",
+                                border: "2px solid #fca5a5",
+                                borderRadius: "10px",
+                                padding: "1rem",
+                                color: "#991b1b",
+                                fontWeight: "700",
+                                marginBottom: "1rem"
+                            }}>
+                                {googleGroupsCSVError}
+                            </div>
+                        )}
+
+                        {/* Loading */}
+                        {googleGroupsCSVLoading && (
+                            <div style={{ textAlign: "center", padding: "2rem", fontWeight: "800", fontSize: "1rem" }}>
+                                ⏳ Načítám a porovnávám členy...
+                            </div>
+                        )}
+
+                        {/* Results Section */}
+                        {!googleGroupsCSVLoading && (googleGroupsCSVMatched.length > 0 || googleGroupsCSVUnmatched.length > 0) && (
+                            <div style={{ display: "grid", gap: "1.5rem" }}>
+                                {/* Matched Members */}
+                                {googleGroupsCSVMatched.length > 0 && (
+                                    <div style={{
+                                        border: "2px solid #10b981",
+                                        borderRadius: "10px",
+                                        padding: "1rem",
+                                        backgroundColor: "#ecfdf5"
+                                    }}>
+                                        <div style={{ fontWeight: "800", marginBottom: "0.75rem", color: "#047857", fontSize: "0.95rem" }}>
+                                            ✓ Nalezeno a přiřazeno: {googleGroupsCSVMatched.length}
+                                        </div>
+                                        <p style={{ margin: "0 0 0.75rem 0", fontWeight: "600", fontSize: "0.85rem", color: "#047857" }}>
+                                            Vyberte členy, kterým chcete aktualizovat e-mail:
+                                        </p>
+                                        <div style={{ display: "grid", gap: "0.5rem" }}>
+                                            {googleGroupsCSVMatched.map((m, idx) => (
+                                                <div key={idx} style={{
+                                                    padding: "0.75rem",
+                                                    backgroundColor: "white",
+                                                    borderRadius: "6px",
+                                                    border: "2px solid #d1fae5",
+                                                    display: "grid",
+                                                    gap: "0.5rem"
+                                                }}>
+                                                    <label style={{
+                                                        display: "flex",
+                                                        alignItems: "flex-start",
+                                                        gap: "0.75rem",
+                                                        cursor: "pointer",
+                                                        fontSize: "0.85rem",
+                                                        fontWeight: "600"
+                                                    }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={googleGroupsCSVEmailsToUpdate[m.memberId] || false}
+                                                            onChange={(evt) => {
+                                                                setGoogleGroupsCSVEmailsToUpdate(prev => ({
+                                                                    ...prev,
+                                                                    [m.memberId]: evt.target.checked
+                                                                }));
+                                                            }}
+                                                            style={{
+                                                                width: "1rem",
+                                                                height: "1rem",
+                                                                cursor: "pointer",
+                                                                accentColor: "#000",
+                                                                marginTop: "0.15rem",
+                                                                flexShrink: 0
+                                                            }}
+                                                        />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div>{m.memberName}</div>
+                                                            <div style={{ color: "#6b7280", fontSize: "0.75rem" }}>
+                                                                {m.currentEmail ? `Současný: ${m.currentEmail} → ` : ""}
+                                                                <span style={{ color: "#047857" }}>{m.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </label>
+                                                    <div style={{ marginLeft: "1.75rem", display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                                                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600" }}>
+                                                            <input
+                                                                type="radio"
+                                                                name={`field-${m.memberId}`}
+                                                                value="member"
+                                                                checked={googleGroupsCSVEmailFieldSelection[m.memberId] === "member"}
+                                                                onChange={(e) => {
+                                                                    setGoogleGroupsCSVEmailFieldSelection(prev => ({
+                                                                        ...prev,
+                                                                        [m.memberId]: "member"
+                                                                    }));
+                                                                }}
+                                                                style={{ cursor: "pointer", accentColor: "#000" }}
+                                                            />
+                                                            Člen
+                                                        </label>
+                                                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600" }}>
+                                                            <input
+                                                                type="radio"
+                                                                name={`field-${m.memberId}`}
+                                                                value="parent1"
+                                                                checked={googleGroupsCSVEmailFieldSelection[m.memberId] === "parent1"}
+                                                                onChange={(e) => {
+                                                                    setGoogleGroupsCSVEmailFieldSelection(prev => ({
+                                                                        ...prev,
+                                                                        [m.memberId]: "parent1"
+                                                                    }));
+                                                                }}
+                                                                style={{ cursor: "pointer", accentColor: "#000" }}
+                                                            />
+                                                            Rodič 1
+                                                        </label>
+                                                        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: "600" }}>
+                                                            <input
+                                                                type="radio"
+                                                                name={`field-${m.memberId}`}
+                                                                value="parent2"
+                                                                checked={googleGroupsCSVEmailFieldSelection[m.memberId] === "parent2"}
+                                                                onChange={(e) => {
+                                                                    setGoogleGroupsCSVEmailFieldSelection(prev => ({
+                                                                        ...prev,
+                                                                        [m.memberId]: "parent2"
+                                                                    }));
+                                                                }}
+                                                                style={{ cursor: "pointer", accentColor: "#000" }}
+                                                            />
+                                                            Rodič 2
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Unmatched Emails - Manual Assignment */}
+                                {googleGroupsCSVUnmatched.length > 0 && (
+                                    <div style={{
+                                        border: "3px solid #f59e0b",
+                                        borderRadius: "10px",
+                                        padding: "1rem",
+                                        backgroundColor: "#fffbeb"
+                                    }}>
+                                        <div style={{ fontWeight: "800", marginBottom: "0.75rem", color: "#b45309", fontSize: "0.95rem" }}>
+                                            ⚠️ Nepřiřazené e-maily: {googleGroupsCSVUnmatched.length}
+                                        </div>
+                                        <p style={{ margin: "0 0 0.75rem 0", fontWeight: "600", fontSize: "0.85rem", color: "#92400e" }}>
+                                            Můžete přiřadit ručně k existujícím členům:
+                                        </p>
+                                        <div style={{ display: "grid", gap: "0.75rem", maxHeight: "300px", overflowY: "auto" }}>
+                                            {googleGroupsCSVUnmatched.map((e, idx) => (
+                                                <div key={idx} style={{
+                                                    padding: "0.75rem",
+                                                    backgroundColor: "white",
+                                                    borderRadius: "6px",
+                                                    border: "2px solid #fed7aa",
+                                                    display: "grid",
+                                                    gap: "0.5rem"
+                                                }}>
+                                                    <div style={{ fontWeight: "700", fontSize: "0.85rem", color: "#92400e" }}>
+                                                        {e.email}
+                                                    </div>
+                                                    <select
+                                                        value={googleGroupsCSVManualAssignments[e.email] || ""}
+                                                        onChange={(evt) => {
+                                                            setGoogleGroupsCSVManualAssignments(prev => ({
+                                                                ...prev,
+                                                                [e.email]: evt.target.value as Id<"members"> | ""
+                                                            }));
+                                                        }}
+                                                        style={{
+                                                            padding: "0.5rem",
+                                                            border: "2px solid #000",
+                                                            borderRadius: "6px",
+                                                            fontSize: "0.85rem",
+                                                            fontWeight: "600",
+                                                            outline: "none",
+                                                            cursor: "pointer",
+                                                            backgroundColor: googleGroupsCSVManualAssignments[e.email] ? "#ecfdf5" : "white"
+                                                        }}
+                                                    >
+                                                        <option value="">— Nepřiřazovat —</option>
+                                                        {members?.map(m => (
+                                                            <option key={m._id} value={m._id}>
+                                                                {m.name} {m.guardianName ? `(${m.guardianName})` : ""}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {googleGroupsCSVManualAssignments[e.email] && googleGroupsCSVManualAssignments[e.email] !== "" && (
+                                                        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                                                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: "600" }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`manual-field-${e.email}`}
+                                                                    value="member"
+                                                                    checked={googleGroupsCSVManualFieldSelection[e.email] === "member"}
+                                                                    onChange={(evt) => {
+                                                                        setGoogleGroupsCSVManualFieldSelection(prev => ({
+                                                                            ...prev,
+                                                                            [e.email]: "member"
+                                                                        }));
+                                                                    }}
+                                                                    style={{ cursor: "pointer", accentColor: "#000" }}
+                                                                />
+                                                                Člen
+                                                            </label>
+                                                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: "600" }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`manual-field-${e.email}`}
+                                                                    value="parent1"
+                                                                    checked={googleGroupsCSVManualFieldSelection[e.email] === "parent1"}
+                                                                    onChange={(evt) => {
+                                                                        setGoogleGroupsCSVManualFieldSelection(prev => ({
+                                                                            ...prev,
+                                                                            [e.email]: "parent1"
+                                                                        }));
+                                                                    }}
+                                                                    style={{ cursor: "pointer", accentColor: "#000" }}
+                                                                />
+                                                                Rodič 1
+                                                            </label>
+                                                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: "600" }}>
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`manual-field-${e.email}`}
+                                                                    value="parent2"
+                                                                    checked={googleGroupsCSVManualFieldSelection[e.email] === "parent2"}
+                                                                    onChange={(evt) => {
+                                                                        setGoogleGroupsCSVManualFieldSelection(prev => ({
+                                                                            ...prev,
+                                                                            [e.email]: "parent2"
+                                                                        }));
+                                                                    }}
+                                                                    style={{ cursor: "pointer", accentColor: "#000" }}
+                                                                />
+                                                                Rodič 2
+                                                            </label>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                                    <button
+                                        onClick={() => {
+                                            setShowGoogleGroupsCSVModal(false);
+                                            setGoogleGroupsCSVFile(null);
+                                            setGoogleGroupsCSVMatched([]);
+                                            setGoogleGroupsCSVUnmatched([]);
+                                            setGoogleGroupsCSVEmailsToUpdate({});
+                                            setGoogleGroupsCSVEmailFieldSelection({});
+                                            setGoogleGroupsCSVManualAssignments({});
+                                            setGoogleGroupsCSVManualFieldSelection({});
+                                            setGoogleGroupsCSVError(null);
+                                        }}
+                                        style={{
+                                            padding: "0.9rem",
+                                            backgroundColor: "#e5e7eb",
+                                            border: "3px solid #000",
+                                            borderRadius: "10px",
+                                            fontWeight: "900",
+                                            fontSize: "0.95rem",
+                                            cursor: "pointer",
+                                            boxShadow: "3px 3px 0 0 #000"
+                                        }}
+                                    >
+                                        Zrušit
+                                    </button>
+                                    <button
+                                        onClick={handleGoogleGroupsCSVConfirm}
+                                        disabled={googleGroupsCSVLoading || (Object.values(googleGroupsCSVEmailsToUpdate).filter(Boolean).length === 0 && Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length === 0)}
+                                        style={{
+                                            padding: "0.9rem",
+                                            backgroundColor: (googleGroupsCSVLoading || (Object.values(googleGroupsCSVEmailsToUpdate).filter(Boolean).length === 0 && Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length === 0)) ? "#e5e7eb" : "#86efac",
+                                            color: (googleGroupsCSVLoading || (Object.values(googleGroupsCSVEmailsToUpdate).filter(Boolean).length === 0 && Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length === 0)) ? "#9ca3af" : "#000",
+                                            border: "3px solid #000",
+                                            borderRadius: "10px",
+                                            fontWeight: "900",
+                                            fontSize: "0.95rem",
+                                            cursor: (googleGroupsCSVLoading || (Object.values(googleGroupsCSVEmailsToUpdate).filter(Boolean).length === 0 && Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length === 0)) ? "not-allowed" : "pointer",
+                                            boxShadow: "3px 3px 0 0 #000"
+                                        }}
+                                    >
+                                        {googleGroupsCSVLoading ? "Aktualizuji..." : `Aktualizovat (${Object.values(googleGroupsCSVEmailsToUpdate).filter(Boolean).length + Object.values(googleGroupsCSVManualAssignments).filter(v => v && v !== "").length})`}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 export default function GmailConnectPage() {
     const [error, setError] = useState<string | null>(null);
     const params = useParams();
+    const searchParams = useSearchParams();
     const troopId = typeof params?.troopId === "string" ? params.troopId : "";
+    const returnAction = searchParams?.get("returnAction") || ""; // "groups-import" or empty
 
     useEffect(() => {
         const fetchConfigAndRedirect = async () => {
@@ -20,12 +22,12 @@ export default function GmailConnectPage() {
                 }
 
                 const redirectUri = `${window.location.origin}/api/auth/gmail/callback`;
-                const state = Buffer.from(JSON.stringify({ troopId })).toString("base64");
+                const state = Buffer.from(JSON.stringify({ troopId, returnAction })).toString("base64");
                 const paramsObj = new URLSearchParams({
                     client_id: clientId,
                     redirect_uri: redirectUri,
                     response_type: "code",
-                    scope: "openid email profile https://www.googleapis.com/auth/gmail.send",
+                    scope: "openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/admin.directory.group.readonly https://www.googleapis.com/auth/contacts.readonly",
                     access_type: "offline",
                     prompt: "consent",
                     state,
@@ -39,7 +41,7 @@ export default function GmailConnectPage() {
         };
 
         fetchConfigAndRedirect();
-    }, [troopId]);
+    }, [troopId, returnAction]);
 
     return (
         <div className="max-w-2xl mx-auto p-6">

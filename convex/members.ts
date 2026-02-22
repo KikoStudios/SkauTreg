@@ -82,6 +82,7 @@ export const update = mutation({
         guardian2Phone: v.optional(v.string()),
         guardian2Email: v.optional(v.string()),
         address: v.optional(v.string()),
+        email: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { id, ...fields } = args;

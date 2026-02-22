@@ -22,12 +22,14 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const redirectUri = `${req.nextUrl.origin}/api/auth/gmail/callback`;
 
-  // Parse state to get troopId early for use in all redirects
+  // Parse state to get troopId and returnAction early for use in all redirects
   let troopId = null;
+  let returnAction = "";
   if (state) {
     try {
       const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
       troopId = decoded.troopId;
+      returnAction = decoded.returnAction || "";
     } catch (e) {
       console.error('Failed to decode state:', e);
     }
@@ -35,7 +37,8 @@ export async function GET(req: NextRequest) {
 
   const getRedirectUrl = (errorOrParams: string) => {
     const path = troopId ? `/settings/${troopId}` : '/settings';
-    return `${path}?${errorOrParams}`;
+    const separator = errorOrParams ? '?' : '';
+    return `${path}${separator}${errorOrParams}`;
   };
 
   // Handle errors from Google
@@ -156,6 +159,9 @@ export async function GET(req: NextRequest) {
       email,
       refresh_token: refreshToken,
     });
+    if (returnAction) {
+      successParams.set('returnAction', returnAction);
+    }
 
     return NextResponse.redirect(
       new URL(getRedirectUrl(successParams.toString()), req.url)

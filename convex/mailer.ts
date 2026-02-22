@@ -544,39 +544,98 @@ ${bodyText.replace(/\n/g, "<br/>")}
   },
 });
 // Fetch Google Groups members via Google Admin API
+// Fetch groups the user is a member of
+// Note: Directory API is not available for regular Gmail users.
+// Users must manually enter their Google Groups email address.
+
 export const fetchGoogleGroupsMembers = action({
   args: {
     groupEmail: v.string(), // e.g., "group-name@googlegroups.com"
-    accessToken: v.string(), // Gmail access token with admin scope
+    accessToken: v.string(), // Can be refreshToken - will exchange if needed
   },
   handler: async (ctx, args): Promise<Array<{ email: string; name?: string }>> => {
     try {
-      // Use Google Directory API to list group members
-      const response = await fetch(
-        `https://www.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(args.groupEmail)}/members`,
-        {
-          headers: {
-            Authorization: `Bearer ${args.accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      let token = args.accessToken;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Google API Error: ${error?.error?.message || "Failed to fetch group members"}`);
+      // If this looks like a refresh token, exchange it for an access token
+      if (!args.accessToken.includes('.') || args.accessToken.split('.').length !== 3) {
+        // It's likely a refresh token, exchange it
+        const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
+        const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+
+        if (!clientId || !clientSecret) {
+          throw new Error("Gmail je špatně nakonfigurován");
+        }
+
+        const params = new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: args.accessToken,
+          grant_type: "refresh_token",
+        });
+
+        const resp = await fetch("https://oauth2.googleapis.com/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
+
+        if (!resp.ok) {
+          const errText = await resp.text();
+          throw new Error(`Nelze se připojit ke Gmailu: ${errText}`);
+        }
+
+        const data = await resp.json();
+        if (!data.access_token) {
+          throw new Error("Gmail token chyba");
+        }
+        token = data.access_token;
       }
 
-      const data = await response.json();
-      const members = (data.members || []).map((m: any) => ({
-        email: m.email,
-        name: m.givenName && m.familyName 
-          ? `${m.givenName} ${m.familyName}` 
-          : m.name || m.email,
-      }));
+      // Try Directory API to list group members
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(args.groupEmail)}/members`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-      return members;
+        if (response.ok) {
+          const data = await response.json();
+          const members = (data.members || []).map((m: any) => ({
+            email: m.email?.toLowerCase() || "",
+            name: m.givenName && m.familyName 
+              ? `${m.givenName} ${m.familyName}` 
+              : m.name || m.email,
+          })).filter((m: any) => m.email);
+          return members;
+        }
+
+        // If we get here, Directory API failed
+        const errorText = await response.text();
+        
+        if (response.status === 403) {
+          throw new Error(
+            `❌ Nemáte práva na přístup k této skupině.\n\n✅ Nejjednoduší řešení - stáhněte členy jako CSV:\n\n1. Otevřete https://groups.google.com\n2. Vyberte svou skupinu\n3. Klikněte na "Members" (Členové)\n4. Klikněte na ikonu stažení (↓) v pravém horním rohu\n5. Zvolte "CSV" formát\n6. Importujte soubor zde`
+          );
+        } else if (response.status === 404) {
+          throw new Error(
+            `❌ Skupinu "${args.groupEmail}" se nepodařilo najít.\n\n👉 Zkontrolujte, že jste zadali správnou e-mailovou adresu skupiny.\n\n💡 Tipy:\n- Adresy Google Groups končí na @googlegroups.com\n- Skupiny mohou být soukromé - ověřte přístup`
+          );
+        } else {
+          throw new Error(
+            `❌ Chyba při načítání skupiny (${response.status}).\n\n✅ Zkuste stáhnout členy jako CSV:\n1. Navštivte https://groups.google.com\n2. Vyberte svou skupinu\n3. Members → Stáhnout jako CSV`
+          );
+        }
+      } catch (dirError: any) {
+        throw dirError;
+      }
     } catch (error: any) {
+      console.error("Google Groups fetch error:", error);
       throw new Error(`Failed to fetch Google Groups members: ${error?.message || "Unknown error"}`);
     }
   },
