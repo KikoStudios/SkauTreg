@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, isValidElement, cloneElement } from "react";
+import { ReactNode, ReactElement, useState, isValidElement, cloneElement } from "react";
 import styles from "./ExperimentalGate.module.css";
 
 interface ExperimentalGateProps {
@@ -20,6 +20,8 @@ const DEFAULT_TITLE = "Experimental feature";
 const DEFAULT_MESSAGE = "This section is under development. Things may change or not work as expected.";
 const DEFAULT_ACK_LABEL = "Continue anyway";
 const DEFAULT_BADGE = "EXPERIMENTAL";
+
+type TriggerElement = ReactElement<{ onClick?: (event: React.MouseEvent) => void }>;
 
 export default function ExperimentalGate({
     children,
@@ -77,10 +79,11 @@ export default function ExperimentalGate({
         }
 
         const triggerNode = isValidElement(trigger)
-            ? cloneElement(trigger, {
+            ? cloneElement(trigger as TriggerElement, {
                 onClick: (event: React.MouseEvent) => {
-                    if (typeof trigger.props.onClick === "function") {
-                        trigger.props.onClick(event);
+                    const triggerElement = trigger as TriggerElement;
+                    if (typeof triggerElement.props.onClick === "function") {
+                        triggerElement.props.onClick(event);
                     }
                     setIsOpen(true);
                 },
