@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Button from "./Button";
 import ExperimentalGate from "./ExperimentalGate";
 import { useFeedback } from "../context/FeedbackContext";
+import { GmailIcon, SeznamIcon, CentrumIcon, GoogleGroupsIcon } from "./EmailProviderIcons";
 
 interface EmailSettingsProps {
     troopId: Id<"troops">;
@@ -19,7 +20,7 @@ type EmailProvider = "gmail" | "outlook" | "seznam" | "centrum" | "google-groups
 const PROVIDER_CONFIGS = {
     gmail: {
         name: "Gmail",
-        icon: "📧",
+        icon: GmailIcon,
         description: "Použít Gmail přes OAuth 2.0 (bez hesla)",
         color: "#4285f4",
         authType: "oauth",
@@ -33,7 +34,7 @@ const PROVIDER_CONFIGS = {
     },
     seznam: {
         name: "Seznam.cz",
-        icon: "📬",
+        icon: SeznamIcon,
         description: "IMAP/SMTP: imap.seznam.cz",
         color: "#e74c3c",
         authType: "smtp",
@@ -44,7 +45,7 @@ const PROVIDER_CONFIGS = {
     },
     centrum: {
         name: "Centrum.cz",
-        icon: "📮",
+        icon: CentrumIcon,
         description: "IMAP/SMTP: imap.centrum.cz",
         color: "#f39c12",
         authType: "smtp",
@@ -55,7 +56,7 @@ const PROVIDER_CONFIGS = {
     },
     "google-groups": {
         name: "Google Groups",
-        icon: "👥",
+        icon: GoogleGroupsIcon,
         description: "Import členů z Google Groups",
         color: "#16a34a",
         authType: "oauth",
@@ -69,11 +70,13 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
     const connectEmailProvider = useMutation(api.troops.connectEmailProvider);
     const disconnectEmailProvider = useMutation(api.troops.disconnectEmailProvider);
     const fetchGoogleGroupsMembers = useAction(api.mailer.fetchGoogleGroupsMembers);
+    const testEmailConnection = useAction(api.mailer.testEmailConnection);
     const router = useRouter();
 
     const [showProviderSelector, setShowProviderSelector] = useState(false);
     const [selectedProvider, setSelectedProvider] = useState<EmailProvider | null>(null);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
 
     // SMTP form state
     const [smtpEmail, setSmtpEmail] = useState("");
@@ -152,14 +155,76 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                 smtpPort: config.smtpPort,
                 smtpPassword: smtpPassword,
             });
+            showSuccess({
+                title: "✅ Úspěch",
+                message: `${config.name} byl úspěšně připojen.`,
+            });
             // Close modal silently after connection
             setSelectedProvider(null);
             setSmtpEmail("");
             setSmtpPassword("");
         } catch (error: any) {
-            console.error(error);
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se připojit e-mailový účet.",
+                details: error?.message,
+                canReport: true,
+            });
         } finally {
             setIsConnecting(false);
+        }
+    };
+
+    const handleTestConnection = async () => {
+        if (!selectedProvider || !smtpEmail || !smtpPassword) {
+            return;
+        }
+
+        setIsTesting(true);
+        try {
+            const results = await testEmailConnection({
+                provider: selectedProvider,
+                email: smtpEmail,
+                password: smtpPassword,
+            });
+
+            let message = '';
+            let allGood = true;
+
+            if (results.smtp.success) {
+                message += '✅ SMTP: Připojeno\n';
+            } else {
+                message += '❌ SMTP: Chyba\n';
+                allGood = false;
+            }
+
+            if (results.imap.success) {
+                message += '✅ IMAP: Připojeno\n';
+            } else {
+                message += '❌ IMAP: Chyba\n';
+                allGood = false;
+            }
+
+            if (allGood) {
+                showSuccess({
+                    title: "✅ Test úspěšný",
+                    message: "E-mailové připojení funguje správně!\n\n" + message,
+                });
+            } else {
+                showError({
+                    title: "⚠️ Test selhal",
+                    message: message + "\n\nZkontrolujte své přihlašovací údaje.",
+                    details: results.smtp.error || results.imap.error,
+                });
+            }
+        } catch (error: any) {
+            showError({
+                title: "❌ Chyba při testování",
+                message: "Nepodařilo se otestovat připojení.",
+                details: error?.message,
+            });
+        } finally {
+            setIsTesting(false);
         }
     };
 
@@ -409,43 +474,48 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
 
                         <div style={{ display: "grid", gap: "1rem" }}>
                             {Object.entries(PROVIDER_CONFIGS)
-                                .filter(([key]) => key === "gmail")
-                                .map(([key, config]) => (
-                                <button
-                                    key={key}
-                                    onClick={() => handleProviderSelect(key as EmailProvider)}
-                                    style={{
-                                        padding: "1.25rem",
-                                        border: "3px solid #000",
-                                        borderRadius: "12px",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                        textAlign: "left",
-                                        boxShadow: "3px 3px 0 0 #000",
-                                        transition: "transform 0.1s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.transform = "translate(-2px, -2px)";
-                                        e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.transform = "translate(0, 0)";
-                                        e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
-                                    }}
-                                >
-                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                        <div style={{ fontSize: "2.5rem" }}>{config.icon}</div>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
-                                                {config.name}
+                                .filter(([key]) => !["google-groups", "outlook"].includes(key))
+                                .map(([key, config]) => {
+                                    const IconComponent = typeof config.icon === 'function' ? config.icon : null;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => handleProviderSelect(key as EmailProvider)}
+                                            style={{
+                                                padding: "1.25rem",
+                                                border: "3px solid #000",
+                                                borderRadius: "12px",
+                                                backgroundColor: "white",
+                                                cursor: "pointer",
+                                                textAlign: "left",
+                                                boxShadow: "3px 3px 0 0 #000",
+                                                transition: "transform 0.1s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = "translate(-2px, -2px)";
+                                                e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = "translate(0, 0)";
+                                                e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                <div style={{ fontSize: "2.5rem", width: "2.5rem", height: "2.5rem" }}>
+                                                    {IconComponent ? <IconComponent /> : config.icon}
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
+                                                        {config.name}
+                                                    </div>
+                                                    <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
+                                                        {config.description}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                                {config.description}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
+                                        </button>
+                                    );
+                                })}
                             <ExperimentalGate
                                 title="Experimental"
                                 message="Tyto poskytovatele jsou ve vyvoji. Muzou se menit nebo nefungovat spravne."
@@ -466,53 +536,58 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                         }}
                                     >
                                         <div style={{ fontWeight: "900", fontSize: "1rem", marginBottom: "0.25rem" }}>
-                                            Ostatni poskytovatele (EXPERIMENTAL)
+                                            Outlook & Google Groups (EXPERIMENTAL)
                                         </div>
                                         <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                            Outlook, Seznam, Centrum, Google Groups
+                                            Outlook, Google Groups
                                         </div>
                                     </button>
                                 }
                             >
                                 <div style={{ display: "grid", gap: "1rem" }}>
                                     {Object.entries(PROVIDER_CONFIGS)
-                                        .filter(([key]) => key !== "gmail")
-                                        .map(([key, config]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => handleProviderSelect(key as EmailProvider)}
-                                                style={{
-                                                    padding: "1.25rem",
-                                                    border: "3px solid #000",
-                                                    borderRadius: "12px",
-                                                    backgroundColor: "white",
-                                                    cursor: "pointer",
-                                                    textAlign: "left",
-                                                    boxShadow: "3px 3px 0 0 #000",
-                                                    transition: "transform 0.1s",
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = "translate(-2px, -2px)";
-                                                    e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = "translate(0, 0)";
-                                                    e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
-                                                }}
-                                            >
-                                                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                                    <div style={{ fontSize: "2.5rem" }}>{config.icon}</div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
-                                                            {config.name}
+                                        .filter(([key]) => key === "google-groups" || key === "outlook")
+                                        .map(([key, config]) => {
+                                            const IconComponent = typeof config.icon === 'function' ? config.icon : null;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    onClick={() => handleProviderSelect(key as EmailProvider)}
+                                                    style={{
+                                                        padding: "1.25rem",
+                                                        border: "3px solid #000",
+                                                        borderRadius: "12px",
+                                                        backgroundColor: "white",
+                                                        cursor: "pointer",
+                                                        textAlign: "left",
+                                                        boxShadow: "3px 3px 0 0 #000",
+                                                        transition: "transform 0.1s",
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.transform = "translate(-2px, -2px)";
+                                                        e.currentTarget.style.boxShadow = "5px 5px 0 0 #000";
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.transform = "translate(0, 0)";
+                                                        e.currentTarget.style.boxShadow = "3px 3px 0 0 #000";
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                        <div style={{ fontSize: "2.5rem", width: "2.5rem", height: "2.5rem" }}>
+                                                            {IconComponent ? <IconComponent /> : config.icon}
                                                         </div>
-                                                        <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
-                                                            {config.description}
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: "900", fontSize: "1.1rem", marginBottom: "0.25rem" }}>
+                                                                {config.name}
+                                                            </div>
+                                                            <div style={{ fontSize: "0.9rem", fontWeight: "600", color: "#6b7280" }}>
+                                                                {config.description}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </button>
-                                        ))}
+                                                </button>
+                                            );
+                                        })}
                                 </div>
                             </ExperimentalGate>
                         </div>
@@ -634,6 +709,22 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                 <div>SMTP: {PROVIDER_CONFIGS[selectedProvider].smtpHost}:{PROVIDER_CONFIGS[selectedProvider].smtpPort}</div>
                                 <div>IMAP: {PROVIDER_CONFIGS[selectedProvider].imapHost}:{PROVIDER_CONFIGS[selectedProvider].imapPort}</div>
                             </div>
+
+                            <button
+                                onClick={handleTestConnection}
+                                disabled={isTesting || !smtpEmail || !smtpPassword}
+                                style={{
+                                    padding: "0.85rem",
+                                    backgroundColor: isTesting || !smtpEmail || !smtpPassword ? "#e5e7eb" : "#fef08a",
+                                    border: "3px solid #000",
+                                    borderRadius: "10px",
+                                    fontWeight: "900",
+                                    cursor: isTesting || !smtpEmail || !smtpPassword ? "not-allowed" : "pointer",
+                                    boxShadow: "3px 3px 0 0 #000"
+                                }}
+                            >
+                                {isTesting ? "Testuji..." : "🔍 Otestovat připojení"}
+                            </button>
 
                             <button
                                 onClick={handleSmtpConnect}

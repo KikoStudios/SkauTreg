@@ -211,6 +211,94 @@ export const sendTripEmail = action({
   },
 });
 
+// Save email to IMAP Sent folder (so it appears in email client)
+async function saveToImapSent(params: {
+  imapHost: string;
+  imapPort: number;
+  email: string;
+  password: string;
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}) {
+  try {
+    const { ImapFlow } = require("imapflow");
+    
+    const client = new ImapFlow({
+      host: params.imapHost,
+      port: params.imapPort,
+      secure: true,
+      auth: {
+        user: params.email,
+        pass: params.password,
+      },
+      logger: false,
+    });
+
+    await client.connect();
+
+    try {
+      // Find Sent folder (different names for different providers)
+      const sentFolderNames = ['Sent', 'Odeslaná pošta', 'Odoslané', 'INBOX.Sent'];
+      let sentFolder = 'Sent';
+
+      const mailboxes = await client.list();
+      for (const folderName of sentFolderNames) {
+        const found = mailboxes.find((mb: any) => 
+          mb.path === folderName || 
+          mb.name === folderName ||
+          mb.path.toLowerCase().includes('sent') ||
+          mb.path.toLowerCase().includes('odeslan')
+        );
+        if (found) {
+          sentFolder = found.path;
+          break;
+        }
+      }
+
+      // Build RFC822 message
+      const boundary = '----=_Part_' + Date.now();
+      const date = new Date().toUTCString();
+      
+      let message = '';
+      message += `From: ${params.from}\r\n`;
+      message += `To: ${params.to}\r\n`;
+      message += `Subject: ${params.subject}\r\n`;
+      message += `Date: ${date}\r\n`;
+      message += `MIME-Version: 1.0\r\n`;
+      message += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n`;
+      message += `X-Mailer: SkautREG\r\n`;
+      message += `\r\n`;
+      
+      // Text part
+      message += `--${boundary}\r\n`;
+      message += `Content-Type: text/plain; charset=UTF-8\r\n`;
+      message += `\r\n`;
+      message += `${params.text || 'Tento e-mail obsahuje HTML obsah.'}\r\n`;
+      message += `\r\n`;
+      
+      // HTML part
+      message += `--${boundary}\r\n`;
+      message += `Content-Type: text/html; charset=UTF-8\r\n`;
+      message += `\r\n`;
+      message += `${params.html}\r\n`;
+      message += `\r\n`;
+      
+      message += `--${boundary}--\r\n`;
+
+      // Append to sent folder with \Seen flag
+      await client.append(sentFolder, message, ['\\Seen'], new Date());
+    } finally {
+      await client.logout();
+    }
+  } catch (error: any) {
+    // Don't fail the whole operation if IMAP save fails
+    console.warn(`Failed to save to Sent folder: ${error?.message}`);
+  }
+}
+
 // Send via SMTP (Seznam, Centrum, etc.)
 async function sendSmtpMessage(params: {
   smtpHost: string;
@@ -222,6 +310,9 @@ async function sendSmtpMessage(params: {
   subject: string;
   html: string;
   replyTo?: string;
+  // Optional IMAP params to save to Sent folder
+  imapHost?: string;
+  imapPort?: number;
 }) {
   try {
     // Using require for Node.js environment
@@ -237,7 +328,7 @@ async function sendSmtpMessage(params: {
       },
     });
 
-    await transporter.sendMail({
+    const mailOptions = {
       from: params.from,
       to: params.to,
       subject: encodeSubject(params.subject),
@@ -246,7 +337,27 @@ async function sendSmtpMessage(params: {
       headers: {
         "X-Mailer": "SkautREG",
       },
-    });
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // Automatically save to IMAP Sent folder (runs in background, doesn't block)
+    if (params.imapHost && params.imapPort) {
+      // Fire and forget - don't wait for IMAP save to complete
+      saveToImapSent({
+        imapHost: params.imapHost,
+        imapPort: params.imapPort,
+        email: params.smtpUser,
+        password: params.smtpPassword,
+        from: params.from,
+        to: params.to,
+        subject: params.subject,
+        html: params.html,
+      }).catch((error) => {
+        // Log but don't fail - email was already sent successfully
+        console.warn(`IMAP Sent folder save failed (email was sent): ${error?.message}`);
+      });
+    }
   } catch (error: any) {
     throw new Error(`SMTP Error: ${error?.message || "Failed to send email"}`);
   }
@@ -324,6 +435,9 @@ export const sendFromDraft = action({
           smtpPort: emailProvider.smtpPort,
           smtpUser: emailProvider.email,
           smtpPassword: emailProvider.smtpPassword,
+          // Add IMAP params for saving to Sent folder
+          imapHost: emailProvider.provider === "seznam" ? "imap.seznam.cz" : "imap.centrum.cz",
+          imapPort: 993,
         };
       } else if (emailProvider?.provider === "google-groups") {
         // Google Groups - use first member's email or fallback to Gmail
@@ -465,5 +579,129 @@ export const fetchGoogleGroupsMembers = action({
     } catch (error: any) {
       throw new Error(`Failed to fetch Google Groups members: ${error?.message || "Unknown error"}`);
     }
+  },
+});
+
+// Test email connection (SMTP/IMAP) from UI
+export const testEmailConnection = action({
+  args: {
+    provider: v.string(), // "seznam" | "centrum"
+    email: v.string(),
+    password: v.string(),
+    testRecipient: v.optional(v.string()), // Optional: send test email to this address
+  },
+  handler: async (ctx, args): Promise<{ 
+    smtp: { success: boolean; error?: string };
+    imap: { success: boolean; error?: string };
+    testEmail?: { success: boolean; error?: string };
+  }> => {
+    const results: any = {
+      smtp: { success: false },
+      imap: { success: false },
+    };
+
+    // Provider configs
+    const providers: any = {
+      seznam: {
+        smtp: { host: 'smtp.seznam.cz', port: 465 },
+        imap: { host: 'imap.seznam.cz', port: 993 },
+      },
+      centrum: {
+        smtp: { host: 'smtp.centrum.cz', port: 465 },
+        imap: { host: 'imap.centrum.cz', port: 993 },
+      },
+    };
+
+    const config = providers[args.provider];
+    if (!config) {
+      throw new Error(`Unsupported provider: ${args.provider}`);
+    }
+
+    // Test SMTP
+    try {
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: config.smtp.host,
+        port: config.smtp.port,
+        secure: true,
+        auth: {
+          user: args.email,
+          pass: args.password,
+        },
+      });
+      await transporter.verify();
+      results.smtp = { success: true };
+    } catch (error: any) {
+      results.smtp = { success: false, error: error?.message || "SMTP connection failed" };
+    }
+
+    // Test IMAP
+    try {
+      const { ImapFlow } = require("imapflow");
+      const client = new ImapFlow({
+        host: config.imap.host,
+        port: config.imap.port,
+        secure: true,
+        auth: {
+          user: args.email,
+          pass: args.password,
+        },
+        logger: false,
+      });
+      await client.connect();
+      await client.logout();
+      results.imap = { success: true };
+    } catch (error: any) {
+      results.imap = { success: false, error: error?.message || "IMAP connection failed" };
+    }
+
+    // Send test email if recipient provided and SMTP works
+    if (args.testRecipient && results.smtp.success) {
+      try {
+        const nodemailer = require("nodemailer");
+        const transporter = nodemailer.createTransport({
+          host: config.smtp.host,
+          port: config.smtp.port,
+          secure: true,
+          auth: {
+            user: args.email,
+            pass: args.password,
+          },
+        });
+
+        const mailContent = {
+          from: args.email,
+          to: args.testRecipient,
+          subject: `Test Email from SkauTreg - ${args.provider}`,
+          html: `<p>This is a test email sent from <strong>SkauTreg</strong> using <strong>${args.provider}</strong> SMTP.</p>
+                 <p>Your email connection is working correctly! ✅</p>
+                 <p style="color: #6b7280; font-size: 0.875rem;">This email has been automatically saved to your Sent folder.</p>`,
+        };
+
+        await transporter.sendMail(mailContent);
+
+        // Automatically save to Sent folder (fire and forget)
+        if (results.imap.success) {
+          saveToImapSent({
+            imapHost: config.imap.host,
+            imapPort: config.imap.port,
+            email: args.email,
+            password: args.password,
+            from: args.email,
+            to: args.testRecipient,
+            subject: mailContent.subject,
+            html: mailContent.html,
+          }).catch(() => {
+            // Silently ignore - email was already sent
+          });
+        }
+
+        results.testEmail = { success: true };
+      } catch (error: any) {
+        results.testEmail = { success: false, error: error?.message || "Failed to send test email" };
+      }
+    }
+
+    return results;
   },
 });

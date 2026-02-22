@@ -1,0 +1,35 @@
+{
+  "verification-checklist": {
+    "seznam": {
+      "status": "NOT_CONFIGURED",
+      "account_exists": false,
+      "smtp_tested": false,
+      "imap_tested": false,
+      "test_email": null,
+      "test_password": null,
+      "notes": "Need to create test account and generate app password"
+    },
+    "centrum": {
+      "status": "NOT_CONFIGURED",
+      "account_exists": false,
+      "smtp_tested": false,
+      "imap_tested": false,
+      "test_email": null,
+      "test_password": null,
+      "notes": "Need to create test account and generate app password"
+    },
+    "next_steps": [
+      "1. Create test accounts at email.seznam.cz and email.centrum.cz",
+      "2. Generate app passwords for both accounts",
+      "3. Install required packages: npm install nodemailer imapflow",
+      "4. Run verification script with test credentials",
+      "5. Update this checklist with results",
+      "6. Test email sending from SkauTreg UI"
+    ],
+    "required_packages": {
+      "nodemailer": "^6.9.0",
+      "imapflow": "^1.0.0"
+    },
+    "package_status": "NOT_INSTALLED"
+  }
+}
