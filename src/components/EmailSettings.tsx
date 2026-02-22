@@ -21,14 +21,14 @@ const PROVIDER_CONFIGS = {
     gmail: {
         name: "Gmail",
         icon: GmailIcon,
-        description: "PouÃ…Â¾ÃƒÂ­t Gmail pÃ…â„¢es OAuth 2.0 (bez hesla)",
+        description: "Používat Gmail přes OAuth 2.0 (bez hesla)",
         color: "#4285f4",
         authType: "oauth",
     },
     outlook: {
         name: "Outlook / Microsoft 365",
-        icon: "Ã°Å¸â€œÂ¨",
-        description: "PouÃ…Â¾ÃƒÂ­t Outlook pÃ…â„¢es OAuth 2.0 (bez hesla)",
+        icon: "📧",
+        description: "Používat Outlook přes OAuth 2.0 (bez hesla)",
         color: "#0078d4",
         authType: "oauth",
     },
@@ -57,7 +57,7 @@ const PROVIDER_CONFIGS = {
     "google-groups": {
         name: "Google Groups",
         icon: GoogleGroupsIcon,
-        description: "Import Ã„ÂlenÃ…Â¯ z Google Groups",
+        description: "Import členů z Google Groups",
         color: "#16a34a",
         authType: "oauth",
     },
@@ -103,8 +103,8 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     });
                 } catch (error: any) {
                     showError({
-                        title: "Chyba pÃ…â„¢i pÃ…â„¢ipojenÃƒÂ­",
-                        message: error?.message || "NepodaÃ…â„¢ilo se pÃ…â„¢ipojit Gmail.",
+                        title: "Chyba při připojení",
+                        message: error?.message || "Nepodařilo se připojit Gmail.",
                     });
                 }
             };
@@ -116,7 +116,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
     }, [searchParams, troopId, connectEmailProvider, router, showError]);
 
     if (!troop) {
-        return <div>NaÃ„ÂÃƒÂ­tÃƒÂ¡nÃƒÂ­...</div>;
+        return <div>Načítání...</div>
     }
 
     const emailProvider = (troop as any).emailProvider;
@@ -221,35 +221,35 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
             let allGood = true;
 
             if (results.smtp.success) {
-                message += 'Ã¢Å“â€¦ SMTP: PÃ…â„¢ipojeno\n';
+                message += '✓ SMTP: Připojeno\n';
             } else {
-                message += 'Ã¢ÂÅ’ SMTP: Chyba\n';
+                message += '✗ SMTP: Chyba\n';
                 allGood = false;
             }
 
             if (results.imap.success) {
-                message += 'Ã¢Å“â€¦ IMAP: PÃ…â„¢ipojeno\n';
+                message += '✓ IMAP: Připojeno\n';
             } else {
-                message += 'Ã¢ÂÅ’ IMAP: Chyba\n';
+                message += '✗ IMAP: Chyba\n';
                 allGood = false;
             }
 
             if (allGood) {
                 showSuccess({
-                    title: "Ã¢Å“â€¦ Test ÃƒÂºspÃ„â€ºÃ…Â¡nÃƒÂ½",
-                    message: "E-mailovÃƒÂ© pÃ…â„¢ipojenÃƒÂ­ funguje sprÃƒÂ¡vnÃ„â€º!\n\n" + message,
+                    title: "✓ Test úspěšný",
+                    message: "E-mailové připojení funguje správně!\n\n" + message,
                 });
             } else {
                 showError({
-                    title: "Ã¢Å¡Â Ã¯Â¸Â Test selhal",
-                    message: message + "\n\nZkontrolujte svÃƒÂ© pÃ…â„¢ihlaÃ…Â¡ovacÃƒÂ­ ÃƒÂºdaje.",
+                    title: "⚠️ Test selhal",
+                    message: message + "\n\nZkontrolujte své přihlašovací údaje.",
                     details: results.smtp.error || results.imap.error,
                 });
             }
         } catch (error: any) {
             showError({
-                title: "Ã¢ÂÅ’ Chyba pÃ…â„¢i testovÃƒÂ¡nÃƒÂ­",
-                message: "NepodaÃ…â„¢ilo se otestovat pÃ…â„¢ipojenÃƒÂ­.",
+                title: "✗ Chyba při testování",
+                message: "Nepodařilo se otestovat připojení.",
                 details: error?.message,
             });
         } finally {
@@ -282,7 +282,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     variant: "danger",
                 },
                 {
-                    label: "ZruÃ…Â¡it",
+                    label: "Zrušit",
                     onClick: () => {},
                     variant: "secondary",
                 },
@@ -301,7 +301,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                 boxShadow: "6px 6px 0 0 #000"
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                    <div style={{ fontSize: "1.25rem", fontWeight: "900" }}>E-mailovÃƒÂ© pÃ…â„¢ipojenÃƒÂ­</div>
+                    <div style={{ fontSize: "1.25rem", fontWeight: "900" }}>E-mailové připojení</div>
                     <span style={{
                         padding: "0.25rem 0.6rem",
                         borderRadius: "999px",
@@ -310,11 +310,11 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                         fontWeight: "900",
                         fontSize: "0.8rem"
                     }}>
-                        {isConnected ? "PÃ…â„¢ipojeno" : "NepÃ…â„¢ipojeno"}
+                        {isConnected ? "Připojeno" : "Nepřipojeno"}
                     </span>
                 </div>
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
-                    Propojte e-mailovÃƒÂ©ho poskytovatele pro odesÃƒÂ­lÃƒÂ¡nÃƒÂ­ zprÃƒÂ¡v Ã„ÂlenÃ…Â¯m. Podporujeme Gmail, Outlook, Seznam, Centrum a Google Groups.
+                    Propojte e-mailového poskytovatele pro odesílání zpráv členům. Podporujeme Gmail, Outlook, Seznam, Centrum a Google Groups.
                 </p>
             </div>
 
@@ -333,7 +333,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     flexWrap: "wrap"
                 }}>
                     <div>
-                        <div style={{ fontWeight: "900", color: "#065f46", marginBottom: "0.25rem" }}>Ã¢Å“â€œ PÃ…â„¢ipojeno</div>
+                        <div style={{ fontWeight: "900", color: "#065f46", marginBottom: "0.25rem" }}>✓ Připojeno</div>
                         <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "#065f46" }}>
                             Poskytovatel: <strong>{currentProvider ? PROVIDER_CONFIGS[currentProvider as EmailProvider]?.name : "Gmail (legacy)"}</strong>
                         </div>
@@ -341,7 +341,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             E-mail: <strong>{emailProvider?.email || gmailOAuth?.email}</strong>
                         </div>
                         <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#047857" }}>
-                            PÃ…â„¢ipojeno: {new Date(emailProvider?.connectedAt || gmailOAuth?.connectedAt).toLocaleString("cs-CZ")}
+                            Připojeno: {new Date(emailProvider?.connectedAt || gmailOAuth?.connectedAt).toLocaleString("cs-CZ")}
                         </div>
                     </div>
                     {isAuthorized && (
@@ -376,7 +376,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                             width: "100%"
                         }}
                     >
-                        PÃ…â„¢ipojit E-mail
+                        Připojit E-mail
                     </button>
                 </div>
             )}
@@ -419,7 +419,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     boxShadow: "3px 3px 0 0 #000"
                                 }}
                             >
-                                Ã¢Å“â€¢
+                                ✕
                             </button>
                         </div>
 
@@ -574,7 +574,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                     }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1.5rem" }}>
                             <div style={{ fontWeight: "900", fontSize: "1.2rem" }}>
-                                PÃ…â„¢ipojit {PROVIDER_CONFIGS[selectedProvider].name}
+                                Připojit {PROVIDER_CONFIGS[selectedProvider].name}
                             </div>
                             <button
                                 onClick={() => setSelectedProvider(null)}
@@ -595,7 +595,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                         <div style={{ display: "grid", gap: "1rem" }}>
                             <div>
                                 <label style={{ display: "block", fontWeight: "800", marginBottom: "0.5rem" }}>
-                                    E-mailovÃƒÂ¡ adresa
+                                    E-mailová adresa
                                 </label>
                                 <input
                                     type="text"
@@ -656,7 +656,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                 fontSize: "0.85rem",
                                 fontWeight: "600"
                             }}>
-                                <div style={{ fontWeight: "900", marginBottom: "0.5rem" }}>Ã¢â€žÂ¹Ã¯Â¸Â NastavenÃƒÂ­:</div>
+                                <div style={{ fontWeight: "900", marginBottom: "0.5rem" }}>ℹ️ Nastavení:</div>
                                 <div>SMTP: {PROVIDER_CONFIGS[selectedProvider].smtpHost}:{PROVIDER_CONFIGS[selectedProvider].smtpPort}</div>
                                 <div>IMAP: {PROVIDER_CONFIGS[selectedProvider].imapHost}:{PROVIDER_CONFIGS[selectedProvider].imapPort}</div>
                             </div>
@@ -674,7 +674,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     boxShadow: "3px 3px 0 0 #000"
                                 }}
                             >
-                                {isTesting ? "Testuji..." : "Otestovat pÃ…â„¢ipojenÃƒÂ­"}
+                                {isTesting ? "Testuji..." : "Otestovat připojení"}
                             </button>
 
                             <button
@@ -690,7 +690,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
                                     boxShadow: "3px 3px 0 0 #000"
                                 }}
                             >
-                                {isConnecting ? "PÃ…â„¢ipojuji..." : "PÃ…â„¢ipojit"}
+                                {isConnecting ? "Připojuji..." : "Připojit"}
                             </button>
                         </div>
                     </div>
