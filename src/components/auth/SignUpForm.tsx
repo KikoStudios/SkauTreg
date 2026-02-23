@@ -17,6 +17,7 @@ export default function SignUpForm() {
     const [password, setPassword] = useState("");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
     const [verifying, setVerifying] = useState(false);
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
@@ -51,6 +52,9 @@ export default function SignUpForm() {
                 password,
                 firstName,
                 lastName,
+                unsafeMetadata: {
+                    dateOfBirth: dateOfBirth,
+                },
             });
 
             // Prepare for email verification
@@ -193,6 +197,22 @@ export default function SignUpForm() {
                             required
                         />
                     </div>
+                </div>
+
+                <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                        Date of Birth
+                    </label>
+                    <input
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        className={styles.input}
+                        max={new Date().toISOString().split('T')[0]}
+                    />
+                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                        Optional - helps personalize your experience
+                    </span>
                 </div>
 
                 <div className={styles.formGroup}>
