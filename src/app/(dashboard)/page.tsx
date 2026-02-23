@@ -88,26 +88,26 @@ export default function Home() {
       </div>
 
       {/* Thick separator line */}
-      <div style={{ height: "2px", backgroundColor: "var(--border-color)", margin: "0 -2rem 2rem -2rem" }} />
+      <div style={{ height: "4px", backgroundColor: "#000", margin: "0 -2rem 2rem -2rem" }} />
 
       {/* Stats Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
         <div style={{
           backgroundColor: "white",
-          border: "2px solid var(--border-color)",
-          borderRadius: "8px",
+          border: "4px solid #000",
+          borderRadius: "12px",
           padding: "1.5rem",
-          boxShadow: "2px 2px 0 0 #000",
+          boxShadow: "6px 6px 0 0 #000",
           transition: "all 0.15s",
           cursor: "default"
         }}
         onMouseDown={(e) => {
-          e.currentTarget.style.transform = "translate(1px, 1px)";
-          e.currentTarget.style.boxShadow = "1px 1px 0 0 #000";
+          e.currentTarget.style.transform = "translate(3px, 3px)";
+          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
         }}
         onMouseUp={(e) => {
           e.currentTarget.style.transform = "translate(0, 0)";
-          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+          e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
         }}
         >
           <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>🏘️</div>
@@ -116,20 +116,20 @@ export default function Home() {
         </div>
         <div style={{
           backgroundColor: "white",
-          border: "2px solid var(--border-color)",
-          borderRadius: "8px",
+          border: "4px solid #000",
+          borderRadius: "12px",
           padding: "1.5rem",
-          boxShadow: "2px 2px 0 0 #000",
+          boxShadow: "6px 6px 0 0 #000",
           transition: "all 0.15s",
           cursor: "default"
         }}
         onMouseDown={(e) => {
-          e.currentTarget.style.transform = "translate(1px, 1px)";
-          e.currentTarget.style.boxShadow = "1px 1px 0 0 #000";
+          e.currentTarget.style.transform = "translate(3px, 3px)";
+          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
         }}
         onMouseUp={(e) => {
           e.currentTarget.style.transform = "translate(0, 0)";
-          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+          e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
         }}
         >
           <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>🎒</div>
@@ -138,20 +138,20 @@ export default function Home() {
         </div>
         <div style={{
           backgroundColor: "white",
-          border: "2px solid var(--border-color)",
-          borderRadius: "8px",
+          border: "4px solid #000",
+          borderRadius: "12px",
           padding: "1.5rem",
-          boxShadow: "2px 2px 0 0 #000",
+          boxShadow: "6px 6px 0 0 #000",
           transition: "all 0.15s",
           cursor: "default"
         }}
         onMouseDown={(e) => {
-          e.currentTarget.style.transform = "translate(1px, 1px)";
-          e.currentTarget.style.boxShadow = "1px 1px 0 0 #000";
+          e.currentTarget.style.transform = "translate(3px, 3px)";
+          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
         }}
         onMouseUp={(e) => {
           e.currentTarget.style.transform = "translate(0, 0)";
-          e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+          e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
         }}
         >
           <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>👥</div>
@@ -164,10 +164,10 @@ export default function Home() {
       <div style={{ marginBottom: "2rem" }}>
         <h2 style={{ fontSize: "1.125rem", fontWeight: "900", marginBottom: "1rem" }}>Nejbližší výpravy</h2>
         {trips && trips.length > 0 ? (
-          <div style={{ backgroundColor: "white", border: "2px solid var(--border-color)", borderRadius: "8px", boxShadow: "2px 2px 0 0 #000", overflow: "hidden" }}>
+          <div style={{ backgroundColor: "white", border: "4px solid #000", borderRadius: "12px", boxShadow: "6px 6px 0 0 #000", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid var(--border-color)", backgroundColor: "#86efac" }}>
+                <tr style={{ borderBottom: "4px solid #000", backgroundColor: "#86efac" }}>
                   <th style={{ padding: "1rem", textAlign: "left", fontWeight: "700" }}>Název</th>
                   <th style={{ padding: "1rem", textAlign: "left", fontWeight: "700" }}>Místo</th>
                   <th style={{ padding: "1rem", textAlign: "left", fontWeight: "700" }}>Datum</th>
@@ -176,7 +176,7 @@ export default function Home() {
               </thead>
               <tbody>
                 {trips.slice(0, 5).map((trip, idx) => (
-                  <tr key={trip._id} style={{ borderBottom: idx === Math.min(4, trips.length - 1) ? "none" : "2px solid var(--border-color)" }}>
+                  <tr key={trip._id} style={{ borderBottom: idx === Math.min(4, trips.length - 1) ? "none" : "4px solid #000" }}>
                     <td style={{ padding: "1rem", fontWeight: "700" }}>
                       <Link href={`/trips/${trip._id}`} style={{ textDecoration: "underline", color: "inherit" }}>
                         {trip.name}
@@ -187,7 +187,7 @@ export default function Home() {
                       {formatDate(trip.startDate)}
                     </td>
                     <td style={{ padding: "1rem" }}>
-                      <span style={{ display: "inline-block", backgroundColor: "#86efac", border: "2px solid #000", borderRadius: "6px", padding: "0.25rem 0.75rem", fontWeight: "700", fontSize: "0.85rem", boxShadow: "2px 2px 0 0 #000" }}>
+                      <span style={{ display: "inline-block", backgroundColor: "#86efac", border: "3px solid #000", borderRadius: "8px", padding: "0.25rem 0.75rem", fontWeight: "800", fontSize: "0.85rem", boxShadow: "4px 4px 0 0 #000" }}>
                         Plánuje se
                       </span>
                     </td>
@@ -197,7 +197,7 @@ export default function Home() {
             </table>
           </div>
         ) : (
-          <div style={{ backgroundColor: "white", border: "2px solid var(--border-color)", borderRadius: "8px", padding: "2rem", textAlign: "center", color: "var(--text-muted)" }}>
+          <div style={{ backgroundColor: "white", border: "4px solid #000", borderRadius: "12px", padding: "2rem", textAlign: "center", color: "var(--text-muted)", boxShadow: "6px 6px 0 0 #000" }}>
             Žádné výpravy. <Link href="/trips"><Button variant="outline" style={{ display: "inline-block", marginTop: "1rem" }}>Vytvořit výpravu</Button></Link>
           </div>
         )}
@@ -212,21 +212,21 @@ export default function Home() {
             onClick={() => setShowHelp(true)}
             style={{
               backgroundColor: "#86efac",
-              border: "2px solid var(--border-color)",
-              borderRadius: "8px",
+              border: "4px solid #000",
+              borderRadius: "12px",
               padding: "2rem",
-              boxShadow: "2px 2px 0 0 #000",
+              boxShadow: "6px 6px 0 0 #000",
               textAlign: "center",
               cursor: "pointer",
               transition: "all 0.15s"
             }}
             onMouseDown={(e) => {
-              e.currentTarget.style.transform = "translate(2px, 2px)";
-              e.currentTarget.style.boxShadow = "0px 0px 0 0 #000";
+              e.currentTarget.style.transform = "translate(4px, 4px)";
+              e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
             }}
             onMouseUp={(e) => {
               e.currentTarget.style.transform = "translate(0, 0)";
-              e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+              e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
             }}
           >
             <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>❓</div>
@@ -236,10 +236,10 @@ export default function Home() {
         ) : (
           <div style={{
             backgroundColor: "white",
-            border: "2px solid var(--border-color)",
-            borderRadius: "8px",
+            border: "4px solid #000",
+            borderRadius: "12px",
             padding: "1.5rem",
-            boxShadow: "2px 2px 0 0 #000"
+            boxShadow: "6px 6px 0 0 #000"
           }}>
             {/* Search Input */}
             <div style={{ marginBottom: "1.5rem" }}>
@@ -252,16 +252,16 @@ export default function Home() {
                 style={{
                   width: "100%",
                   padding: "0.75rem 1rem",
-                  border: "2px solid #000",
-                  borderRadius: "8px",
+                  border: "4px solid #000",
+                  borderRadius: "10px",
                   fontSize: "0.95rem",
-                  boxShadow: "2px 2px 0 0 #000",
+                  boxShadow: "6px 6px 0 0 #000",
                   fontWeight: "600",
                   boxSizing: "border-box",
                   transition: "all 0.15s"
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+                  e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
                 }}
               />
             </div>
@@ -274,8 +274,8 @@ export default function Home() {
                     key={idx}
                     style={{
                       backgroundColor: "#f9f9f9",
-                      border: "2px solid var(--border-color)",
-                      borderRadius: "8px",
+                      border: "4px solid #000",
+                      borderRadius: "12px",
                       padding: "1rem",
                       transition: "all 0.15s",
                       cursor: "default"
@@ -303,7 +303,7 @@ export default function Home() {
             </div>
 
             {/* Close Button */}
-            <div style={{ textAlign: "center", marginTop: "1rem", paddingTop: "1rem", borderTop: "2px solid var(--border-color)" }}>
+            <div style={{ textAlign: "center", marginTop: "1rem", paddingTop: "1rem", borderTop: "4px solid #000" }}>
               <button
                 onClick={() => {
                   setShowHelp(false);
@@ -311,21 +311,21 @@ export default function Home() {
                 }}
                 style={{
                   backgroundColor: "white",
-                  border: "2px solid var(--border-color)",
-                  borderRadius: "8px",
+                  border: "4px solid #000",
+                  borderRadius: "10px",
                   padding: "0.5rem 1.5rem",
                   fontWeight: "700",
                   cursor: "pointer",
                   transition: "all 0.15s",
-                  boxShadow: "2px 2px 0 0 #000"
+                  boxShadow: "6px 6px 0 0 #000"
                 }}
                 onMouseDown={(e) => {
-                  e.currentTarget.style.transform = "translate(1px, 1px)";
-                  e.currentTarget.style.boxShadow = "1px 1px 0 0 #000";
+                  e.currentTarget.style.transform = "translate(3px, 3px)";
+                  e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
                 }}
                 onMouseUp={(e) => {
                   e.currentTarget.style.transform = "translate(0, 0)";
-                  e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
+                  e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
                 }}
               >
                 Zavřít
