@@ -1,13 +1,30 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from "react-leaflet";
+import React from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 
-// Get icon based on base type
-function getBaseIcon(type?: string, isSelected?: boolean) {
+// Calculate icon size based on zoom level
+function getIconSizeForZoom(zoom: number, baseSize: number = 43): number {
+    // Scale icons based on zoom level
+    // At zoom 8 (country view): smaller icons
+    // At zoom 13+ (city view): normal size icons
+    const minZoom = 6;
+    const maxZoom = 16;
+    const minSize = baseSize * 0.4; // 40% of base size at min zoom
+    const maxSize = baseSize * 1.2; // 120% of base size at max zoom
+    
+    const normalizedZoom = Math.max(minZoom, Math.min(zoom, maxZoom));
+    const scale = (normalizedZoom - minZoom) / (maxZoom - minZoom);
+    
+    return minSize + (maxSize - minSize) * scale;
+}
+
+// Get icon based on base type and zoom level
+function getBaseIcon(type?: string, isSelected?: boolean, zoom: number = 13) {
     let iconUrl = "/map-elements/zakladna-zakladna-map-icon.svg";
     
     if (isSelected) {
@@ -28,16 +45,17 @@ function getBaseIcon(type?: string, isSelected?: boolean) {
         }
     }
     
+    const size = getIconSizeForZoom(zoom);
     return new L.Icon({
         iconUrl: iconUrl,
-        iconSize: [43, 43],
-        iconAnchor: [21.5, 43],
-        popupAnchor: [0, -43],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2], // Center the icon on the coordinates
+        popupAnchor: [0, -size / 2], // Popup appears above the center
     });
 }
 
-// Get station icon based on type
-function getStationIcon(type?: string) {
+// Get station icon based on type and zoom level
+function getStationIcon(type?: string, zoom: number = 13) {
     let iconUrl = "/map-elements/other-vehucles-map-icon.png";
     
     if (type) {
@@ -55,17 +73,25 @@ function getStationIcon(type?: string) {
         }
     }
     
+    const size = getIconSizeForZoom(zoom, 35); // Slightly smaller base size for stations
     return new L.Icon({
         iconUrl: iconUrl,
-        iconSize: [43, 43],
-        iconAnchor: [21.5, 43],
-        popupAnchor: [0, -43],
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2], // Center the icon on the coordinates
+        popupAnchor: [0, -size / 2], // Popup appears above the center
     });
 }
 
-// Map controller to handle view changes
-function MapController({ selectedLocation }: { selectedLocation: [number, number] | null }) {
+// Map controller to handle view changes and zoom tracking
+function MapController({ 
+    selectedLocation, 
+    onZoomChange 
+}: { 
+    selectedLocation: [number, number] | null;
+    onZoomChange: (zoom: number) => void;
+}) {
     const map = useMap();
+    
     useEffect(() => {
         if (selectedLocation) {
             map.flyTo(selectedLocation, 13, {
@@ -73,6 +99,23 @@ function MapController({ selectedLocation }: { selectedLocation: [number, number
             });
         }
     }, [selectedLocation, map]);
+    
+    useEffect(() => {
+        const handleZoom = () => {
+            onZoomChange(map.getZoom());
+        };
+        
+        // Set initial zoom
+        onZoomChange(map.getZoom());
+        
+        // Listen to zoom changes
+        map.on('zoomend', handleZoom);
+        
+        return () => {
+            map.off('zoomend', handleZoom);
+        };
+    }, [map, onZoomChange]);
+    
     return null;
 }
 
@@ -100,6 +143,7 @@ interface BaseFinderMapProps {
 }
 
 export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, stations = [] }: BaseFinderMapProps) {
+    const [currentZoom, setCurrentZoom] = useState(13);
     const mapyApiKey = process.env.NEXT_PUBLIC_MAPY_API_KEY || "";
     const selectedBase = bases.find(b => b.id === selectedBaseId);
     const center: [number, number] = selectedBase
@@ -119,7 +163,10 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
                 url={`https://api.mapy.com/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=${mapyApiKey}&lang=cs`}
             />
 
-            <MapController selectedLocation={selectedBase ? [selectedBase.lat, selectedBase.lng] : null} />
+            <MapController 
+                selectedLocation={selectedBase ? [selectedBase.lat, selectedBase.lng] : null} 
+                onZoomChange={setCurrentZoom}
+            />
 
             {/* Base Markers */}
             {bases.map((base) => {
@@ -127,38 +174,65 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
                 const opacity = isSelected ? 1 : (selectedBaseId ? 0.3 : 1);
                 
                 return (
-                    <Marker
-                        key={base.id}
-                        position={[base.lat, base.lng]}
-                        icon={getBaseIcon(base.type, isSelected)}
-                        eventHandlers={{
-                            click: () => onBaseSelect(base.id),
-                        }}
-                        opacity={opacity}
-                    >
-                        <Popup>
-                            <div className="text-sm font-semibold">{base.name}</div>
-                        </Popup>
-                    </Marker>
+                    <React.Fragment key={base.id}>
+                        {/* Circle around base - scales with zoom */}
+                        <Circle
+                            center={[base.lat, base.lng]}
+                            radius={isSelected ? 5000 : 2000} // radius in meters (5km for selected, 2km for others)
+                            pathOptions={{
+                                color: isSelected ? '#5aa31b' : '#ffd31a',
+                                fillColor: isSelected ? '#5aa31b' : '#ffd31a',
+                                fillOpacity: 0.1,
+                                weight: 2,
+                                opacity: opacity * 0.5
+                            }}
+                        />
+                        <Marker
+                            position={[base.lat, base.lng]}
+                            icon={getBaseIcon(base.type, isSelected, currentZoom)}
+                            eventHandlers={{
+                                click: () => onBaseSelect(base.id),
+                            }}
+                            opacity={opacity}
+                        >
+                            <Popup>
+                                <div className="text-sm font-semibold">{base.name}</div>
+                            </Popup>
+                        </Marker>
+                    </React.Fragment>
                 );
             })}
 
             {/* Station Markers - only show when base is selected */}
             {selectedBaseId && stations.map((station) => (
-                <Marker
-                    key={station._id}
-                    position={[station.lat, station.lng]}
-                    icon={getStationIcon(station.type)}
-                >
-                    <Popup>
-                        <div>
-                            <div className="text-sm font-semibold">{station.name}</div>
-                            <div className="text-xs text-gray-600">{station.type}</div>
-                            <div className="text-xs text-gray-600">{station.distanceKm.toFixed(1)} km</div>
-                        </div>
-                    </Popup>
-                </Marker>
+                <React.Fragment key={station._id}>
+                    {/* Circle around station - scales with zoom */}
+                    <Circle
+                        center={[station.lat, station.lng]}
+                        radius={500} // 500 meters radius for stations
+                        pathOptions={{
+                            color: '#3b82f6',
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.1,
+                            weight: 1.5,
+                            opacity: 0.4
+                        }}
+                    />
+                    <Marker
+                        position={[station.lat, station.lng]}
+                        icon={getStationIcon(station.type, currentZoom)}
+                    >
+                        <Popup>
+                            <div>
+                                <div className="text-sm font-semibold">{station.name}</div>
+                                <div className="text-xs text-gray-600">{station.type}</div>
+                                <div className="text-xs text-gray-600">{station.distanceKm.toFixed(1)} km</div>
+                            </div>
+                        </Popup>
+                    </Marker>
+                </React.Fragment>
             ))}
         </MapContainer>
     );
 }
+
