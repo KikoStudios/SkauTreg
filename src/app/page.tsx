@@ -66,15 +66,28 @@ export default function HomePage() {
 
           <div className={styles.heroBadges} aria-hidden="true">
             {troops && troops.length > 0 ? (
-              troops.map((troop) => (
-                <img 
-                  key={troop._id} 
-                  className={styles.badge} 
-                  src={troop.logo || "/bages/rover-bage.svg"} 
-                  alt={troop.name} 
-                />
-              ))
-            ) : null}
+              <>
+                {troops.slice(0, 4).map((troop) => (
+                  <img 
+                    key={troop._id} 
+                    className={styles.badge} 
+                    src={troop.logo || "/bages/rover-bage.svg"} 
+                    alt={troop.name} 
+                  />
+                ))}
+                {troops.length > 4 && (
+                  <div className={styles.badgePlus}>
+                    +{troops.length - 4}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <img className={styles.badge} src="/bages/rover-bage.svg" alt="Roveři" />
+                <img className={styles.badge} src="/bages/vedouci-bage.svg" alt="Vedoucí" />
+                <img className={styles.badge} src="/bages/owner-bage.svg" alt="Vlastník" />
+              </>
+            )}
           </div>
         </main>
 
