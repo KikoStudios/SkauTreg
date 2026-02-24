@@ -27,7 +27,7 @@ export default function GmailConnectPage() {
                     client_id: clientId,
                     redirect_uri: redirectUri,
                     response_type: "code",
-                    scope: "openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/admin.directory.group.readonly https://www.googleapis.com/auth/contacts.readonly",
+                    scope: "openid email profile https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/contacts.readonly",
                     access_type: "offline",
                     prompt: "consent",
                     state,

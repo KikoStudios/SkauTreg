@@ -10,10 +10,10 @@ export default function HomePage() {
   const { isSignedIn } = useAuth();
   const strediskoName =
     process.env.NEXT_PUBLIC_STREDISKO_NAME || "Středisko Bratří Mašinů";
-  const dashboardHref = isSignedIn ? "/home" : "/sign-in";
+  const dashboardHref = "/home";
   
   // Fetch user's troops to display their logos
-  const troops = useQuery(api.troops.getByUser);
+  const troops = useQuery(api.troops.listPublic);
 
   return (
     <>
@@ -30,10 +30,23 @@ export default function HomePage() {
         <header className={styles.topbar}>
           <div className={styles.org}>{strediskoName}</div>
           <img className={styles.brand} src="/logo_skautreg.svg" alt="skaut reg" />
-          <Link href={dashboardHref} className={styles.dashboard}>
-            <span className={styles.arrow}>➜</span>
-            <span>Dashboard</span>
-          </Link>
+          <div className={styles.headerActions}>
+            {isSignedIn ? (
+              <Link href={dashboardHref} className={styles.dashboard}>
+                <span className={styles.arrow}>➜</span>
+                <span>Dashboard</span>
+              </Link>
+            ) : (
+              <>
+                <Link href="/sign-in" className={styles.authButton}>
+                  Login
+                </Link>
+                <Link href="/sign-up" className={styles.authButtonPrimary}>
+                  Register
+                </Link>
+              </>
+            )}
+          </div>
         </header>
 
         <main className={styles.hero}>
@@ -53,7 +66,7 @@ export default function HomePage() {
 
           <div className={styles.heroBadges} aria-hidden="true">
             {troops && troops.length > 0 ? (
-              troops.slice(0, 6).map((troop) => (
+              troops.map((troop) => (
                 <img 
                   key={troop._id} 
                   className={styles.badge} 
