@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as appVersions from "../appVersions.js";
 import type * as bases from "../bases.js";
 import type * as editorPresence from "../editorPresence.js";
 import type * as emailDrafts from "../emailDrafts.js";
@@ -40,6 +41,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appVersions: typeof appVersions;
   bases: typeof bases;
   editorPresence: typeof editorPresence;
   emailDrafts: typeof emailDrafts;

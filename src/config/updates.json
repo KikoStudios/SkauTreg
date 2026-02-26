@@ -1,0 +1,25 @@
+{
+  "updates": [
+    {
+      "version": "2.1.0",
+      "title": "Major UI Redesign",
+      "tags": ["ui", "performance"],
+      "description": "Complete redesign of the dashboard with new navigation structure, improved dark mode support, and faster page load times.",
+      "releaseDate": "2024-01-29"
+    },
+    {
+      "version": "2.0.8",
+      "title": "Email System Improvements",
+      "tags": ["email", "bugfix"],
+      "description": "Fixed email delivery issues for members with non-latin characters in names, improved retry mechanism, and added better error logging.",
+      "releaseDate": "2024-01-20"
+    },
+    {
+      "version": "2.0.7",
+      "title": "OAuth Provider Updates",
+      "tags": ["security", "oauth"],
+      "description": "Updated authentication flow for improved security, added Google OAuth, and fixed token refresh issues.",
+      "releaseDate": "2024-01-15"
+    }
+  ]
+}
