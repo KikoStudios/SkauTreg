@@ -7,7 +7,6 @@ import { useState, useEffect } from "react";
 import { useFeedback } from "@/context/FeedbackContext";
 import styles from "./page.module.css";
 import { SupernotesCard } from "@/lib/supernotes";
-
 type Tab = "errors" | "features" | "submit" | "notes";
 type Status = "all" | "open" | "planned" | "completed" | "rejected";
 

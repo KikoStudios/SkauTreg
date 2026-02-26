@@ -443,4 +443,28 @@ export default defineSchema({
         .index("by_action", ["actionId"])
         .index("by_troop_date", ["troopId", "executedAt"]),
 
+    // App Version and Update Logs
+    app_versions: defineTable({
+        version: v.string(), // Semantic version e.g., "1.2.3"
+        releaseDate: v.string(), // ISO timestamp
+        isActive: v.boolean(), // Current active version
+        supernotesCardId: v.optional(v.string()), // Supernotes card ID containing changelog
+        changelogMarkdown: v.string(), // Markdown content of the changelog
+        changelogHtml: v.optional(v.string()), // HTML rendered version
+        category: v.optional(v.string()), // "major", "minor", "patch", "hotfix"
+        highlights: v.optional(v.array(v.string())), // Array of highlight bullet points
+        createdBy: v.optional(v.id("users")),
+    })
+        .index("by_version", ["version"])
+        .index("by_active", ["isActive"]),
+
+    // User-specific version tracking
+    user_version_tracking: defineTable({
+        userId: v.id("users"),
+        lastSeenVersion: v.string(), // Last version the user acknowledged
+        lastSeenAt: v.string(), // ISO timestamp
+        dismissedVersions: v.optional(v.array(v.string())), // Versions user explicitly dismissed
+    })
+        .index("by_user", ["userId"]),
+
 });
