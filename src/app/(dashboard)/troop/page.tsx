@@ -8,6 +8,8 @@ import Link from "next/link";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
 
+import Breadcrumbs from "../../../components/Breadcrumbs";
+
 // Canvas Helper for Cropping
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
     const image = await createImage(imageSrc);
@@ -196,139 +198,138 @@ export default function TroopsPage() {
 
     return (
         <div style={{ position: "relative", minHeight: "80vh", paddingBottom: "2rem" }} onClick={() => setShowCreateForm(false)}>
-            <div className="u-flex u-justify-between u-items-center u-mb-4" style={{ position: 'relative' }}>
-                <h1 className="u-text-lg u-font-bold">Moje Oddíly</h1>
-
-                {/* Header Plus Button */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setShowCreateForm(!showCreateForm);
-                    }}
-                    style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "50%",
-                        backgroundColor: "white",
-                        border: "2px solid #000",
-                        boxShadow: "4px 4px 0 0 #000",
-                        fontSize: "2rem",
-                        fontWeight: "300",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        paddingBottom: "6px",
-                        transition: "transform 0.1s"
-                    }}
-                    onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                >
-                    +
-                </button>
-
-                {/* Popover Form - Positioned absolute relative to header or container */}
-                {showCreateForm && (
-                    <div style={{
-                        position: "absolute",
-                        top: "60px",
-                        right: "0",
-                        zIndex: 50,
-                        backgroundColor: "white",
-                        border: "2px solid #000",
-                        borderRadius: "12px",
-                        boxShadow: "8px 8px 0 0 #000",
-                        padding: "1.5rem",
-                        width: "320px",
-                        animation: "slideDown 0.2s ease-out"
-                    }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ fontSize: "1.25rem", fontWeight: "800", marginBottom: "1rem" }}>Nový Oddíl</h2>
-
-                        <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                            {/* Logo Upload */}
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <div style={{
-                                    width: "64px", height: "64px",
-                                    border: "2px solid #000", borderRadius: "50%",
-                                    overflow: "hidden", backgroundColor: "#f4f4f5",
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                }}>
-                                    {previewUrl ? (
-                                        <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    ) : (
-                                        <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>LOGO</span>
-                                    )}
-                                </div>
-                                <div>
-                                    <label style={{
-                                        display: "inline-block",
-                                        padding: "0.5rem 1rem",
-                                        border: "2px solid #000",
-                                        borderRadius: "6px",
-                                        fontWeight: "700",
-                                        fontSize: "0.8rem",
-                                        cursor: "pointer",
-                                        backgroundColor: "#e4e4e7",
-                                        boxShadow: "2px 2px 0 0 #000"
+            {/* Standard Header */}
+            <div className="headingContainer">
+                <Breadcrumbs />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                    <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Moje Oddíly</h1>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowCreateForm(!showCreateForm);
+                        }}
+                        style={{
+                            width: "48px",
+                            height: "48px",
+                            borderRadius: "50%",
+                            backgroundColor: "white",
+                            border: "2px solid #000",
+                            boxShadow: "4px 4px 0 0 #000",
+                            fontSize: "2rem",
+                            fontWeight: "300",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            cursor: "pointer",
+                            paddingBottom: "6px",
+                            transition: "transform 0.1s"
+                        }}
+                        onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
+                        onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
+                    >
+                        +
+                    </button>
+                    
+                    {/* Popover Form moved inside relative header container wrapper if needed, 
+                        but we can keep it here, it will be relative to the header. */}
+                    {showCreateForm && (
+                        <div style={{
+                            position: "absolute",
+                            top: "100%",
+                            right: "2rem",
+                            zIndex: 50,
+                            backgroundColor: "white",
+                            border: "2px solid #000",
+                            borderRadius: "12px",
+                            boxShadow: "8px 8px 0 0 #000",
+                            padding: "1.5rem",
+                            width: "320px",
+                            marginTop: "1rem"
+                        }} onClick={e => e.stopPropagation()}>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: "800", marginBottom: "1rem" }}>Nový Oddíl</h2>
+                            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                {/* Logo Upload */}
+                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    <div style={{
+                                        width: "64px", height: "64px",
+                                        border: "2px solid #000", borderRadius: "50%",
+                                        overflow: "hidden", backgroundColor: "#f4f4f5",
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                                     }}>
-                                        Nahrát
-                                        <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Jméno</label>
-                                <input
-                                    required
-                                    value={newName}
-                                    onChange={e => setNewName(e.target.value)}
-                                    style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
-                                    placeholder="Chodci"
-                                />
-                            </div>
-
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                                <div>
-                                    <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Číslo</label>
-                                    <input
-                                        value={newNumber}
-                                        onChange={e => setNewNumber(e.target.value)}
-                                        style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
-                                        placeholder="106"
-                                    />
+                                        {previewUrl ? (
+                                            <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>LOGO</span>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label style={{
+                                            display: "inline-block",
+                                            padding: "0.5rem 1rem",
+                                            border: "2px solid #000",
+                                            borderRadius: "6px",
+                                            fontWeight: "700",
+                                            fontSize: "0.8rem",
+                                            cursor: "pointer",
+                                            backgroundColor: "#e4e4e7",
+                                            boxShadow: "2px 2px 0 0 #000"
+                                        }}>
+                                            Nahrát
+                                            <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
+                                        </label>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Typ</label>
+                                    <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Jméno</label>
                                     <input
-                                        value={newType}
-                                        onChange={e => setNewType(e.target.value)}
+                                        required
+                                        value={newName}
+                                        onChange={e => setNewName(e.target.value)}
                                         style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
-                                        placeholder="Skauti"
+                                        placeholder="Chodci"
                                     />
                                 </div>
-                            </div>
-
-                            <button type="submit" disabled={isCreating} style={{
-                                marginTop: "0.5rem",
-                                padding: "0.75rem",
-                                backgroundColor: "#86efac",
-                                border: "2px solid #000",
-                                borderRadius: "6px",
-                                fontWeight: "800",
-                                fontSize: "1rem",
-                                cursor: "pointer",
-                                boxShadow: "4px 4px 0 0 #000",
-                                width: "100%"
-                            }}>
-                                {isCreating ? "..." : "Vytvořit"}
-                            </button>
-                        </form>
-                    </div>
-                )}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                                    <div>
+                                        <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Číslo</label>
+                                        <input
+                                            value={newNumber}
+                                            onChange={e => setNewNumber(e.target.value)}
+                                            style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
+                                            placeholder="106"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Typ</label>
+                                        <input
+                                            value={newType}
+                                            onChange={e => setNewType(e.target.value)}
+                                            style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
+                                            placeholder="Skauti"
+                                        />
+                                    </div>
+                                </div>
+                                <button type="submit" disabled={isCreating} style={{
+                                    marginTop: "0.5rem",
+                                    padding: "0.75rem",
+                                    backgroundColor: "#86efac",
+                                    border: "2px solid #000",
+                                    borderRadius: "6px",
+                                    fontWeight: "800",
+                                    fontSize: "1rem",
+                                    cursor: "pointer",
+                                    boxShadow: "4px 4px 0 0 #000",
+                                    width: "100%"
+                                }}>
+                                    {isCreating ? "..." : "Vytvořit"}
+                                </button>
+                            </form>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            <div style={{ height: 'var(--border-width)', backgroundColor: 'var(--border-color)', margin: '0 -2rem 2rem -2rem' }} />
+            <div className="dashboardContent">
 
             {/* Troops Grid */}
             <div style={{
@@ -433,6 +434,7 @@ export default function TroopsPage() {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
