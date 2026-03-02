@@ -143,7 +143,6 @@ function DashboardLayoutInner({
                 <UpdateNotification />
 
                 <main className={`${styles.mainContent} ${isSidebarCollapsed ? styles.mainContentExpanded : ''}`}>
-                    <Breadcrumbs />
                     {children}
                 </main>
                 <ProfileModal />

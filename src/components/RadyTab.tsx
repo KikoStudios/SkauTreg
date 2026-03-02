@@ -458,9 +458,9 @@ export default function RadyTab() {
                     justify-content: space-between;
                     align-items: center;
                     margin-bottom: 2rem;
+                    margin-top: 0;
                     flex-wrap: wrap;
                     gap: 2rem;
-                    border-bottom: 3px solid #000;
                     padding-bottom: 1rem;
                 }
                 .troop-selector-container {

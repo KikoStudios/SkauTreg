@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import TripForm, { TripFormData } from "../../../components/TripForm";
+import Breadcrumbs from "../../../components/Breadcrumbs";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -122,20 +123,13 @@ export default function TripsPage() {
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
-            <div style={{
-                backgroundColor: "white",
-                borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
-                margin: "0 -2rem 2rem -2rem", // Break out to full width
-                width: "calc(100% + 4rem)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-            }}>
+            <div className="headingContainer">
+                <Breadcrumbs />
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Výpravy</h1>
             </div>
 
-            {/* Controls Row */}
+            <div className="dashboardContent">
+                {/* Controls Row */}
             <div className="controls-row">
                 <div className="troop-selector-container">
                     {/* Troop Selector Pill */}
@@ -464,6 +458,7 @@ export default function TripsPage() {
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }

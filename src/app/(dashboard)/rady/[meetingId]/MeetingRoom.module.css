@@ -5,7 +5,7 @@
     width: 100%;
     position: relative;
     background: #fafafa;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .mainArea {
