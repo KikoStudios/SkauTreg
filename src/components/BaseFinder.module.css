@@ -951,8 +951,8 @@
 .tripCard {
     background: #ffffff;
     border: 3px solid #000;
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 10px;
+    padding: 14px;
     margin-bottom: 16px;
     box-shadow: 6px 6px 0 0 #000;
 }
@@ -977,30 +977,37 @@
     display: flex;
     align-items: center;
     gap: 0;
-    padding: 8px 12px;
+    padding: 12px 0 14px;
     margin-bottom: 12px;
-    background: #E3F2FD;
-    border-radius: 8px;
-}
-
-.tripTimelineItem {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    background: transparent;
+    border-radius: 0;
+    min-height: 52px;
+    flex-wrap: nowrap;
+    width: 100%;
+    overflow: visible;
 }
 
 .timelineDot {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0 0 #000;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
 }
 
 .timelineLine {
-    flex: 1;
-    height: 4px;
-    min-width: 30px;
-    max-width: 50px;
+    flex: 1 1 auto;
+    height: 8px;
+    min-width: 14px;
+    max-width: none;
+    border-radius: 0;
+    border: 2px solid #000;
+    margin: 0;
+    box-shadow: 2px 2px 0 0 #000;
 }
 
 .timelineTime {
@@ -1008,6 +1015,63 @@
     font-weight: 700;
     color: #000;
     white-space: nowrap;
+}
+
+.timelineSegment {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding: 0;
+}
+
+.timelineRowTop {
+    transform: translateY(-10px);
+}
+
+.timelineRowBottom {
+    transform: translateY(10px);
+}
+
+.timelineTimeTop {
+    top: -18px;
+}
+
+.timelineTimeBottom {
+    bottom: -18px;
+}
+
+.timelineTime {
+    position: absolute;
+    line-height: 1;
+    background: white;
+    padding: 0 2px;
+    z-index: 2;
+}
+
+.timelineTimeStart {
+    left: 0;
+    transform: translateX(0);
+    text-align: right;
+}
+
+.timelineTimeEnd {
+    right: 0;
+    transform: translateX(0);
+    text-align: left;
+}
+
+.timelineDotStart {
+    left: 0;
+    transform: translate(-50%, -50%);
+}
+
+.timelineDotEnd {
+    right: 0;
+    transform: translate(50%, -50%);
 }
 
 .tripLegs {
@@ -1032,7 +1096,7 @@
 .tripLegIndex {
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: 999px;
     border: 2px solid #000;
     display: flex;
     align-items: center;
@@ -1043,6 +1107,7 @@
     flex-shrink: 0;
     align-self: flex-start;
     margin-top: 2px;
+    box-shadow: 2px 2px 0 0 #000;
 }
 
 .tripLegContent {
@@ -1066,7 +1131,7 @@
 
 .tripLegType {
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 2px solid #000;
     font-size: 11px;
     font-weight: 800;
@@ -1075,6 +1140,7 @@
     white-space: nowrap;
     flex-shrink: 0;
     height: fit-content;
+    box-shadow: 2px 2px 0 0 #000;
 }
 
 .tripLegTypeTrain { background: #F2C94C; }
@@ -1092,36 +1158,38 @@
 
 .tripLegTime {
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 2px solid #000;
     background: #F2C94C;
     font-size: 11px;
     font-weight: 800;
     white-space: nowrap;
     flex-shrink: 0;
+    box-shadow: 2px 2px 0 0 #000;
 }
 
 .tripLegVehicle {
     padding: 4px 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 2px solid #000;
     background: #4DD0E1;
     font-size: 11px;
     font-weight: 800;
     white-space: nowrap;
     flex-shrink: 0;
+    box-shadow: 2px 2px 0 0 #000;
 }
 
 .tripFooter {
-    display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    display: flex;
     gap: 8px;
-    align-items: center;
+    align-items: stretch;
+    flex-wrap: wrap;
 }
 
 .tripFooterIdos {
     border: 3px solid #000;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 8px 12px;
     font-weight: 900;
     text-align: center;
@@ -1136,6 +1204,7 @@
     box-shadow: 3px 3px 0 0 #000;
     text-decoration: none;
     color: #000;
+    flex: 1;
 }
 
 .tripFooterIdos img {
@@ -1155,7 +1224,7 @@
 
 .tripFooterPrice {
     border: 3px solid #000;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 8px 12px;
     font-weight: 900;
     font-size: 12px;
@@ -1168,7 +1237,7 @@
 
 .tripFooterTransfers {
     border: 3px solid #000;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 8px 12px;
     font-weight: 900;
     font-size: 12px;
@@ -1180,8 +1249,8 @@
 }
 
 .tripFooterIcon {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     object-fit: contain;
 }
 
@@ -1240,7 +1309,7 @@
     width: 44px;
     height: 44px;
     border: 3px solid #000;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #4A90E2;
     color: white;
     font-size: 24px;
@@ -1663,6 +1732,39 @@
     font-weight: 800;
     color: white;
     white-space: nowrap;
+}
+
+.routeDirectionButtons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.routeDirectionButton {
+    padding: 14px;
+    border: 3px solid #000;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 900;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 0 #000;
+    transition: all 0.2s;
+}
+
+.routeDirectionButton:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 0 #000;
+}
+
+.routeDirectionPrimary {
+    background: #4A90E2;
+    color: white;
+}
+
+.routeDirectionSecondary {
+    background: white;
+    color: #000;
 }
 
 /* Responsive */

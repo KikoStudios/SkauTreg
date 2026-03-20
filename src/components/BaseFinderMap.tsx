@@ -4,7 +4,7 @@ import React from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 // Calculate icon size based on zoom level
@@ -22,6 +22,11 @@ function getIconSizeForZoom(zoom: number, baseSize: number = 43): number {
     
     return minSize + (maxSize - minSize) * scale;
 }
+
+const baseIconCache = new Map<string, L.Icon>();
+const stationIconCache = new Map<string, L.Icon>();
+
+const DEFAULT_CENTER: [number, number] = [49.8175, 15.4730]; // Center of CR
 
 // Get icon based on base type and zoom level
 function getBaseIcon(type?: string, isSelected?: boolean, zoom: number = 13) {
@@ -45,13 +50,20 @@ function getBaseIcon(type?: string, isSelected?: boolean, zoom: number = 13) {
         }
     }
     
-    const size = getIconSizeForZoom(zoom);
-    return new L.Icon({
-        iconUrl: iconUrl,
+    const baseSize = isSelected ? 46 : 36;
+    const size = getIconSizeForZoom(zoom, baseSize);
+    const cacheKey = `base|${iconUrl}|${size}`;
+    const cached = baseIconCache.get(cacheKey);
+    if (cached) return cached;
+
+    const created = new L.Icon({
+        iconUrl,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2], // Center the icon on the coordinates
         popupAnchor: [0, -size / 2], // Popup appears above the center
     });
+    baseIconCache.set(cacheKey, created);
+    return created;
 }
 
 // Get station icon based on type and zoom level
@@ -73,32 +85,42 @@ function getStationIcon(type?: string, zoom: number = 13) {
         }
     }
     
-    const size = getIconSizeForZoom(zoom, 35); // Slightly smaller base size for stations
-    return new L.Icon({
-        iconUrl: iconUrl,
+    const size = getIconSizeForZoom(zoom, 28); // Visibly smaller than bases
+    const cacheKey = `station|${iconUrl}|${size}`;
+    const cached = stationIconCache.get(cacheKey);
+    if (cached) return cached;
+
+    const created = new L.Icon({
+        iconUrl,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2], // Center the icon on the coordinates
         popupAnchor: [0, -size / 2], // Popup appears above the center
     });
+    stationIconCache.set(cacheKey, created);
+    return created;
 }
 
 // Map controller to handle view changes and zoom tracking
 function MapController({ 
+    selectedBaseId,
     selectedLocation, 
     onZoomChange 
 }: { 
+    selectedBaseId: Id<"bases"> | null;
     selectedLocation: [number, number] | null;
     onZoomChange: (zoom: number) => void;
 }) {
     const map = useMap();
+    const lastFlownToBaseIdRef = useRef<Id<"bases"> | null>(null);
     
     useEffect(() => {
-        if (selectedLocation) {
+        if (selectedBaseId && selectedLocation && lastFlownToBaseIdRef.current !== selectedBaseId) {
+            lastFlownToBaseIdRef.current = selectedBaseId;
             map.flyTo(selectedLocation, 13, {
                 duration: 1.5
             });
         }
-    }, [selectedLocation, map]);
+    }, [selectedBaseId, selectedLocation, map]);
     
     useEffect(() => {
         const handleZoom = () => {
@@ -146,9 +168,13 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
     const [currentZoom, setCurrentZoom] = useState(13);
     const mapyApiKey = process.env.NEXT_PUBLIC_MAPY_API_KEY || "";
     const selectedBase = bases.find(b => b.id === selectedBaseId);
-    const center: [number, number] = selectedBase
-        ? [selectedBase.lat, selectedBase.lng]
-        : [49.8175, 15.4730]; // Center of CR
+
+    const selectedLocation = useMemo<[number, number] | null>(() => {
+        if (!selectedBase) return null;
+        return [selectedBase.lat, selectedBase.lng];
+    }, [selectedBase?.lat, selectedBase?.lng]);
+
+    const center: [number, number] = selectedLocation ?? DEFAULT_CENTER;
 
     return (
         <MapContainer
@@ -156,6 +182,7 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
             zoom={selectedBase ? 13 : 8}
             style={{ height: "100%", width: "100%", zIndex: 0 }}
             zoomControl={false}
+            preferCanvas={true}
         >
             <ZoomControl position="bottomright" />
             <TileLayer
@@ -164,7 +191,8 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
             />
 
             <MapController 
-                selectedLocation={selectedBase ? [selectedBase.lat, selectedBase.lng] : null} 
+                selectedBaseId={selectedBaseId}
+                selectedLocation={selectedLocation}
                 onZoomChange={setCurrentZoom}
             />
 
@@ -206,18 +234,6 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
             {/* Station Markers - only show when base is selected */}
             {selectedBaseId && stations.map((station) => (
                 <React.Fragment key={station._id}>
-                    {/* Circle around station - scales with zoom */}
-                    <Circle
-                        center={[station.lat, station.lng]}
-                        radius={500} // 500 meters radius for stations
-                        pathOptions={{
-                            color: '#3b82f6',
-                            fillColor: '#3b82f6',
-                            fillOpacity: 0.1,
-                            weight: 1.5,
-                            opacity: 0.4
-                        }}
-                    />
                     <Marker
                         position={[station.lat, station.lng]}
                         icon={getStationIcon(station.type, currentZoom)}

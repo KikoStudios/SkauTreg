@@ -1,6 +1,8 @@
-"use client";
+﻿"use client";
 import React, { useState, useRef } from 'react';
 import { useUser, useClerk } from "@clerk/nextjs";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useProfileModal } from "../context/ProfileModalContext";
 import styles from './ProfileModal.module.css';
 
@@ -8,6 +10,7 @@ export default function ProfileModal() {
     const { isOpen, closeProfile } = useProfileModal();
     const { user } = useUser();
     const { signOut } = useClerk();
+    const updateUser = useMutation(api.users.update);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -15,6 +18,7 @@ export default function ProfileModal() {
     const [lastName, setLastName] = useState(user?.lastName || "");
     const [username, setUsername] = useState(user?.username || "");
     const [dateOfBirth, setDateOfBirth] = useState((user?.unsafeMetadata?.dateOfBirth as string) || "");
+    const [benefit, setBenefit] = useState((user?.unsafeMetadata?.benefit as string) || "");
     const [password, setPassword] = useState("");
     const [needsPasswordForUsername, setNeedsPasswordForUsername] = useState(false);
 
@@ -24,6 +28,7 @@ export default function ProfileModal() {
             setLastName(user.lastName || "");
             setUsername(user.username || "");
             setDateOfBirth((user.unsafeMetadata?.dateOfBirth as string) || "");
+            setBenefit((user.unsafeMetadata?.benefit as string) || "");
         }
     }, [user]);
 
@@ -37,6 +42,7 @@ export default function ProfileModal() {
             setLastName(user.lastName || "");
             setUsername(user.username || "");
             setDateOfBirth((user.unsafeMetadata?.dateOfBirth as string) || "");
+            setBenefit((user.unsafeMetadata?.benefit as string) || "");
         }
     };
 
@@ -61,6 +67,7 @@ export default function ProfileModal() {
                 unsafeMetadata: {
                     ...user.unsafeMetadata,
                     dateOfBirth: dateOfBirth,
+                    benefit: benefit,
                 },
             };
             
@@ -71,6 +78,10 @@ export default function ProfileModal() {
             }
             
             await user.update(updateData);
+            await updateUser({
+                dateOfBirth: dateOfBirth || undefined,
+                benefit: benefit || undefined,
+            });
             
             setPassword("");
             setNeedsPasswordForUsername(false);
@@ -215,6 +226,11 @@ export default function ProfileModal() {
                                             Narození: {new Date(dateOfBirth).toLocaleDateString('cs-CZ')}
                                         </p>
                                     )}
+                                    {benefit && (
+                                        <p style={{ fontSize: '0.9rem', color: '#52525b', fontWeight: '600', marginTop: '0.5rem' }}>
+                                            Benefit: {benefit}
+                                        </p>
+                                    )}
                                 </>
                             ) : (
                                 <div className={styles.editForm}>
@@ -252,7 +268,7 @@ export default function ProfileModal() {
                                                 className={styles.input}
                                                 value={lastName}
                                                 onChange={(e) => setLastName(e.target.value)}
-                                                placeholder="Novák"
+                                                placeholder="NovÃ¡k"
                                             />
                                         </div>
                                     </div>
@@ -268,7 +284,30 @@ export default function ProfileModal() {
                                             max={new Date().toISOString().split('T')[0]}
                                         />
                                     </div>
-                                    
+                                    <div>
+                                        <label className={styles.formLabel}>Benefit pro dopravu</label>
+                                        <select
+                                            className={styles.input}
+                                            value={benefit}
+                                            onChange={(e) => setBenefit(e.target.value)}
+                                        >
+                                            <option value="">Bez benefitu</option>
+                                            <option value="žákovský průkaz ČR">žákovský průkaz ČR</option>
+                                            <option value="karta ISIC">karta ISIC</option>
+                                            <option value="karta ITIC">karta ITIC</option>
+                                            <option value="karta ALIVE">karta ALIVE</option>
+                                            <option value="karta EYCA (EURO<26)">karta EYCA (EURO&lt;26)</option>
+                                            <option value="potvrzení o studiu">potvrzení o studiu</option>
+                                            <option value="průkaz ZTP">průkaz ZTP</option>
+                                            <option value="průkaz ZTP/P">průkaz ZTP/P</option>
+                                            <option value="průvodce ZTP/P">průvodce ZTP/P</option>
+                                            <option value="průkaz ŤZP">průkaz ŤZP</option>
+                                            <option value="průkaz ŤZP/S">průkaz ŤZP/S</option>
+                                            <option value="průvodce ŤZP/S">průvodce ŤZP/S</option>
+                                            <option value="JUNIOR (ZSSK)">JUNIOR (ZSSK)</option>
+                                            <option value="průkaz rodiče pro ústavy">průkaz rodiče pro ústavy</option>
+                                        </select>
+                                    </div>
                                     {needsPasswordForUsername && (
                                         <div style={{ 
                                             backgroundColor: '#fef2f2', 
@@ -364,3 +403,10 @@ export default function ProfileModal() {
         </div>
     );
 }
+
+
+
+
+
+
+

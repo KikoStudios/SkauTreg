@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
@@ -9,8 +9,26 @@ import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
 import EmailDraftsTab from "../../../../components/EmailDraftsTab";
 import { useFeedback } from "../../../../context/FeedbackContext";
+import TransportTab from "../../../../components/trip/TransportTab";
 
 type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace' | 'emaily';
+
+const BENEFIT_OPTIONS = [
+    "žákovský průkaz ČR",
+    "karta ISIC",
+    "karta ITIC",
+    "karta ALIVE",
+    "karta EYCA (EURO<26)",
+    "potvrzení o studiu",
+    "průkaz ZTP",
+    "průkaz ZTP/P",
+    "průvodce ZTP/P",
+    "průkaz ŤZP",
+    "průkaz ŤZP/S",
+    "průvodce ŤZP/S",
+    "JUNIOR (ZSSK)",
+    "průkaz rodiče pro ústavy",
+];
 
 export default function TripDashboardPage() {
     const params = useParams();
@@ -24,6 +42,11 @@ export default function TripDashboardPage() {
     const unassignBase = useMutation(api.trips.unassignBase);
     const ensureParticipations = useMutation(api.trips.ensureParticipations);
     const sendTripEmail = useAction(api.mailer.sendTripEmail);
+    const addTripStaffUser = useMutation(api.tripStaff.addUser);
+    const addTripStaffExternal = useMutation(api.tripStaff.addExternal);
+    const addTripStaffFromPreset = useMutation(api.tripStaff.addFromPreset);
+    const removeTripStaff = useMutation(api.tripStaff.remove);
+    const removeLeaderPreset = useMutation(api.leaderPresets.remove);
 
     const troop = useQuery(
         api.troops.getById,
@@ -42,6 +65,13 @@ export default function TripDashboardPage() {
     const [isSendingEmail, setIsSendingEmail] = useState(false);
     const [emailResult, setEmailResult] = useState<{ sentCount: number; skippedCount: number; total: number; failed: { email: string; error: string }[] } | null>(null);
     const [didEnsureParticipants, setDidEnsureParticipants] = useState(false);
+    const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
+    const [selectedLeaderId, setSelectedLeaderId] = useState<string>("");
+    const [externalName, setExternalName] = useState("");
+    const [externalRole, setExternalRole] = useState<"leader" | "rover">("leader");
+    const [externalAge, setExternalAge] = useState<string>("");
+    const [externalBenefit, setExternalBenefit] = useState<string>("");
+    const [saveExternalAsPreset, setSaveExternalAsPreset] = useState(false);
 
     const tripDocs = useQuery(api.meetings.listByTrip, { tripId });
     const createDoc = useMutation(api.meetings.create);
@@ -142,6 +172,73 @@ export default function TripDashboardPage() {
                 },
             ],
         });
+    };
+
+    const handleAddLeaderFromTeam = async () => {
+        if (!selectedLeaderId) return;
+        try {
+            const selected = dashboard?.leaders?.find((l: any) => l._id === selectedLeaderId);
+            const roleFromTeam = selected?.role === "rover" ? "rover" : "leader";
+            await addTripStaffUser({
+                tripId,
+                userId: selectedLeaderId as Id<"users">,
+                role: roleFromTeam,
+            });
+            setSelectedLeaderId("");
+            showSuccess({ title: "✅ Přidáno", message: "Vedoucí/rover byl přidán.", duration: 1500 });
+        } catch (error: any) {
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se přidat vedoucího/rovera.",
+                icon: "error",
+                canReport: true,
+                details: error?.message,
+            });
+        }
+    };
+
+    const handleAddExternal = async () => {
+        const name = externalName.trim();
+        if (!name) return;
+        const age = externalAge.trim() === "" ? undefined : Number(externalAge);
+        try {
+            await addTripStaffExternal({
+                tripId,
+                name,
+                role: externalRole,
+                age: Number.isFinite(age) ? age : undefined,
+                benefit: externalBenefit || undefined,
+                saveAsPreset: saveExternalAsPreset || undefined,
+            });
+            setExternalName("");
+            setExternalAge("");
+            setExternalBenefit("");
+            setSaveExternalAsPreset(false);
+            showSuccess({ title: "✅ Přidáno", message: "Externí vedoucí/rover byl přidán.", duration: 1500 });
+        } catch (error: any) {
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se přidat externí osobu.",
+                icon: "error",
+                canReport: true,
+                details: error?.message,
+            });
+        }
+    };
+
+    const handleAddFromPreset = async (presetId: Id<"leader_presets">) => {
+        try {
+            await addTripStaffFromPreset({ tripId, presetId });
+            showSuccess({ title: "✅ Přidáno", message: "Preset byl přidán do výpravy.", duration: 1500 });
+        } catch (error: any) {
+            showError({
+                title: "❌ Chyba",
+                message: "Nepodařilo se přidat preset.",
+                icon: "error",
+                canReport: true,
+                details: error?.message,
+            });
+        }
     };
 
     const handleOpenTripDocs = async () => {
@@ -296,6 +393,11 @@ export default function TripDashboardPage() {
     const { trip, participants, base } = dashboard;
     const validParticipants = participants.filter((p: any) => p.member);
     const participantsWithEmail = validParticipants.filter((p: any) => p.member?.email);
+    const tripStaff = (dashboard as any).tripStaff || [];
+    const leaderPresets = (dashboard as any).leaderPresets || [];
+    const attendingCount = validParticipants.filter((p: any) => p.status === "attending").length;
+    const notAttendingCount = validParticipants.filter((p: any) => p.status === "not_attending").length;
+    const pendingCount = validParticipants.filter((p: any) => p.status === "pending").length;
 
     if (isEditing) {
         return (
@@ -360,7 +462,7 @@ export default function TripDashboardPage() {
     }
 
     return (
-        <div style={{ width: "100%", position: "relative", paddingBottom: "2rem" }}>
+        <div style={{ width: "100%", position: "relative", padding: "0 2rem 2rem" }}>
             {/* Top Title Bar */}
             <div style={{
                 backgroundColor: "white",
@@ -574,203 +676,437 @@ export default function TripDashboardPage() {
             {/* Tab Content - INFO */}
             {activeTab === 'info' && (
                 <>
-                    {/* Info Card - Two Column Layout */}
                     <div style={{
-                        backgroundColor: "#FFF9E6",
-                        border: "3px solid #000",
-                        borderRadius: "12px",
-                        padding: "2rem",
-                        boxShadow: "6px 6px 0 0 #000",
-                        marginBottom: "2rem"
+                        display: "grid",
+                        gridTemplateColumns: "minmax(0, 1fr) 460px",
+                        gap: "1.5rem",
+                        alignItems: "start",
+                        width: "100%"
                     }}>
-                        <h2 style={{ fontSize: "1.8rem", fontWeight: "900", marginBottom: "1.5rem", textTransform: "uppercase" }}>
-                            Informace o výpravě
-                        </h2>
-                        
-                        {/* Two Column Grid */}
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                            gap: "1.5rem",
-                            marginBottom: "1.5rem"
-                        }}>
-                            {/* Location Card */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.9rem" }}>
+                            {/* Info Card - Two Column Layout */}
                             <div style={{
-                                backgroundColor: "white",
-                                border: "2px solid #000",
-                                borderRadius: "8px",
-                                padding: "1.2rem",
-                                boxShadow: "3px 3px 0 0 #000"
+                                backgroundColor: "#FFF9E6",
+                                border: "3px solid #000",
+                                borderRadius: "12px",
+                                padding: "2rem",
+                                boxShadow: "6px 6px 0 0 #000"
                             }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                                    <img src="/place-icon.svg" alt="Location" style={{ width: "28px", height: "28px" }} />
-                                    <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", textTransform: "uppercase" }}>Místo</div>
+                                <h2 style={{ fontSize: "1.8rem", fontWeight: "900", marginBottom: "1.5rem", textTransform: "uppercase" }}>
+                                    Informace o výpravě
+                                </h2>
+                                
+                                {/* Two Column Grid */}
+                                <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+                                    gap: "1.5rem",
+                                    marginBottom: "1.5rem"
+                                }}>
+                                    {/* Location Card */}
+                                    <div style={{
+                                        backgroundColor: "white",
+                                        border: "2px solid #000",
+                                        borderRadius: "8px",
+                                        padding: "1.2rem",
+                                        boxShadow: "3px 3px 0 0 #000"
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                                            <img src="/place-icon.svg" alt="Location" style={{ width: "28px", height: "28px" }} />
+                                            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", textTransform: "uppercase" }}>Místo</div>
+                                        </div>
+                                        <div style={{ fontSize: "1.2rem", fontWeight: "800", paddingLeft: "2.5rem" }}>{trip.location}</div>
+                                    </div>
+
+                                    {/* Date Card */}
+                                    <div style={{
+                                        backgroundColor: "white",
+                                        border: "2px solid #000",
+                                        borderRadius: "8px",
+                                        padding: "1.2rem",
+                                        boxShadow: "3px 3px 0 0 #000"
+                                    }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                                            <img src="/clock-time-icon.svg" alt="Time" style={{ width: "28px", height: "28px" }} />
+                                            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", textTransform: "uppercase" }}>Termín</div>
+                                        </div>
+                                        <div style={{ fontSize: "1.2rem", fontWeight: "800", paddingLeft: "2.5rem" }}>
+                                            {(() => {
+                                                const fmt = (dStr: string) => {
+                                                    if (!dStr) return "";
+                                                    const [y, m, d] = dStr.split("-");
+                                                    return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
+                                                };
+                                                return `${fmt(trip.startDate)}${trip.endDate ? ` - ${fmt(trip.endDate)}` : ""}`;
+                                            })()}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: "1.2rem", fontWeight: "800", paddingLeft: "2.5rem" }}>{trip.location}</div>
+
+                                {/* Description */}
+                                {trip.description && (
+                                    <div style={{
+                                        backgroundColor: "white",
+                                        border: "2px solid #000",
+                                        borderRadius: "8px",
+                                        padding: "1.2rem",
+                                        boxShadow: "3px 3px 0 0 #000"
+                                    }}>
+                                        <div style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "0.75rem" }}>
+                                            Popis
+                                        </div>
+                                        <p style={{ lineHeight: "1.6", margin: 0, fontSize: "1rem" }}>{trip.description}</p>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Date Card */}
+                            {/* Další informace (kompaktní) */}
                             <div style={{
-                                backgroundColor: "white",
-                                border: "2px solid #000",
-                                borderRadius: "8px",
-                                padding: "1.2rem",
-                                boxShadow: "3px 3px 0 0 #000"
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                                gap: "0.85rem"
                             }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                                    <img src="/clock-time-icon.svg" alt="Time" style={{ width: "28px", height: "28px" }} />
-                                    <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", textTransform: "uppercase" }}>Termín</div>
+                                <div style={{
+                                    backgroundColor: "white",
+                                    border: "2px solid #000",
+                                    borderRadius: "8px",
+                                    padding: "0.85rem 1rem",
+                                    boxShadow: "2px 2px 0 0 #000"
+                                }}>
+                                    <div style={{ fontSize: "0.8rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+                                        Účast
+                                    </div>
+                                    <div style={{ display: "grid", gap: "0.2rem", fontWeight: "700", fontSize: "0.95rem" }}>
+                                        <div>Celkem: {validParticipants.length}</div>
+                                        <div>Jede: {attendingCount} · Nejede: {notAttendingCount} · Bez reakce: {pendingCount}</div>
+                                    </div>
                                 </div>
-                                <div style={{ fontSize: "1.2rem", fontWeight: "800", paddingLeft: "2.5rem" }}>
-                                    {(() => {
-                                        const fmt = (dStr: string) => {
-                                            if (!dStr) return "";
-                                            const [y, m, d] = dStr.split("-");
-                                            return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-                                        };
-                                        return `${fmt(trip.startDate)}${trip.endDate ? ` - ${fmt(trip.endDate)}` : ""}`;
-                                    })()}
+
+                                <div style={{
+                                    backgroundColor: "white",
+                                    border: "2px solid #000",
+                                    borderRadius: "8px",
+                                    padding: "0.85rem 1rem",
+                                    boxShadow: "2px 2px 0 0 #000"
+                                }}>
+                                    <div style={{ fontSize: "0.8rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+                                        Přihláška a kontakty
+                                    </div>
+                                    <div style={{ display: "grid", gap: "0.2rem", fontWeight: "700", fontSize: "0.95rem" }}>
+                                        <div>Formulář: {trip.formType || "registration"} · Otázky: {trip.customFields ? trip.customFields.length : 0}</div>
+                                        <div>E-maily: {participantsWithEmail.length} · Bez e-mailu: {validParticipants.length - participantsWithEmail.length}</div>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    backgroundColor: "white",
+                                    border: "2px solid #000",
+                                    borderRadius: "8px",
+                                    padding: "0.85rem 1rem",
+                                    boxShadow: "2px 2px 0 0 #000"
+                                }}>
+                                    <div style={{ fontSize: "0.8rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "0.4rem" }}>
+                                        Lhůty a základna
+                                    </div>
+                                    <div style={{ display: "grid", gap: "0.2rem", fontWeight: "700", fontSize: "0.95rem" }}>
+                                        <div>
+                                            Odhlášení: {trip.lastCancellationDate ? (() => {
+                                                const [y, m, d] = trip.lastCancellationDate.split("-");
+                                                return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
+                                            })() : "Nezadáno"}
+                                        </div>
+                                        <div>Pozdní: {trip.lateCancellationMessage ? "Ano" : "Ne"} · Základna: {base ? base.name : "Nezadaná"}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Description */}
-                        {trip.description && (
-                            <div style={{
-                                backgroundColor: "white",
-                                border: "2px solid #000",
-                                borderRadius: "8px",
-                                padding: "1.2rem",
-                                boxShadow: "3px 3px 0 0 #000"
-                            }}>
-                                <div style={{ fontSize: "0.9rem", fontWeight: "900", textTransform: "uppercase", marginBottom: "0.75rem" }}>
-                                    Popis
-                                </div>
-                                <p style={{ lineHeight: "1.6", margin: 0, fontSize: "1rem" }}>{trip.description}</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Participants */}
-                    <div>
-                        <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({validParticipants.length})</h2>
-
                         <div style={{
-                            overflowX: "auto",
-                            border: "3px solid #000",
-                            borderRadius: "12px",
-                            boxShadow: "6px 6px 0 0 #000",
                             backgroundColor: "white",
-                            WebkitOverflowScrolling: "touch"
+                            border: "2px solid #000",
+                            borderRadius: "10px",
+                            padding: "0.9rem",
+                            boxShadow: "2px 2px 0 0 #000",
+                            position: "sticky",
+                            top: "1rem"
                         }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                                <thead style={{ backgroundColor: "#86efac", borderBottom: "3px solid #000" }}>
-                                    <tr>
-                                        <th style={thStyle}>Skaut</th>
-                                        <th style={thStyle}>Stav</th>
-                                        <th style={thStyle}>Odkaz na Přihlášku</th>
-                                        {trip.customFields && trip.customFields.length > 0 && (
-                                            <th style={thStyle}>Odpovědi</th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {validParticipants.map((p, index) => (
-                                        <tr key={p._id} style={{ borderBottom: index === validParticipants.length - 1 ? "none" : "2px solid #000" }}>
-                                            <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
-                                                <div style={{ fontWeight: "800", fontSize: "1rem" }}>{p.member?.name}</div>
-                                                <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Zástupce: {p.member?.guardianPhone}</div>
-                                            </td>
-                                            <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
-                                                <span style={{
-                                                    padding: "0.25rem 0.75rem",
-                                                    borderRadius: "99px",
-                                                    fontSize: "0.85rem",
-                                                    border: "2px solid #000",
-                                                    backgroundColor: p.status === "attending" ? "#86efac" : p.status === "not_attending" ? "#fca5a5" : "#fff",
-                                                    color: "black",
-                                                    fontWeight: "700",
-                                                    boxShadow: "2px 2px 0 0 #000"
-                                                }}>
-                                                    {p.status === "pending" ? "Bez reakce" : p.status === "attending" ? "Jede" : "Nejede"}
-                                                </span>
-                                                {p.status === "not_attending" && p.lateCancellation && (
-                                                    <span style={{
-                                                        marginLeft: "0.5rem",
-                                                        padding: "0.2rem 0.6rem",
-                                                        borderRadius: "6px",
-                                                        fontSize: "0.75rem",
-                                                        border: "2px solid #dc2626",
-                                                        color: "#991b1b",
-                                                        fontWeight: "700",
-                                                        backgroundColor: "#fee2e2"
-                                                    }}>
-                                                        Po lhute
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
-                                                <button
-                                                    onClick={() => copyLink(p.accessKey)}
-                                                    style={{
-                                                        fontSize: "0.85rem",
-                                                        padding: "0.25rem 0.5rem",
-                                                        border: "2px solid #000",
-                                                        borderRadius: "4px",
-                                                        cursor: "pointer",
-                                                        backgroundColor: "white",
-                                                        fontWeight: "600",
-                                                        boxShadow: "2px 2px 0 0 #000",
-                                                        transition: "transform 0.1s",
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        gap: "0.5rem"
-                                                    }}
-                                                    onMouseDown={e => e.currentTarget.style.transform = "translate(1px, 1px)"}
-                                                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                                                >
-                                                    {copiedKey === p.accessKey ? "✅ Zkopírováno!" : (
-                                                        <>
-                                                            <img src="/Link-icon.svg" alt="link" style={{ width: "16px", height: "16px" }} />
-                                                            Zkopírovat
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </td>
-                                            {trip.customFields && trip.customFields.length > 0 && (
-                                                <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
-                                                    {(() => {
-                                                        const parsed = getParsedResponses(p.responses);
-                                                        const hasData = Object.keys(parsed).length > 0;
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.6rem" }}>
+                                <div style={{ fontWeight: "900", textTransform: "uppercase", fontSize: "0.95rem" }}>Vedoucí & Roveři</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <div style={{ fontSize: "0.8rem", color: "#666", fontWeight: "700" }}>Přidáno: {tripStaff.length}</div>
+                                    <button
+                                        onClick={() => setIsStaffModalOpen(true)}
+                                        style={{
+                                            padding: "6px 10px",
+                                            border: "2px solid #000",
+                                            borderRadius: "8px",
+                                            backgroundColor: "#86efac",
+                                            fontWeight: "900",
+                                            cursor: "pointer",
+                                            fontSize: "0.85rem",
+                                        }}
+                                    >
+                                        Přidat
+                                    </button>
+                                </div>
+                            </div>
 
-                                                        return hasData ? (
-                                                            <button
-                                                                onClick={() => setViewResponse({ name: p.member?.name, responses: parsed })}
-                                                                style={{
-                                                                    padding: "0.25rem 0.75rem",
-                                                                    border: "2px solid #000",
-                                                                    borderRadius: "6px",
-                                                                    backgroundColor: "#e5e7eb",
-                                                                    fontWeight: "600",
-                                                                    cursor: "pointer",
-                                                                    fontSize: "0.85rem",
-                                                                    boxShadow: "2px 2px 0 0 #000"
-                                                                }}
-                                                            >
-                                                                Zobrazit
-                                                            </button>
-                                                        ) : (
-                                                            <span style={{ color: "#9ca3af", fontStyle: "italic" }}>-</span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                {tripStaff.length === 0 ? (
+                                    <div style={{ color: "#888", fontStyle: "italic", fontWeight: "600" }}>Zatím nikdo není přiřazen.</div>
+                                ) : (
+                                    tripStaff.map((s: any) => (
+                                        <div key={s._id} style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            gap: "0.4rem",
+                                            border: "2px solid #000",
+                                            borderRadius: "8px",
+                                            padding: "0.45rem 0.6rem",
+                                            backgroundColor: "#f9fafb"
+                                        }}>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                                                <div style={{ fontWeight: "800" }}>{s.user?.name || s.name}</div>
+                                                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
+                                                    <span style={{
+                                                        border: "2px solid #000",
+                                                        borderRadius: "999px",
+                                                        padding: "0 6px",
+                                                        fontSize: "0.7rem",
+                                                        fontWeight: "900",
+                                                        backgroundColor: s.role === "rover" ? "#a7f3d0" : "#fde047"
+                                                    }}>
+                                                        {s.role === "rover" ? "ROVER" : "VEDOUCÍ"}
+                                                    </span>
+                                                    {typeof s.age === "number" && <span style={{ fontSize: "0.75rem", fontWeight: "700" }}>{s.age} let</span>}
+                                                    {s.benefit && <span style={{ fontSize: "0.75rem", fontWeight: "700" }}>{s.benefit}</span>}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={async () => {
+                                                    await removeTripStaff({ tripStaffId: s._id });
+                                                }}
+                                                style={{
+                                                    border: "2px solid #000",
+                                                    borderRadius: "6px",
+                                                    backgroundColor: "#fee2e2",
+                                                    fontWeight: "900",
+                                                    padding: "0 6px",
+                                                    cursor: "pointer"
+                                                }}
+                                                title="Odebrat"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
+
+                    {isStaffModalOpen && (
+                        <div
+                            style={{
+                                position: "fixed",
+                                inset: 0,
+                                backgroundColor: "rgba(0,0,0,0.5)",
+                                zIndex: 2000,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                padding: "1rem"
+                            }}
+                            onClick={() => setIsStaffModalOpen(false)}
+                        >
+                            <div
+                                style={{
+                                    backgroundColor: "white",
+                                    border: "3px solid #000",
+                                    borderRadius: "16px",
+                                    boxShadow: "8px 8px 0 0 #000",
+                                    width: "100%",
+                                    maxWidth: "900px",
+                                    maxHeight: "85vh",
+                                    overflowY: "auto",
+                                    padding: "1.5rem"
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+                                    <h2 style={{ fontSize: "1.4rem", fontWeight: "900", margin: 0 }}>Vedoucí & Roveři</h2>
+                                    <button
+                                        onClick={() => setIsStaffModalOpen(false)}
+                                        style={{
+                                            border: "3px solid #000",
+                                            borderRadius: "10px",
+                                            padding: "0.4rem 0.8rem",
+                                            fontWeight: "900",
+                                            backgroundColor: "#f4f4f5",
+                                            cursor: "pointer"
+                                        }}
+                                    >
+                                        Zavřít
+                                    </button>
+                                </div>
+
+                                <div style={{
+                                    border: "2px solid #000",
+                                    borderRadius: "12px",
+                                    padding: "1rem",
+                                    backgroundColor: "#f0fdf4",
+                                    boxShadow: "3px 3px 0 0 #000",
+                                    marginBottom: "1rem"
+                                }}>
+                                    <div style={{ fontWeight: "900", marginBottom: "0.6rem" }}>Přidat z týmu</div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 1fr) auto", gap: "0.6rem", alignItems: "center" }}>
+                                        <select
+                                            value={selectedLeaderId}
+                                            onChange={(e) => setSelectedLeaderId(e.target.value)}
+                                            style={{ padding: "10px 12px", border: "2px solid #000", borderRadius: "10px", fontWeight: "800" }}
+                                        >
+                                            <option value="">Vyber vedoucího/rovera…</option>
+                                            {dashboard.leaders?.map((l: any) => (
+                                                <option key={l._id} value={l._id}>
+                                                    {l.name || l.email} · {l.role === "rover" ? "Rover" : "Vedoucí"}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={handleAddLeaderFromTeam}
+                                            style={{
+                                                padding: "10px 14px",
+                                                border: "2px solid #000",
+                                                borderRadius: "10px",
+                                                backgroundColor: "#86efac",
+                                                fontWeight: "900",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Přidat
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div style={{
+                                    border: "2px solid #000",
+                                    borderRadius: "12px",
+                                    padding: "1rem",
+                                    backgroundColor: "#fff7ed",
+                                    boxShadow: "3px 3px 0 0 #000",
+                                    marginBottom: "1rem"
+                                }}>
+                                    <div style={{ fontWeight: "900", marginBottom: "0.6rem" }}>Přidat externího</div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 1fr auto", gap: "0.6rem", alignItems: "center" }}>
+                                        <input
+                                            value={externalName}
+                                            onChange={(e) => setExternalName(e.target.value)}
+                                            placeholder="Externí jméno"
+                                            style={{ padding: "10px 12px", border: "2px solid #000", borderRadius: "10px", fontWeight: "800" }}
+                                        />
+                                        <input
+                                            value={externalAge}
+                                            onChange={(e) => setExternalAge(e.target.value)}
+                                            placeholder="Věk"
+                                            inputMode="numeric"
+                                            style={{ padding: "10px 12px", border: "2px solid #000", borderRadius: "10px", fontWeight: "800" }}
+                                        />
+                                        <select
+                                            value={externalBenefit}
+                                            onChange={(e) => setExternalBenefit(e.target.value)}
+                                            style={{ padding: "10px 12px", border: "2px solid #000", borderRadius: "10px", fontWeight: "800" }}
+                                        >
+                                            <option value="">Benefit</option>
+                                            {BENEFIT_OPTIONS.map((b) => (
+                                                <option key={b} value={b}>{b}</option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={externalRole}
+                                            onChange={(e) => setExternalRole(e.target.value as "leader" | "rover")}
+                                            style={{ padding: "10px 12px", border: "2px solid #000", borderRadius: "10px", fontWeight: "800" }}
+                                        >
+                                            <option value="leader">Vedoucí</option>
+                                            <option value="rover">Rover</option>
+                                        </select>
+                                    </div>
+
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap", marginTop: "0.6rem" }}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontWeight: "800", fontSize: "0.9rem" }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={saveExternalAsPreset}
+                                                onChange={(e) => setSaveExternalAsPreset(e.target.checked)}
+                                            />
+                                            Uložit jako preset
+                                        </label>
+                                        <button
+                                            onClick={handleAddExternal}
+                                            style={{
+                                                padding: "10px 14px",
+                                                border: "2px solid #000",
+                                                borderRadius: "10px",
+                                                backgroundColor: "#fde047",
+                                                fontWeight: "900",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Přidat externího
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {leaderPresets.length > 0 && (
+                                    <div style={{
+                                        border: "2px solid #000",
+                                        borderRadius: "12px",
+                                        padding: "0.8rem",
+                                        backgroundColor: "#f8fafc",
+                                        boxShadow: "3px 3px 0 0 #000"
+                                    }}>
+                                        <div style={{ fontWeight: "900", marginBottom: "0.5rem" }}>Presety</div>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                                            {leaderPresets.map((p: any) => (
+                                                <div key={p._id} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                                                    <button
+                                                        onClick={() => handleAddFromPreset(p._id)}
+                                                        style={{
+                                                            padding: "6px 10px",
+                                                            border: "2px solid #000",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: "#f4f4f5",
+                                                            fontWeight: "800",
+                                                            cursor: "pointer",
+                                                            fontSize: "0.85rem"
+                                                        }}
+                                                    >
+                                                        {p.name} · {p.role === "rover" ? "Rover" : "Vedoucí"}
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            await removeLeaderPreset({ presetId: p._id });
+                                                        }}
+                                                        title="Smazat preset"
+                                                        style={{
+                                                            border: "2px solid #000",
+                                                            borderRadius: "999px",
+                                                            backgroundColor: "#fee2e2",
+                                                            fontWeight: "900",
+                                                            padding: "0 6px",
+                                                            cursor: "pointer"
+                                                        }}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
 
@@ -1106,312 +1442,7 @@ export default function TripDashboardPage() {
             {/* Tab Content - DOPRAVA */}
             {activeTab === 'doprava' && (
                 <div>
-                    <div style={{
-                        backgroundColor: "#E8F5E9",
-                        border: "3px solid #000",
-                        borderRadius: "12px",
-                        padding: "2rem",
-                        boxShadow: "6px 6px 0 0 #000",
-                        marginBottom: "2rem"
-                    }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-                            <h2 style={{ fontSize: "2rem", fontWeight: "900", margin: 0, textTransform: "uppercase" }}>Doprava</h2>
-                            <button
-                                onClick={() => {
-                                    const origin = prompt("Odkud?", "Praha");
-                                    if (!origin) return;
-                                    const destination = trip.location || prompt("Kam?", "");
-                                    if (!destination) return;
-                                    const dateStr = trip.startDate || new Date().toISOString().split('T')[0];
-                                    const timeStr = prompt("Čas odjezdu (HH:MM)?", "09:00");
-                                    if (!timeStr) return;
-                                    
-                                    // Open IDOS in new tab
-                                    const url = `https://idos.idnes.cz/vlaky/spojeni/?f=${encodeURIComponent(origin)}&t=${encodeURIComponent(destination)}&date=${dateStr}&time=${timeStr}`;
-                                    window.open(url, '_blank');
-                                }}
-                                style={{
-                                    padding: "0.75rem 1.5rem",
-                                    backgroundColor: "#86efac",
-                                    border: "3px solid #000",
-                                    borderRadius: "8px",
-                                    fontWeight: "900",
-                                    cursor: "pointer",
-                                    boxShadow: "4px 4px 0 0 #000",
-                                    fontSize: "1rem",
-                                    textTransform: "uppercase",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem"
-                                }}
-                            >
-                                <img src="/plus-icon-dark.svg" alt="" style={{ width: "20px", height: "20px" }} />
-                                Přidat trasu
-                            </button>
-                        </div>
-
-                        <div style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.85rem",
-                            padding: "0.9rem 1.1rem",
-                            backgroundColor: "#ffe4e6",
-                            border: "3px solid #c43737",
-                            borderRadius: "12px",
-                            fontWeight: "900",
-                            marginBottom: "1.5rem",
-                            boxShadow: "4px 4px 0 0 #c43737",
-                        }}>
-                            <img
-                                src="/exclamation-icon.svg"
-                                alt=""
-                                style={{ width: "28px", height: "28px" }}
-                            />
-                            <span style={{ color: "#9b1c1c" }}>Tato sekce je ve vyvoji.</span>
-                        </div>
-
-                        {/* Route Cards */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                            {/* Example: Travel to destination */}
-                            <div style={{
-                                backgroundColor: "white",
-                                border: "3px solid #000",
-                                borderRadius: "12px",
-                                padding: "1.5rem",
-                                boxShadow: "4px 4px 0 0 #000"
-                            }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-                                    <div>
-                                        <h3 style={{ fontSize: "1.3rem", fontWeight: "900", marginBottom: "0.5rem" }}>Cesta tam</h3>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "#666", fontSize: "0.95rem", fontWeight: "600" }}>
-                                            <img src="/place-icon.svg" alt="" style={{ width: "18px", height: "18px" }} />
-                                            <span>→ {trip.location}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-                                    <div style={{
-                                        backgroundColor: "#f0f9ff",
-                                        border: "2px solid #000",
-                                        borderRadius: "8px",
-                                        padding: "1rem",
-                                        boxShadow: "2px 2px 0 0 #000"
-                                    }}>
-                                        <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", marginBottom: "0.5rem", textTransform: "uppercase" }}>Datum</div>
-                                        <div style={{ fontSize: "1.1rem", fontWeight: "800" }}>
-                                            {(() => {
-                                                const fmt = (dStr: string) => {
-                                                    if (!dStr) return "";
-                                                    const [y, m, d] = dStr.split("-");
-                                                    return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-                                                };
-                                                return fmt(trip.startDate);
-                                            })()}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                                    <a
-                                        href={`https://idos.idnes.cz/vlaky/spojeni/?t=${encodeURIComponent(trip.location)}&date=${trip.startDate}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            padding: "0.6rem 1.2rem",
-                                            backgroundColor: "#fef3c7",
-                                            border: "3px solid #000",
-                                            borderRadius: "6px",
-                                            fontWeight: "800",
-                                            textDecoration: "none",
-                                            color: "#000",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            fontSize: "0.9rem",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.5rem"
-                                        }}
-                                    >
-                                        <img src="/metro-map-icon.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                        Vlak/Bus (IDOS)
-                                    </a>
-                                    <a
-                                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(trip.location)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            padding: "0.6rem 1.2rem",
-                                            backgroundColor: "white",
-                                            border: "3px solid #000",
-                                            borderRadius: "6px",
-                                            fontWeight: "800",
-                                            textDecoration: "none",
-                                            color: "#000",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            fontSize: "0.9rem",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.5rem"
-                                        }}
-                                    >
-                                        <img src="/google-maps-logo.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                        Auto (Google Maps)
-                                    </a>
-                                    <a
-                                        href={`https://mapy.cz/zakladni?q=${encodeURIComponent(trip.location)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            padding: "0.6rem 1.2rem",
-                                            backgroundColor: "white",
-                                            border: "3px solid #000",
-                                            borderRadius: "6px",
-                                            fontWeight: "800",
-                                            textDecoration: "none",
-                                            color: "#000",
-                                            boxShadow: "3px 3px 0 0 #000",
-                                            fontSize: "0.9rem",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "0.5rem"
-                                        }}
-                                    >
-                                        <img src="/mapy-cz-logo.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                        Mapy.cz
-                                    </a>
-                                </div>
-                            </div>
-
-                            {/* Return journey */}
-                            {trip.endDate && (
-                                <div style={{
-                                    backgroundColor: "white",
-                                    border: "3px solid #000",
-                                    borderRadius: "12px",
-                                    padding: "1.5rem",
-                                    boxShadow: "4px 4px 0 0 #000"
-                                }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-                                        <div>
-                                            <h3 style={{ fontSize: "1.3rem", fontWeight: "900", marginBottom: "0.5rem" }}>Cesta zpět</h3>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", color: "#666", fontSize: "0.95rem", fontWeight: "600" }}>
-                                                <img src="/place-icon.svg" alt="" style={{ width: "18px", height: "18px" }} />
-                                                <span>{trip.location} →</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
-                                        <div style={{
-                                            backgroundColor: "#f0f9ff",
-                                            border: "2px solid #000",
-                                            borderRadius: "8px",
-                                            padding: "1rem",
-                                            boxShadow: "2px 2px 0 0 #000"
-                                        }}>
-                                            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", marginBottom: "0.5rem", textTransform: "uppercase" }}>Datum</div>
-                                            <div style={{ fontSize: "1.1rem", fontWeight: "800" }}>
-                                                {(() => {
-                                                    const fmt = (dStr: string) => {
-                                                        if (!dStr) return "";
-                                                        const [y, m, d] = dStr.split("-");
-                                                        return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-                                                    };
-                                                    return fmt(trip.endDate || "");
-                                                })()}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                                        <a
-                                            href={`https://idos.idnes.cz/vlaky/spojeni/?f=${encodeURIComponent(trip.location)}&date=${trip.endDate}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                                padding: "0.6rem 1.2rem",
-                                                backgroundColor: "#fef3c7",
-                                                border: "3px solid #000",
-                                                borderRadius: "6px",
-                                                fontWeight: "800",
-                                                textDecoration: "none",
-                                                color: "#000",
-                                                boxShadow: "3px 3px 0 0 #000",
-                                                fontSize: "0.9rem",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem"
-                                            }}
-                                        >
-                                            <img src="/metro-map-icon.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                            Vlak/Bus (IDOS)
-                                        </a>
-                                        <a
-                                            href={`https://www.google.com/maps/dir/${encodeURIComponent(trip.location)}/`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                                padding: "0.6rem 1.2rem",
-                                                backgroundColor: "white",
-                                                border: "3px solid #000",
-                                                borderRadius: "6px",
-                                                fontWeight: "800",
-                                                textDecoration: "none",
-                                                color: "#000",
-                                                boxShadow: "3px 3px 0 0 #000",
-                                                fontSize: "0.9rem",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem"
-                                            }}
-                                        >
-                                            <img src="/google-maps-logo.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                            Auto (Google Maps)
-                                        </a>
-                                        <a
-                                            href={`https://mapy.cz/zakladni?q=${encodeURIComponent(trip.location)}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            style={{
-                                                padding: "0.6rem 1.2rem",
-                                                backgroundColor: "white",
-                                                border: "3px solid #000",
-                                                borderRadius: "6px",
-                                                fontWeight: "800",
-                                                textDecoration: "none",
-                                                color: "#000",
-                                                boxShadow: "3px 3px 0 0 #000",
-                                                fontSize: "0.9rem",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "0.5rem"
-                                            }}
-                                        >
-                                            <img src="/mapy-cz-logo.png" alt="" style={{ width: "18px", height: "18px" }} />
-                                            Mapy.cz
-                                        </a>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Info box */}
-                        <div style={{
-                            marginTop: "1.5rem",
-                            padding: "1rem",
-                            backgroundColor: "#fff9e6",
-                            border: "2px solid #000",
-                            borderRadius: "8px",
-                            boxShadow: "2px 2px 0 0 #000"
-                        }}>
-                            <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
-                                <img src="/info-icon.svg" alt="" style={{ width: "20px", height: "20px", marginTop: "2px" }} />
-                                <div style={{ fontSize: "0.9rem", lineHeight: "1.5" }}>
-                                    <strong>Tip:</strong> Kliknutím na "Přidat trasu" můžete vyhledat vlastní spoje na IDOS. Odkazy níže otevírají oblíbené navigace s předvyplněnou destinací.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <TransportTab tripId={tripId} trip={trip} />
                 </div>
             )}
 
