@@ -144,7 +144,7 @@ function extractHiddenInputs(html: string): Record<string, string> {
 
 function extractLabeledFaresFromHtml(html: string): { adult?: string; child?: string; isic?: string } {
   const $ = cheerio.load(html);
-  const text = normalizeTextForMatch($.text());
+  const text = normalizeTextForMatch($.root().text());
 
   const pick = (label: string): string | undefined => {
     const idx = text.indexOf(label);
