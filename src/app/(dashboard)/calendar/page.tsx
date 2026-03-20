@@ -7,6 +7,7 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInte
 import { cs } from "date-fns/locale";
 import Link from "next/link";
 import styles from "./Calendar.module.css";
+import Breadcrumbs from "../../../components/Breadcrumbs";
 
 export default function CalendarPage() {
     const trips = useQuery(api.trips.getAllUserTrips);
@@ -31,30 +32,23 @@ export default function CalendarPage() {
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
-            <div style={{
-                backgroundColor: "white",
-                borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
-                margin: "0 -2rem 2rem -2rem", // Break out to full width
-                width: "calc(100% + 4rem)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.5rem"
-            }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Kalendář</h1>
-                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <button onClick={prevMonth} style={navButtonStyle}>←</button>
-                    <span style={{ fontSize: "1rem", fontWeight: "800", minWidth: "120px", textAlign: "center" }}>
-                        {format(currentDate, "MMMM yyyy", { locale: cs })}
-                    </span>
-                    <button onClick={nextMonth} style={navButtonStyle}>→</button>
-                    <button onClick={today} style={{ ...navButtonStyle, fontSize: "0.8rem", width: "auto", padding: "0 0.75rem", whiteSpace: "nowrap" }}>Dnes</button>
+            <div className="headingContainer">
+                <Breadcrumbs />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                    <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Kalendář</h1>
+                    <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                        <button onClick={prevMonth} style={navButtonStyle}>←</button>
+                        <span style={{ fontSize: "1rem", fontWeight: "800", minWidth: "120px", textAlign: "center" }}>
+                            {format(currentDate, "MMMM yyyy", { locale: cs })}
+                        </span>
+                        <button onClick={nextMonth} style={navButtonStyle}>→</button>
+                        <button onClick={today} style={{ ...navButtonStyle, fontSize: "0.8rem", width: "auto", padding: "0 0.75rem", whiteSpace: "nowrap" }}>Dnes</button>
+                    </div>
                 </div>
             </div>
 
-            {/* Calendar Grid */}
+            <div className="dashboardContent">
+                {/* Calendar Grid */}
             <div style={{
                 border: "3px solid #000",
                 borderRadius: "12px",
@@ -145,7 +139,8 @@ export default function CalendarPage() {
                 </div>
             </div>
         </div>
-    );
+    </div>
+);
 }
 
 const navButtonStyle = {

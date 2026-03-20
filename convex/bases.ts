@@ -125,9 +125,21 @@ export const getBaseWithStations = query({
         score: link.score,
       }));
 
+    stations.sort((a, b) => {
+      // Rank (lower=better) is the primary sort key.
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      // Score (lower=better) is a stable tie-breaker.
+      if (a.score !== b.score) return a.score - b.score;
+      return a.distanceKm - b.distanceKm;
+    });
+
+    const limitedStations = stations
+      .filter((s) => s.distanceKm <= 5)
+      .slice(0, 15);
+
     return {
       ...base,
-      stations: stations,
+      stations: limitedStations,
     };
   },
 });
@@ -274,9 +286,19 @@ export const listBasesWithStations = query({
           score: link.score,
         }));
 
+      stations.sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        if (a.score !== b.score) return a.score - b.score;
+        return a.distanceKm - b.distanceKm;
+      });
+
+      const limitedStations = stations
+        .filter((s) => s.distanceKm <= 5)
+        .slice(0, 15);
+
       result.push({
         base,
-        stations: stations,
+        stations: limitedStations,
       });
     }
 

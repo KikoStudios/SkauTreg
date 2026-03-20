@@ -26,6 +26,7 @@ export interface SupernotesCard {
   tags?: string[];
   color?: string;
   status?: string;
+  collectionId?: string;
 }
 
 export interface SupernotesResponse {
@@ -99,15 +100,23 @@ export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCa
       const rawTags = Array.isArray(item.data.tags) ? item.data.tags : [];
       const tags = rawTags.filter((tag: unknown): tag is string => typeof tag === "string");
 
+      const collectionId =
+        item.data.collection_id ??
+        item.data.collectionId ??
+        item.data.collection ??
+        item.data.collection_id?.id ??
+        item.data.collection?.id;
+
       return {
-      id: item.data.id,
-      name: item.data.name,
-      markup: item.data.markup,
-      html: item.data.html,
-      created_when: item.data.created_when,
-      modified_when: item.data.modified_when,
-      tags,
-      color: item.data.color,
+        id: item.data.id,
+        name: item.data.name,
+        markup: item.data.markup,
+        html: item.data.html,
+        created_when: item.data.created_when,
+        modified_when: item.data.modified_when,
+        tags,
+        color: item.data.color,
+        collectionId,
       };
     });
     

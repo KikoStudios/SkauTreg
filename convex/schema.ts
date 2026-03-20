@@ -6,6 +6,8 @@ export default defineSchema({
         name: v.optional(v.string()),
         email: v.optional(v.string()),
         image: v.optional(v.string()),
+        dateOfBirth: v.optional(v.string()),
+        benefit: v.optional(v.string()),
         tokenIdentifier: v.string(),
     })
         .index("by_token", ["tokenIdentifier"])
@@ -113,6 +115,56 @@ export default defineSchema({
         }))),
     }).index("by_troop", ["troopId"]),
 
+    transport_routes: defineTable({
+        tripId: v.id("trips"),
+        direction: v.string(), // "outbound" | "return" | "unknown"
+        source: v.string(), // "idos" | "manual"
+        from: v.optional(v.string()),
+        to: v.optional(v.string()),
+        date: v.optional(v.string()), // YYYY-MM-DD
+        departureTime: v.optional(v.string()), // HH:MM
+        arrivalTime: v.optional(v.string()), // HH:MM
+        duration: v.optional(v.string()),
+        transferCount: v.optional(v.number()),
+        price: v.optional(v.string()),
+        shareLink: v.optional(v.string()),
+        idosTrip: v.optional(v.any()), // Snapshot of IDOS trip payload
+        createdAt: v.string(),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_direction", ["tripId", "direction"]),
+
+    transport_tickets: defineTable({
+        tripId: v.id("trips"),
+        routeId: v.optional(v.id("transport_routes")),
+        storageId: v.string(),
+        name: v.string(),
+        contentType: v.string(), // "application/pdf" | "image/*" | other
+        parsed: v.optional(v.any()), // { ticketCode?, ... }
+        shareEnabled: v.optional(v.boolean()),
+        shareSlug: v.optional(v.string()),
+        shareUpdatedAt: v.optional(v.string()),
+        priceOverview: v.optional(v.object({
+            // v2 (preferred): unit prices + counts
+            kidUnitCzk: v.optional(v.number()),
+            adultUnitCzk: v.optional(v.number()),
+            studentUnitCzk: v.optional(v.number()),
+            kidCount: v.optional(v.number()),
+            adultCount: v.optional(v.number()),
+            studentCount: v.optional(v.number()),
+            // v1 legacy: treat as unit prices in UI
+            kidCzk: v.optional(v.number()),
+            adultCzk: v.optional(v.number()),
+            studentCzk: v.optional(v.number()),
+        })),
+        createdAt: v.string(),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_route", ["routeId"])
+        .index("by_share_slug", ["shareSlug"]),
+
     participations: defineTable({
         tripId: v.id("trips"),
         memberId: v.id("members"),
@@ -124,6 +176,31 @@ export default defineSchema({
     })
         .index("by_trip", ["tripId"])
         .index("by_access_key", ["accessKey"]),
+
+    trip_staff: defineTable({
+        tripId: v.id("trips"),
+        troopId: v.id("troops"),
+        role: v.string(), // "leader" | "rover"
+        source: v.string(), // "user" | "external" | "preset"
+        userId: v.optional(v.id("users")),
+        name: v.string(),
+        age: v.optional(v.number()),
+        benefit: v.optional(v.string()),
+        createdAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_troop", ["troopId"])
+        .index("by_user_trip", ["userId", "tripId"]),
+
+    leader_presets: defineTable({
+        troopId: v.id("troops"),
+        name: v.string(),
+        role: v.string(), // "leader" | "rover"
+        age: v.optional(v.number()),
+        benefit: v.optional(v.string()),
+        createdAt: v.string(),
+        updatedAt: v.string(),
+    }).index("by_troop", ["troopId"]),
 
     // Pre-synced catalogue of scout bases (zakladny.skaut.cz)
     bases: defineTable({
@@ -442,5 +519,29 @@ export default defineSchema({
     })
         .index("by_action", ["actionId"])
         .index("by_troop_date", ["troopId", "executedAt"]),
+
+    // App Version and Update Logs
+    app_versions: defineTable({
+        version: v.string(), // Semantic version e.g., "1.2.3"
+        releaseDate: v.string(), // ISO timestamp
+        isActive: v.boolean(), // Current active version
+        supernotesCardId: v.optional(v.string()), // Supernotes card ID containing changelog
+        changelogMarkdown: v.string(), // Markdown content of the changelog
+        changelogHtml: v.optional(v.string()), // HTML rendered version
+        category: v.optional(v.string()), // "major", "minor", "patch", "hotfix"
+        highlights: v.optional(v.array(v.string())), // Array of highlight bullet points
+        createdBy: v.optional(v.id("users")),
+    })
+        .index("by_version", ["version"])
+        .index("by_active", ["isActive"]),
+
+    // User-specific version tracking
+    user_version_tracking: defineTable({
+        userId: v.id("users"),
+        lastSeenVersion: v.string(), // Last version the user acknowledged
+        lastSeenAt: v.string(), // ISO timestamp
+        dismissedVersions: v.optional(v.array(v.string())), // Versions user explicitly dismissed
+    })
+        .index("by_user", ["userId"]),
 
 });

@@ -18,6 +18,7 @@ export default function SignUpForm() {
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
     const [dateOfBirth, setDateOfBirth] = useState("");
+    const [benefit, setBenefit] = useState("");
     const [verifying, setVerifying] = useState(false);
     const [code, setCode] = useState("");
     const [error, setError] = useState("");
@@ -54,6 +55,7 @@ export default function SignUpForm() {
                 lastName,
                 unsafeMetadata: {
                     dateOfBirth: dateOfBirth,
+                    benefit: benefit,
                 },
             });
 
@@ -213,6 +215,32 @@ export default function SignUpForm() {
                     <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
                         Optional - helps personalize your experience
                     </span>
+                </div>
+                <div className={styles.formGroup}>
+                    <label className={styles.label}>
+                        Benefit for transport
+                    </label>
+                    <select
+                        value={benefit}
+                        onChange={(e) => setBenefit(e.target.value)}
+                        className={styles.input}
+                    >
+                        <option value="">No benefit</option>
+                        <option value="žákovský průkaz ČR">žákovský průkaz ČR</option>
+                        <option value="karta ISIC">karta ISIC</option>
+                        <option value="karta ITIC">karta ITIC</option>
+                        <option value="karta ALIVE">karta ALIVE</option>
+                        <option value="karta EYCA (EURO<26)">karta EYCA (EURO&lt;26)</option>
+                        <option value="potvrzení o studiu">potvrzení o studiu</option>
+                        <option value="průkaz ZTP">průkaz ZTP</option>
+                        <option value="průkaz ZTP/P">průkaz ZTP/P</option>
+                        <option value="průvodce ZTP/P">průvodce ZTP/P</option>
+                        <option value="průkaz ŤZP">průkaz ŤZP</option>
+                        <option value="průkaz ŤZP/S">průkaz ŤZP/S</option>
+                        <option value="průvodce ŤZP/S">průvodce ŤZP/S</option>
+                        <option value="JUNIOR (ZSSK)">JUNIOR (ZSSK)</option>
+                        <option value="průkaz rodiče pro ústavy">průkaz rodiče pro ústavy</option>
+                    </select>
                 </div>
 
                 <div className={styles.formGroup}>

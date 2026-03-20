@@ -9,7 +9,8 @@
     "lint": "eslint",
     "sync:all": "node scripts/sync-all-bases-with-stations.mjs",
     "deploy:convex": "npx convex deploy --prod",
-    "sync:prod": "node scripts/sync-all-bases-with-stations.mjs --prod"
+    "sync:prod": "node scripts/sync-all-bases-with-stations.mjs --prod",
+    "preload:stations:v2": "node scripts/preload-base-stations-v2.mjs"
   },
   "dependencies": {
     "@auth/core": "^0.37.4",
@@ -37,6 +38,7 @@
     "leaflet": "^1.9.4",
     "next": "16.1.4",
     "nodemailer": "^6.10.1",
+    "pdfjs-dist": "^5.5.207",
     "puppeteer": "^24.36.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",

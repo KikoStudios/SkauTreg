@@ -10,6 +10,7 @@ import styles from "./DashboardLayout.module.css";
 import ProfileModal from "../../components/ProfileModal";
 import { CommandMenu } from "../../components/CommandMenu";
 import Breadcrumbs from "../../components/Breadcrumbs";
+import { UpdateNotification } from "../../components/UpdateNotification";
 
 export default function DashboardLayout({
     children,
@@ -139,9 +140,9 @@ function DashboardLayoutInner({
                 )}
 
                 <CommandMenu />
+                <UpdateNotification />
 
                 <main className={`${styles.mainContent} ${isSidebarCollapsed ? styles.mainContentExpanded : ''}`}>
-                    <Breadcrumbs />
                     {children}
                 </main>
                 <ProfileModal />

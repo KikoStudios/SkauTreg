@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import TripForm, { TripFormData } from "../../../components/TripForm";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -122,21 +123,14 @@ export default function TripsPage() {
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
-            <div style={{
-                backgroundColor: "white",
-                borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
-                margin: "0 -2rem 2rem -2rem", // Break out to full width
-                width: "calc(100% + 4rem)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-            }}>
+            <div className="headingContainer">
+                <Breadcrumbs />
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Výpravy</h1>
             </div>
 
-            {/* Controls Row */}
-            <div className="controls-row">
+            <div className="dashboardContent">
+                {/* Controls Row */}
+                <div className="controls-row">
                 <div className="troop-selector-container">
                     {/* Troop Selector Pill */}
                     {troops.length > 0 && (
@@ -429,38 +423,70 @@ export default function TripsPage() {
                 )}
             </div>
 
+            </div>
+
             {/* Create Modal */}
             {showAddModal && (
                 <div style={{
                     position: "fixed",
                     top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: "rgba(0,0,0,0.5)",
-                    zIndex: 2000,
+                    backgroundColor: "rgba(0,0,0,0.3)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
+                    zIndex: 2000,
+                    padding: "1rem"
                 }} onClick={() => setShowAddModal(false)}>
                     <div style={{
                         backgroundColor: "white",
-                        padding: "2rem",
                         border: "3px solid #000",
-                        borderRadius: "16px",
-                        boxShadow: "8px 8px 0 0 #000",
+                        borderRadius: "24px",
+                        boxShadow: "10px 10px 0 0 #000",
                         width: "100%",
-                        maxWidth: "600px",
+                        maxWidth: "900px",
                         maxHeight: "90vh",
-                        overflowY: "auto"
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column"
                     }} onClick={e => e.stopPropagation()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: "900" }}>Naplánovat Výpravu</h2>
-                            <button onClick={() => setShowAddModal(false)} style={{ fontSize: "1.5rem", background: "none", border: "none", cursor: "pointer" }}>×</button>
+                        
+                        {/* Header with Gradient */}
+                        <div style={{
+                            background: "linear-gradient(135deg, #86efac 0%, #4ade80 100%)",
+                            padding: "1rem 2rem",
+                            borderBottom: "3px solid #000",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                        }}>
+                            <h2 style={{ fontSize: "1.2rem", fontWeight: "900", margin: 0 }}>Naplánovat Výpravu</h2>
+                            <button
+                                onClick={() => setShowAddModal(false)}
+                                style={{
+                                    backgroundColor: "white",
+                                    border: "2px solid #000",
+                                    borderRadius: "50%",
+                                    width: "32px",
+                                    height: "32px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    cursor: "pointer",
+                                    fontWeight: "900",
+                                    boxShadow: "2px 2px 0 0 #000"
+                                }}
+                            >
+                                ✕
+                            </button>
                         </div>
 
-                        <TripForm
-                            onSubmit={handleCreate}
-                            isLoading={isCreating}
-                            buttonText="Vytvořit Výpravu"
-                        />
+                        <div style={{ flex: "1 1 auto", overflowY: "auto", padding: "1.5rem 2rem" }}>
+                            <TripForm
+                                onSubmit={handleCreate}
+                                isLoading={isCreating}
+                                buttonText="Vytvořit Výpravu"
+                            />
+                        </div>
                     </div>
                 </div>
             )}

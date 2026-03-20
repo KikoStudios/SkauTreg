@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as appVersions from "../appVersions.js";
 import type * as bases from "../bases.js";
 import type * as editorPresence from "../editorPresence.js";
 import type * as emailDrafts from "../emailDrafts.js";
@@ -16,6 +17,7 @@ import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as integration_actions from "../integration_actions.js";
 import type * as integrations from "../integrations.js";
+import type * as leaderPresets from "../leaderPresets.js";
 import type * as mailer from "../mailer.js";
 import type * as meetingFiles from "../meetingFiles.js";
 import type * as meetings from "../meetings.js";
@@ -28,7 +30,11 @@ import type * as pages from "../pages.js";
 import type * as presence from "../presence.js";
 import type * as prosemirror from "../prosemirror.js";
 import type * as prosemirrorSync from "../prosemirrorSync.js";
+import type * as publicTickets from "../publicTickets.js";
 import type * as public_rsvp from "../public_rsvp.js";
+import type * as transportRoutes from "../transportRoutes.js";
+import type * as transportTickets from "../transportTickets.js";
+import type * as tripStaff from "../tripStaff.js";
 import type * as trips from "../trips.js";
 import type * as troops from "../troops.js";
 import type * as users from "../users.js";
@@ -40,6 +46,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appVersions: typeof appVersions;
   bases: typeof bases;
   editorPresence: typeof editorPresence;
   emailDrafts: typeof emailDrafts;
@@ -48,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   integration_actions: typeof integration_actions;
   integrations: typeof integrations;
+  leaderPresets: typeof leaderPresets;
   mailer: typeof mailer;
   meetingFiles: typeof meetingFiles;
   meetings: typeof meetings;
@@ -60,7 +68,11 @@ declare const fullApi: ApiFromModules<{
   presence: typeof presence;
   prosemirror: typeof prosemirror;
   prosemirrorSync: typeof prosemirrorSync;
+  publicTickets: typeof publicTickets;
   public_rsvp: typeof public_rsvp;
+  transportRoutes: typeof transportRoutes;
+  transportTickets: typeof transportTickets;
+  tripStaff: typeof tripStaff;
   trips: typeof trips;
   troops: typeof troops;
   users: typeof users;

@@ -201,16 +201,13 @@ export default function TripForm({ initialData, onSubmit, isLoading, buttonText 
             {activeTab === 'basic' && (
                 <>
             {/* Basic Trip Info */}
-            <div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <input required placeholder="Název Výpravy" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} style={inputStyle} />
+                <input required placeholder="Místo" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} style={inputStyle} />
             </div>
             
             <div>
                 <textarea required placeholder="Popis" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} style={{ ...inputStyle, minHeight: "80px" }} />
-            </div>
-            
-            <div>
-                <input required placeholder="Místo" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} style={inputStyle} />
             </div>
             
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
