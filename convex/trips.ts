@@ -1,6 +1,50 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+function parseDateParts(value?: string | null) {
+    if (!value) return null;
+    const trimmed = value.trim();
+    const parts = trimmed.match(/\d+/g);
+    if (!parts || parts.length < 3) return null;
+
+    const [a, b, c] = parts;
+    const toInt = (n?: string) => (n ? parseInt(n, 10) : NaN);
+
+    let y = NaN;
+    let m = NaN;
+    let d = NaN;
+
+    if (a.length === 4) {
+        // YYYY M D
+        y = toInt(a);
+        m = toInt(b);
+        d = toInt(c);
+    } else if (c.length === 4) {
+        // D M YYYY
+        d = toInt(a);
+        m = toInt(b);
+        y = toInt(c);
+    } else {
+        // Fallback for 2-digit years (assume 2000+)
+        d = toInt(a);
+        m = toInt(b);
+        y = toInt(c);
+        if (y < 100) y += 2000;
+    }
+
+    if (!y || !m || !d) return null;
+    return { y, m, d };
+}
+
+function computeAgeOnDate(birthDate?: string | null, refDate?: string | null): number | null {
+    const birth = parseDateParts(birthDate);
+    const ref = parseDateParts(refDate);
+    if (!birth || !ref) return null;
+    let age = ref.y - birth.y;
+    if (ref.m < birth.m || (ref.m === birth.m && ref.d < birth.d)) age -= 1;
+    return age >= 0 && age <= 120 ? age : null;
+}
+
 export const create = mutation({
     args: {
         troopId: v.id("troops"),
@@ -170,12 +214,110 @@ export const getDashboard = query({
             })()
             : [];
 
+        const tripStaff = await ctx.db
+            .query("trip_staff")
+            .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
+            .collect();
+
+        const tripStaffWithUsers = await Promise.all(
+            tripStaff.map(async (row) => {
+                const user = row.userId ? await ctx.db.get(row.userId) : null;
+                return { ...row, user };
+            })
+        );
+
+        const leaderPresets = await ctx.db
+            .query("leader_presets")
+            .withIndex("by_troop", (q) => q.eq("troopId", trip.troopId))
+            .collect();
+
         return {
             trip,
             participants: participantsWithDetails,
             base,
             leaders,
             currentUser,
+            tripStaff: tripStaffWithUsers,
+            leaderPresets,
+        };
+    },
+});
+
+export const getAttendanceCounts = query({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        const trip = await ctx.db.get(args.tripId);
+        const refDate = trip?.startDate ?? null;
+        const studentBenefits = new Set([
+            "žákovský průkaz ČR",
+            "karta ISIC",
+            "karta ITIC",
+            "karta ALIVE",
+            "karta EYCA (EURO<26)",
+            "potvrzení o studiu",
+            "JUNIOR (ZSSK)",
+        ]);
+        const isStudentBenefit = (benefit?: string | null) =>
+            typeof benefit === "string" && studentBenefits.has(benefit);
+
+        const participations = await ctx.db
+            .query("participations")
+            .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
+            .collect();
+
+        const attending = participations.filter((p) => p.status === "attending");
+        let kidCount = 0;
+        let adultCount = 0;
+        let studentCount = 0;
+        let unknownCount = 0;
+
+        for (const p of attending) {
+            const member = await ctx.db.get(p.memberId);
+            const age = computeAgeOnDate(member?.birthDate ?? null, refDate);
+            if (age === null) {
+                // For participants (members), unknown birth dates are usually kids.
+                kidCount += 1;
+                continue;
+            }
+            if (age >= 6 && age <= 15) kidCount += 1;
+            else adultCount += 1;
+        }
+
+        const staff = await ctx.db
+            .query("trip_staff")
+            .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
+            .collect();
+
+        let staffKid = 0;
+        let staffAdult = 0;
+        let staffStudent = 0;
+        let staffUnknown = 0;
+
+        for (const s of staff) {
+            const user = s.userId ? await ctx.db.get(s.userId) : null;
+            const staffBenefit = user?.benefit ?? s.benefit ?? null;
+            const staffBirth = user?.dateOfBirth ?? null;
+            const staffAge =
+                typeof s.age === "number"
+                    ? s.age
+                    : computeAgeOnDate(staffBirth, refDate);
+            if (staffAge === null) {
+                staffUnknown += 1;
+                if (isStudentBenefit(staffBenefit)) staffStudent += 1;
+                else staffAdult += 1;
+                continue;
+            }
+            if (staffAge <= 15) staffKid += 1;
+            else if (isStudentBenefit(staffBenefit)) staffStudent += 1;
+            else staffAdult += 1;
+        }
+
+        return {
+            attendingCount: attending.length + staff.length,
+            kidCount: kidCount + staffKid,
+            adultCount: adultCount + staffAdult,
+            studentCount: studentCount + staffStudent,
+            unknownCount: unknownCount + staffUnknown,
         };
     },
 });

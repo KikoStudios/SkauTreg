@@ -76,6 +76,10 @@ export default function BaseFinder() {
     
     // Trip assignment state
     const [isTripAssignModalOpen, setIsTripAssignModalOpen] = useState(false);
+    const [tripAssignMode, setTripAssignMode] = useState<"base" | "route">("base");
+    const [routeToAssign, setRouteToAssign] = useState<any | null>(null);
+    const [routeAssignDirection, setRouteAssignDirection] = useState<"outbound" | "return" | "unknown">("outbound");
+    const [isRouteDirectionModalOpen, setIsRouteDirectionModalOpen] = useState(false);
     
     // Assigned trip state
     const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
@@ -94,15 +98,26 @@ export default function BaseFinder() {
     // Fetch all user trips
     const userTrips = useQuery(api.trips.getAllUserTrips);
     
-    // Mutations for trip assignment
-    const assignBase = useMutation(api.trips.assignBase);
-    const unassignBase = useMutation(api.trips.unassignBase);
+    // Mutations for trip assignment                                                                        
+    const assignBase = useMutation(api.trips.assignBase);                                                   
+    const unassignBase = useMutation(api.trips.unassignBase);                                               
+    const addTransportRoute = useMutation(api.transportRoutes.addFromIdos);
     
     // Fetch selected base with stations
     const selectedBaseData = useQuery(
         api.bases.getBaseWithStations,
         selectedBaseId ? { baseId: selectedBaseId } : "skip"
     );
+
+    useEffect(() => {
+        if (!selectedBaseData) return;
+        if (!selectedStation && selectedBaseData.stations && selectedBaseData.stations.length > 0) {
+            setSelectedStation(selectedBaseData.stations[0].name);
+        }
+        if (!destinationCity && selectedBaseData.location?.city) {
+            setDestinationCity(selectedBaseData.location.city);
+        }
+    }, [selectedBaseData, selectedStation, destinationCity]);
 
     // Transform bases for map
     const mapBases = useMemo(() => {
@@ -128,10 +143,42 @@ export default function BaseFinder() {
         if (normalized.includes('trolley')) return styles.tripLegTypeTrolley;
         return styles.tripLegTypeTrain;
     };
+
+    const getVehicleTypeLabel = (vehicleType: string) => {
+        const normalized = vehicleType.toLowerCase();
+        if (normalized.includes("metro")) return "METRO";
+        if (normalized.includes("tram")) return "TRAM";
+        if (normalized.includes("trolley")) return "TROL";
+        if (normalized.includes("bus")) return "BUS";
+        return "VLAK";
+    };
+
+    const getIdosUrlForTrip = (trip: Trip): string => {
+        const fallbackFrom = selectedStation || selectedBaseData?.stations?.[0]?.name || "";
+        const fallbackTo = destinationCity || selectedBaseData?.location?.city || selectedBaseData?.name || "";
+        if (trip.shareLink) {
+            try {
+                return new URL(trip.shareLink, "https://idos.cz").toString();
+            } catch {
+                // ignore
+            }
+        }
+
+        const params = new URLSearchParams({
+            f: fallbackFrom,
+            t: fallbackTo,
+        });
+        if (departureDate) params.append("date", departureDate);
+        if (departureTime) params.append("time", departureTime);
+
+        return `https://idos.cz/vlakyautobusymhdvse/spojeni/vysledky/?${params.toString()}`;
+    };
     
     // Fetch trip connections with streaming
     const fetchTrips = async () => {
-        if (!selectedStation || !destinationCity) {
+        const resolvedFrom = selectedStation || selectedBaseData?.stations?.[0]?.name || "";
+        const resolvedTo = destinationCity || selectedBaseData?.location?.city || selectedBaseData?.name || "";
+        if (!resolvedFrom || !resolvedTo) {
             showError({
                 title: "⚠️ Chyby ve formuláři",
                 message: "Vyberte prosím stanici a cílové město.",
@@ -147,8 +194,8 @@ export default function BaseFinder() {
         
         try {
             const params = new URLSearchParams({
-                from: selectedStation,
-                to: destinationCity,
+                from: resolvedFrom,
+                to: resolvedTo,
                 maxPages: '2'
             });
             
@@ -496,9 +543,12 @@ export default function BaseFinder() {
                                 </div>
                                 
                                 {/* Assign to Trip Button */}
-                                <button 
+                                <button
                                     className={styles.assignToTripButton}
-                                    onClick={() => setIsTripAssignModalOpen(true)}
+                                    onClick={() => {
+                                        setTripAssignMode("base");
+                                        setIsTripAssignModalOpen(true);
+                                    }}
                                 >
                                     <span className={styles.assignTripPlus}>+</span>
                                     <span>Přiřadit k výpravě</span>
@@ -686,30 +736,26 @@ export default function BaseFinder() {
                                                             <span className={styles.tripCardDuration}>{trip.duration}</span>
                                                         </div>
                                                         <div className={styles.tripTimeline}>
-                                                            <div className={styles.tripTimelineItem}>
-                                                                <div className={styles.timelineTime}>{trip.segments[0].departureTime}</div>
-                                                                <span
-                                                                    className={styles.timelineDot}
-                                                                    style={{ backgroundColor: timelineColors[0] }}
-                                                                />
-                                                            </div>
-                                                            {trip.segments.map((seg, segIdx) => (
-                                                                <React.Fragment key={segIdx}>
-                                                                    <span
-                                                                        className={styles.timelineLine}
-                                                                        style={{ backgroundColor: timelineColors[segIdx % timelineColors.length] }}
-                                                                    />
-                                                                    <div className={styles.tripTimelineItem}>
-                                                                        <div className={styles.timelineTime}>
-                                                                            {segIdx < trip.segments.length - 1 ? seg.arrivalTime : seg.arrivalTime}
-                                                                        </div>
-                                                                        <span
-                                                                            className={styles.timelineDot}
-                                                                            style={{ backgroundColor: segIdx < trip.segments.length - 1 ? timelineColors[(segIdx + 1) % timelineColors.length] : timelineColors[segIdx % timelineColors.length] }}
-                                                                        />
+                                                            {trip.segments.map((seg, segIdx) => {
+                                                                const isTopRow = segIdx % 2 === 0;
+                                                                const color = timelineColors[segIdx % timelineColors.length];
+                                                                return (
+                                                                    <div
+                                                                        key={segIdx}
+                                                                        className={`${styles.timelineSegment} ${isTopRow ? styles.timelineRowTop : styles.timelineRowBottom}`}
+                                                                    >
+                                                                        <span className={`${styles.timelineTime} ${styles.timelineTimeStart} ${isTopRow ? styles.timelineTimeTop : styles.timelineTimeBottom}`}>
+                                                                            {seg.departureTime}
+                                                                        </span>
+                                                                        <span className={`${styles.timelineDot} ${styles.timelineDotStart}`} style={{ backgroundColor: color }} />
+                                                                        <span className={styles.timelineLine} style={{ backgroundColor: color }} />
+                                                                        <span className={`${styles.timelineDot} ${styles.timelineDotEnd}`} style={{ backgroundColor: color }} />
+                                                                        <span className={`${styles.timelineTime} ${styles.timelineTimeEnd} ${isTopRow ? styles.timelineTimeTop : styles.timelineTimeBottom}`}>
+                                                                            {seg.arrivalTime}
+                                                                        </span>
                                                                     </div>
-                                                                </React.Fragment>
-                                                            ))}
+                                                                );
+                                                            })}
                                                         </div>
                                                         <div className={styles.tripLegs}>
                                                             {trip.segments.map((seg, segIdx) => (
@@ -723,7 +769,7 @@ export default function BaseFinder() {
                                                                     <div className={styles.tripLegContent}>
                                                                         <div className={styles.tripLegTop}>
                                                                             <span className={`${styles.tripLegType} ${getVehicleTypeClass(seg.vehicleType)}`}>
-                                                                                {seg.vehicleType.toUpperCase()}
+                                                                                {getVehicleTypeLabel(seg.vehicleType)}
                                                                             </span>
                                                                             <div className={styles.tripLegRoute}>
                                                                                 {seg.departureStation} → {seg.arrivalStation}
@@ -741,7 +787,7 @@ export default function BaseFinder() {
                                                         </div>
                                                         <div className={styles.tripFooter}>
                                                             <a 
-                                                                href={trip.shareLink || '#'}
+                                                                href={getIdosUrlForTrip(trip)}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 className={styles.tripFooterIdos}
@@ -750,16 +796,20 @@ export default function BaseFinder() {
                                                                 IDOS
                                                             </a>
                                                             <div className={styles.tripFooterPrice}>
+                                                                <img src="/map-elements/money-symbol.png" alt="" className={styles.tripFooterIcon} />
                                                                 {trip.price}
                                                             </div>
                                                             <div className={styles.tripFooterTransfers}>
-                                                                {trip.transferCount}x přestup
+                                                                <img src="/map-elements/transfers-icon.png" alt="" className={styles.tripFooterIcon} />
+                                                                {trip.transferCount}x
                                                             </div>
                                                             <button 
                                                                 className={styles.assignTripCardButton}
                                                                 onClick={() => {
                                                                     setAssignedTrip(trip);
-                                                                    setActiveTab('info');
+                                                                    setTripAssignMode("route");
+                                                                    setRouteToAssign(trip);
+                                                                    setIsRouteDirectionModalOpen(true);
                                                                 }}
                                                                 title="Použít toto spojení"
                                                             >
@@ -818,7 +868,9 @@ export default function BaseFinder() {
                 <div className={styles.modalOverlay} onClick={() => setIsTripAssignModalOpen(false)}>
                     <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
-                            <h3 className={styles.modalTitle}>Přiřadit základnu k výpravě</h3>
+                            <h3 className={styles.modalTitle}>
+                                {tripAssignMode === "base" ? "Přiřadit základnu k výpravě" : "Uložit trasu k výpravě"}
+                            </h3>
                             <button 
                                 className={styles.modalClose}
                                 onClick={() => setIsTripAssignModalOpen(false)}
@@ -836,10 +888,45 @@ export default function BaseFinder() {
                                             key={trip._id}
                                             className={styles.tripModalItem}
                                             onClick={async () => {
-                                                if (selectedBaseId) {
-                                                    await assignBase({ tripId: trip._id, baseId: selectedBaseId });
-                                                    setIsTripAssignModalOpen(false);
+                                                if (tripAssignMode === "base") {
+                                                    if (selectedBaseId) {
+                                                        await assignBase({ tripId: trip._id, baseId: selectedBaseId });
+                                                        setIsTripAssignModalOpen(false);
+                                                    }
+                                                    return;
                                                 }
+
+                                                if (!routeToAssign) {
+                                                    showError({
+                                                        title: "⚠️ Chybí trasa",
+                                                        message: "Nejdřív vyberte konkrétní spojení (tlačítko + u spoje).",
+                                                        icon: "warning",
+                                                    });
+                                                    return;
+                                                }
+                                                if (!selectedStation || !destinationCity) {
+                                                    showError({
+                                                        title: "⚠️ Chybí údaje",
+                                                        message: "Vyberte prosím stanici a cílové město.",
+                                                        icon: "warning",
+                                                    });
+                                                    return;
+                                                }
+
+                                                await addTransportRoute({
+                                                    tripId: trip._id,
+                                                    direction: routeAssignDirection,
+                                                    from: selectedStation,
+                                                    to: destinationCity,
+                                                    date: departureDate || undefined,
+                                                    idosTrip: routeToAssign,
+                                                });
+                                                setIsTripAssignModalOpen(false);
+                                                showSuccess({
+                                                    title: "✅ Uloženo",
+                                                    message: "Trasa byla přiřazena k výpravě.",
+                                                    duration: 2000,
+                                                });
                                             }}
                                         >
                                             <div className={styles.tripModalInfo}>
@@ -862,6 +949,47 @@ export default function BaseFinder() {
                 </div>
             )}
             
+            {/* Route Direction Modal */}
+            {isRouteDirectionModalOpen && (
+                <div className={styles.modalOverlay} onClick={() => setIsRouteDirectionModalOpen(false)}>
+                    <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h3 className={styles.modalTitle}>Vyberte směr cesty</h3>
+                            <button 
+                                className={styles.modalClose}
+                                onClick={() => setIsRouteDirectionModalOpen(false)}
+                            >
+                                x
+                            </button>
+                        </div>
+                        <div className={styles.modalBody}>
+                            <div className={styles.routeDirectionButtons}>
+                                <button
+                                    className={`${styles.routeDirectionButton} ${styles.routeDirectionPrimary}`}
+                                    onClick={() => {
+                                        setRouteAssignDirection("outbound");
+                                        setIsRouteDirectionModalOpen(false);
+                                        setIsTripAssignModalOpen(true);
+                                    }}
+                                >
+                                    Cesta tam
+                                </button>
+                                <button
+                                    className={`${styles.routeDirectionButton} ${styles.routeDirectionSecondary}`}
+                                    onClick={() => {
+                                        setRouteAssignDirection("return");
+                                        setIsRouteDirectionModalOpen(false);
+                                        setIsTripAssignModalOpen(true);
+                                    }}
+                                >
+                                    Cesta zpÄ›t
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Photo Gallery Modal */}
             {isGalleryOpen && selectedBaseData?.media?.photos && (
                 <div className={styles.galleryModal} onClick={() => setIsGalleryOpen(false)}>
@@ -915,4 +1043,5 @@ export default function BaseFinder() {
         </>
     );
 }
+
 

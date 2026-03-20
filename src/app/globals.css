@@ -198,6 +198,21 @@ select::-ms-expand {
   box-sizing: border-box;
 }
 
+/* Horizontal-only padding (useful when a page has its own header) */
+.dashboardContentX {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .dashboardContentX {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .headingContainer {
     padding: 1rem;

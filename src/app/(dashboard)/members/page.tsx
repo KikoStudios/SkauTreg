@@ -7,7 +7,6 @@ import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useFeedback } from "@/context/FeedbackContext";
-import Breadcrumbs from "@/components/Breadcrumbs";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -613,12 +612,10 @@ export default function MembersPage() {
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div className="headingContainer">
-                <Breadcrumbs />
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Členové</h1>
             </div>
 
-            <div className="dashboardContent">
-                {/* Controls Row */}
+            {/* Controls Row */}
             <div className="controls-row">
                 <div className="troop-selector-container">
                     {/* Troop Selector Pill */}
@@ -1871,7 +1868,6 @@ export default function MembersPage() {
                     </div>
                 </div>
             )}
-            </div>
         </div>
     );
 }

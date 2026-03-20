@@ -208,7 +208,7 @@ export default function TroopSettingsPage() {
     if (!troop) return <div>Načítám...</div>;
 
     return (
-        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingBottom: "6rem", overflowX: "hidden" }}>
+        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingTop: "2rem", paddingBottom: "2rem", overflowX: "hidden" }}>
             <div style={{
                 background: "linear-gradient(140deg, #fef3c7 0%, #e0e7ff 100%)",
                 border: "3px solid #000",
@@ -458,11 +458,14 @@ export default function TroopSettingsPage() {
                 {/* DANGER TAB */}
                 {activeTab !== "danger" && (
                     <div style={{
-                        position: "fixed",
-                        bottom: 0, left: 0, right: 0,
+                        position: "sticky",
+                        bottom: 0,
+                        marginTop: "2rem",
                         padding: "1rem",
                         backgroundColor: "white",
-                        borderTop: "3px solid #000",
+                        border: "3px solid #000",
+                        borderRadius: "12px",
+                        boxShadow: "4px 4px 0 0 #000",
                         display: "flex",
                         justifyContent: "center",
                         gap: "0.5rem",
