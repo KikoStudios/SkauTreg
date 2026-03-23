@@ -1,83 +1,155 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useUser, useClerk } from "@clerk/nextjs";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useProfileModal } from "../context/ProfileModalContext";
+import { useFeedback } from "../context/FeedbackContext";
 import styles from './ProfileModal.module.css';
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === "object") {
+        const maybeError = error as { message?: string; errors?: Array<{ message?: string }> };
+        return maybeError.errors?.[0]?.message || maybeError.message || fallback;
+    }
+
+    return fallback;
+};
 
 export default function ProfileModal() {
     const { isOpen, closeProfile } = useProfileModal();
     const { user } = useUser();
+    const viewer = useQuery(api.users.viewer, {});
+    const updateViewer = useMutation(api.users.update);
+    const { showError, showSuccess } = useFeedback();
     const { signOut } = useClerk();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const [firstName, setFirstName] = useState(user?.firstName || "");
-    const [lastName, setLastName] = useState(user?.lastName || "");
-    const [username, setUsername] = useState(user?.username || "");
-    const [dateOfBirth, setDateOfBirth] = useState((user?.unsafeMetadata?.dateOfBirth as string) || "");
+    const [isSaving, setIsSaving] = useState(false);
+    const [firstName, setFirstName] = useState("");
+    const [lastName, setLastName] = useState("");
+    const [username, setUsername] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
+    const [address, setAddress] = useState("");
+    const [personalEmail, setPersonalEmail] = useState("");
+    const [personalPhone, setPersonalPhone] = useState("");
+    const [contactProfileType, setContactProfileType] = useState<"rover" | "leader">("leader");
+    const [emergencyContactName, setEmergencyContactName] = useState("");
+    const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
+    const [emergencyContactEmail, setEmergencyContactEmail] = useState("");
+    const [parent1Name, setParent1Name] = useState("");
+    const [parent1Phone, setParent1Phone] = useState("");
+    const [parent1Email, setParent1Email] = useState("");
+    const [parent2Name, setParent2Name] = useState("");
+    const [parent2Phone, setParent2Phone] = useState("");
+    const [parent2Email, setParent2Email] = useState("");
     const [password, setPassword] = useState("");
     const [needsPasswordForUsername, setNeedsPasswordForUsername] = useState(false);
+    const [activeSection, setActiveSection] = useState<"personal" | "contact" | "parents">("personal");
+
+    const resetForm = React.useCallback(() => {
+        setFirstName(user?.firstName || "");
+        setLastName(user?.lastName || "");
+        setUsername(user?.username || "");
+        setDateOfBirth(viewer?.birthDate || (user?.unsafeMetadata?.dateOfBirth as string) || "");
+        setAddress(viewer?.address || "");
+        setPersonalEmail(viewer?.personalEmail || "");
+        setPersonalPhone(viewer?.personalPhone || "");
+        setContactProfileType((viewer?.contactProfileType as "rover" | "leader" | undefined) || "leader");
+        setEmergencyContactName(viewer?.emergencyContactName || "");
+        setEmergencyContactPhone(viewer?.emergencyContactPhone || "");
+        setEmergencyContactEmail(viewer?.emergencyContactEmail || "");
+        setParent1Name(viewer?.parent1Name || "");
+        setParent1Phone(viewer?.parent1Phone || "");
+        setParent1Email(viewer?.parent1Email || "");
+        setParent2Name(viewer?.parent2Name || "");
+        setParent2Phone(viewer?.parent2Phone || "");
+        setParent2Email(viewer?.parent2Email || "");
+        setPassword("");
+        setNeedsPasswordForUsername(false);
+        setActiveSection("personal");
+    }, [user, viewer]);
 
     React.useEffect(() => {
-        if (user) {
-            setFirstName(user.firstName || "");
-            setLastName(user.lastName || "");
-            setUsername(user.username || "");
-            setDateOfBirth((user.unsafeMetadata?.dateOfBirth as string) || "");
-        }
-    }, [user]);
+        resetForm();
+    }, [resetForm]);
 
     const handleCancel = () => {
         setIsEditing(false);
-        setPassword("");
-        setNeedsPasswordForUsername(false);
-        // Reset to original values
-        if (user) {
-            setFirstName(user.firstName || "");
-            setLastName(user.lastName || "");
-            setUsername(user.username || "");
-            setDateOfBirth((user.unsafeMetadata?.dateOfBirth as string) || "");
-        }
+        resetForm();
     };
 
     if (!isOpen) return null;
 
     const handleSave = async () => {
         if (!user) return;
-        
+
         const usernameChanged = username !== user.username;
-        
-        // Validate password if username changed
+
         if (usernameChanged && !password) {
-            alert("Pro změnu uživatelského jména musíte zadat heslo");
+            showError({
+                title: "Chybí heslo",
+                message: "Pro změnu uživatelského jména zadejte heslo.",
+                icon: "warning",
+                canReport: false,
+            });
             return;
         }
-        
+
+        setIsSaving(true);
+
         try {
-            // Update all fields together
-            const updateData: any = {
-                firstName: firstName,
-                lastName: lastName,
+            const updateData: Record<string, unknown> = {
+                firstName,
+                lastName,
                 unsafeMetadata: {
                     ...user.unsafeMetadata,
-                    dateOfBirth: dateOfBirth,
+                    dateOfBirth,
                 },
             };
-            
-            // Add username and password if changed
+
             if (usernameChanged) {
                 updateData.username = username;
                 updateData.password = password;
             }
-            
+
             await user.update(updateData);
-            
+            await updateViewer({
+                birthDate: dateOfBirth,
+                address,
+                personalEmail,
+                personalPhone,
+                contactProfileType,
+                emergencyContactName,
+                emergencyContactPhone,
+                emergencyContactEmail,
+                parent1Name,
+                parent1Phone,
+                parent1Email,
+                parent2Name,
+                parent2Phone,
+                parent2Email,
+            });
+
             setPassword("");
             setNeedsPasswordForUsername(false);
             setIsEditing(false);
-        } catch (err: any) {
+            showSuccess({
+                title: "Profil uložen",
+                message: "Kontakty a osobní údaje byly aktualizovány.",
+                duration: 2500,
+            });
+        } catch (err: unknown) {
             console.error("Failed to update profile", err);
-            alert("Chyba při ukládání profilu: " + (err.errors?.[0]?.message || err.message));
+            showError({
+                title: "Uložení se nepovedlo",
+                message: getErrorMessage(err, "Nepodařilo se uložit profil."),
+                icon: "error",
+                canReport: true,
+            });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -91,17 +163,14 @@ export default function ProfileModal() {
                     let width = img.width;
                     let height = img.height;
 
-                    // Calculate new dimensions
                     if (width > height) {
                         if (width > maxSize) {
                             height = Math.round((height * maxSize) / width);
                             width = maxSize;
                         }
-                    } else {
-                        if (height > maxSize) {
-                            width = Math.round((width * maxSize) / height);
-                            height = maxSize;
-                        }
+                    } else if (height > maxSize) {
+                        width = Math.round((width * maxSize) / height);
+                        height = maxSize;
                     }
 
                     canvas.width = width;
@@ -124,7 +193,7 @@ export default function ProfileModal() {
                             }
                         },
                         'image/jpeg',
-                        0.85 // 85% quality
+                        0.85
                     );
                 };
                 img.onerror = () => reject(new Error('Failed to load image'));
@@ -141,14 +210,17 @@ export default function ProfileModal() {
 
         setIsUploadingImage(true);
         try {
-            // Resize and compress image
             const resizedBlob = await resizeImage(file);
             const resizedFile = new File([resizedBlob], file.name, { type: 'image/jpeg' });
-            
             await user.setProfileImage({ file: resizedFile });
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Failed to upload image", err);
-            alert("Chyba při nahrávání obrázku: " + (err.errors?.[0]?.message || err.message));
+            showError({
+                title: "Nahrání se nepovedlo",
+                message: getErrorMessage(err, "Nepodařilo se nahrát obrázek."),
+                icon: "error",
+                canReport: true,
+            });
         } finally {
             setIsUploadingImage(false);
         }
@@ -210,14 +282,58 @@ export default function ProfileModal() {
                                     <p className={styles.userName}>{user?.fullName || 'Uživatel'}</p>
                                     {user?.username && <p className={styles.userHandle}>@{user.username}</p>}
                                     <p className={styles.userEmail}>{user?.primaryEmailAddress?.emailAddress}</p>
-                                    {dateOfBirth && (
-                                        <p style={{ fontSize: '0.9rem', color: '#52525b', fontWeight: '600', marginTop: '0.5rem' }}>
-                                            Narození: {new Date(dateOfBirth).toLocaleDateString('cs-CZ')}
-                                        </p>
-                                    )}
+                                    <div className={styles.profileFacts}>
+                                        <span>Narození: {dateOfBirth || "neuvedeno"}</span>
+                                        <span>Telefon: {personalPhone || "neuvedeno"}</span>
+                                        <span>Adresa: {address || "neuvedena"}</span>
+                                        <span>Režim: {contactProfileType === "rover" ? "Rover" : "Vedoucí / Hl. vedoucí"}</span>
+                                    </div>
                                 </>
                             ) : (
                                 <div className={styles.editForm}>
+                                    <div className={styles.sectionTabs}>
+                                        <button
+                                            type="button"
+                                            className={`${styles.sectionTab} ${activeSection === "personal" ? styles.sectionTabActive : ""}`}
+                                            onClick={() => setActiveSection("personal")}
+                                        >
+                                            Osobní
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.sectionTab} ${activeSection === "contact" ? styles.sectionTabActive : ""}`}
+                                            onClick={() => setActiveSection("contact")}
+                                        >
+                                            Kontakt
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.sectionTab} ${activeSection === "parents" ? styles.sectionTabActive : ""}`}
+                                            onClick={() => setActiveSection("parents")}
+                                        >
+                                            Rodiče
+                                        </button>
+                                    </div>
+
+                                    <div className={styles.roleModeSwitch}>
+                                        <button
+                                            type="button"
+                                            className={`${styles.roleModeButton} ${contactProfileType === "leader" ? styles.roleModeButtonActive : ""}`}
+                                            onClick={() => setContactProfileType("leader")}
+                                        >
+                                            Vedoucí / Hl. vedoucí
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`${styles.roleModeButton} ${contactProfileType === "rover" ? styles.roleModeButtonActive : ""}`}
+                                            onClick={() => setContactProfileType("rover")}
+                                        >
+                                            Rover
+                                        </button>
+                                    </div>
+
+                                    {activeSection === "personal" && (
+                                        <div className={styles.sectionPanel}>
                                     <div>
                                         <label className={styles.formLabel}>Uživatelské jméno</label>
                                         <input
@@ -225,7 +341,6 @@ export default function ProfileModal() {
                                             value={username}
                                             onChange={(e) => {
                                                 setUsername(e.target.value);
-                                                // Check if username changed
                                                 if (user && e.target.value !== user.username) {
                                                     setNeedsPasswordForUsername(true);
                                                 } else {
@@ -236,47 +351,113 @@ export default function ProfileModal() {
                                             placeholder="username"
                                         />
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className={styles.twoColumn}>
                                         <div>
                                             <label className={styles.formLabel}>Jméno</label>
-                                            <input
-                                                className={styles.input}
-                                                value={firstName}
-                                                onChange={(e) => setFirstName(e.target.value)}
-                                                placeholder="Jan"
-                                            />
+                                            <input className={styles.input} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jan" />
                                         </div>
                                         <div>
                                             <label className={styles.formLabel}>Příjmení</label>
+                                            <input className={styles.input} value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Novák" />
+                                        </div>
+                                    </div>
+                                    <div className={styles.twoColumn}>
+                                        <div>
+                                            <label className={styles.formLabel}>Datum narození</label>
                                             <input
                                                 className={styles.input}
-                                                value={lastName}
-                                                onChange={(e) => setLastName(e.target.value)}
-                                                placeholder="Novák"
+                                                type="date"
+                                                value={dateOfBirth}
+                                                onChange={(e) => setDateOfBirth(e.target.value)}
+                                                max={new Date().toISOString().split('T')[0]}
                                             />
+                                        </div>
+                                        <div>
+                                            <label className={styles.formLabel}>Osobní telefon</label>
+                                            <input className={styles.input} value={personalPhone} onChange={(e) => setPersonalPhone(e.target.value)} placeholder="+420..." />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className={styles.formLabel}>Datum narození</label>
-                                        <input
-                                
-                                            className={styles.input}
-                                            type="date"
-                                            value={dateOfBirth}
-                                            onChange={(e) => setDateOfBirth(e.target.value)}
-                                            placeholder="1995-01-01"
-                                            max={new Date().toISOString().split('T')[0]}
-                                        />
+                                        <label className={styles.formLabel}>Osobní e-mail</label>
+                                        <input className={styles.input} value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} placeholder="vas@email.cz" />
                                     </div>
-                                    
+                                    <div>
+                                        <label className={styles.formLabel}>Adresa</label>
+                                        <input className={styles.input} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ulice, město" />
+                                    </div>
+                                        </div>
+                                    )}
+
+                                    {activeSection === "contact" && (
+                                        <div className={styles.sectionPanel}>
+                                            {contactProfileType === "leader" ? (
+                                                <>
+                                                    <div className={styles.twoColumn}>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Jméno kontaktu</label>
+                                                            <input className={styles.input} value={emergencyContactName} onChange={(e) => setEmergencyContactName(e.target.value)} />
+                                                        </div>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Telefon kontaktu</label>
+                                                            <input className={styles.input} value={emergencyContactPhone} onChange={(e) => setEmergencyContactPhone(e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className={styles.formLabel}>E-mail kontaktu</label>
+                                                        <input className={styles.input} value={emergencyContactEmail} onChange={(e) => setEmergencyContactEmail(e.target.value)} />
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className={styles.sectionHint}>
+                                                    Rover vyplňuje kontakty na rodiče v sekci Rodiče. Tady nic dalšího není potřeba.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {activeSection === "parents" && (
+                                        <div className={styles.sectionPanel}>
+                                            {contactProfileType === "rover" ? (
+                                                <>
+                                                    <div className={styles.twoColumn}>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Rodič 1</label>
+                                                            <input className={styles.input} value={parent1Name} onChange={(e) => setParent1Name(e.target.value)} />
+                                                        </div>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Telefon rodiče 1</label>
+                                                            <input className={styles.input} value={parent1Phone} onChange={(e) => setParent1Phone(e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className={styles.formLabel}>E-mail rodiče 1</label>
+                                                        <input className={styles.input} value={parent1Email} onChange={(e) => setParent1Email(e.target.value)} />
+                                                    </div>
+                                                    <div className={styles.twoColumn}>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Rodič 2</label>
+                                                            <input className={styles.input} value={parent2Name} onChange={(e) => setParent2Name(e.target.value)} />
+                                                        </div>
+                                                        <div>
+                                                            <label className={styles.formLabel}>Telefon rodiče 2</label>
+                                                            <input className={styles.input} value={parent2Phone} onChange={(e) => setParent2Phone(e.target.value)} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className={styles.formLabel}>E-mail rodiče 2</label>
+                                                        <input className={styles.input} value={parent2Email} onChange={(e) => setParent2Email(e.target.value)} />
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className={styles.sectionHint}>
+                                                    Vedoucí a hl. vedoucí vyplňují jen jeden kontakt v sekci Kontakt.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {needsPasswordForUsername && (
-                                        <div style={{ 
-                                            backgroundColor: '#fef2f2', 
-                                            border: '3px solid #dc2626', 
-                                            borderRadius: '8px', 
-                                            padding: '1rem',
-                                            animation: 'fadeSlideIn 0.3s ease-out'
-                                        }}>
+                                        <div style={{ backgroundColor: '#fef2f2', border: '3px solid #dc2626', borderRadius: '8px', padding: '1rem' }}>
                                             <label className={styles.formLabel} style={{ color: '#991b1b' }}>
                                                 Pro změnu uživatelského jména zadejte heslo
                                             </label>
@@ -297,48 +478,15 @@ export default function ProfileModal() {
 
                     <div className={styles.actionButtons}>
                         {!isEditing ? (
-                            <button 
-                                className={styles.actionButton} 
-                                onClick={() => setIsEditing(true)}
-                                onMouseDown={(e) => {
-                                    e.currentTarget.style.transform = "translate(4px, 4px)";
-                                    e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-                                }}
-                                onMouseUp={(e) => {
-                                    e.currentTarget.style.transform = "translate(0, 0)";
-                                    e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                                }}
-                            >
+                            <button className={styles.actionButton} onClick={() => setIsEditing(true)}>
                                 Upravit Profil
                             </button>
                         ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <button 
-                                    className={`${styles.actionButton} ${styles.primaryButton}`} 
-                                    onClick={handleSave}
-                                    onMouseDown={(e) => {
-                                        e.currentTarget.style.transform = "translate(4px, 4px)";
-                                        e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-                                    }}
-                                    onMouseUp={(e) => {
-                                        e.currentTarget.style.transform = "translate(0, 0)";
-                                        e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                                    }}
-                                >
-                                    Uložit
+                            <div className={styles.twoColumn}>
+                                <button className={`${styles.actionButton} ${styles.primaryButton}`} onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? "Ukládám..." : "Uložit"}
                                 </button>
-                                <button 
-                                    className={styles.actionButton} 
-                                    onClick={handleCancel}
-                                    onMouseDown={(e) => {
-                                        e.currentTarget.style.transform = "translate(4px, 4px)";
-                                        e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-                                    }}
-                                    onMouseUp={(e) => {
-                                        e.currentTarget.style.transform = "translate(0, 0)";
-                                        e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                                    }}
-                                >
+                                <button className={styles.actionButton} onClick={handleCancel}>
                                     Zrušit
                                 </button>
                             </div>
@@ -347,14 +495,6 @@ export default function ProfileModal() {
                         <button
                             className={`${styles.actionButton} ${styles.dangerButton}`}
                             onClick={() => signOut({ redirectUrl: '/sign-in' })}
-                            onMouseDown={(e) => {
-                                e.currentTarget.style.transform = "translate(4px, 4px)";
-                                e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-                            }}
-                            onMouseUp={(e) => {
-                                e.currentTarget.style.transform = "translate(0, 0)";
-                                e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                            }}
                         >
                             Odhlásit se
                         </button>
