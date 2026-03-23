@@ -9,7 +9,6 @@ export const store = mutation({
             throw new Error("Called storeUser without authentication present");
         }
 
-        // Check if we've already stored this identity before.
         const user = await ctx.db
             .query("users")
             .withIndex("by_token", (q) =>
@@ -18,7 +17,6 @@ export const store = mutation({
             .unique();
 
         if (user !== null) {
-            // If we've seen this identity before but the name has changed, patch the value.
             if (user.name !== identity.name || user.email !== identity.email || user.image !== identity.pictureUrl) {
                 await ctx.db.patch(user._id, {
                     name: identity.name,
@@ -29,7 +27,6 @@ export const store = mutation({
             return user._id;
         }
 
-        // If it's a new identity, create a new `User`.
         return await ctx.db.insert("users", {
             name: identity.name,
             email: identity.email,
@@ -63,6 +60,20 @@ export const update = mutation({
         image: v.optional(v.string()),
         dateOfBirth: v.optional(v.string()),
         benefit: v.optional(v.string()),
+        birthDate: v.optional(v.string()),
+        address: v.optional(v.string()),
+        personalEmail: v.optional(v.string()),
+        personalPhone: v.optional(v.string()),
+        contactProfileType: v.optional(v.string()),
+        emergencyContactName: v.optional(v.string()),
+        emergencyContactPhone: v.optional(v.string()),
+        emergencyContactEmail: v.optional(v.string()),
+        parent1Name: v.optional(v.string()),
+        parent1Phone: v.optional(v.string()),
+        parent1Email: v.optional(v.string()),
+        parent2Name: v.optional(v.string()),
+        parent2Phone: v.optional(v.string()),
+        parent2Email: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
