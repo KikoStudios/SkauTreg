@@ -3,40 +3,116 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
 import Button from "../../../../../components/Button";
 import Select from "../../../../../components/Select";
 import { useFeedback } from "../../../../../context/FeedbackContext";
+import styles from "./page.module.css";
 
-const ROLES = [
-    { value: "main_leader", label: "HL. Vedoucí" },
+const ROLE_OPTIONS = [
+    { value: "main_leader", label: "Hl. vedoucí" },
     { value: "leader", label: "Vedoucí" },
     { value: "rover", label: "Rover" },
 ];
 
-const RoleBadge = ({ role }: { role: string }) => {
-    let imgSrc = "";
+const ROLE_META: Record<string, { label: string; tone: string }> = {
+    owner: {
+        label: "Majitel",
+        tone: "roleOwner",
+    },
+    main_leader: {
+        label: "Hl. vedoucí",
+        tone: "roleMainLeader",
+    },
+    leader: {
+        label: "Vedoucí",
+        tone: "roleLeader",
+    },
+    rover: {
+        label: "Rover",
+        tone: "roleRover",
+    },
+};
+
+type LeaderRecord = {
+    _id: Id<"users">;
+    name?: string;
+    email?: string;
+    image?: string;
+    role: string;
+    isOwner?: boolean;
+    birthDate?: string;
+    address?: string;
+    personalEmail?: string;
+    personalPhone?: string;
+    contactProfileType?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    emergencyContactEmail?: string;
+    parent1Name?: string;
+    parent1Phone?: string;
+    parent1Email?: string;
+    parent2Name?: string;
+    parent2Phone?: string;
+    parent2Email?: string;
+};
+
+const getRoleMeta = (role: string) => ROLE_META[role] ?? ROLE_META.rover;
+
+const getRoleBadgeSrc = (role: string) => {
     switch (role) {
-        case "owner": imgSrc = "/bages/owner-bage.svg"; break;
-        case "main_leader": imgSrc = "/bages/main-vedouci-bage.svg"; break;
-        case "leader": imgSrc = "/bages/vedouci-bage.svg"; break;
-        case "rover": imgSrc = "/bages/rover-bage.svg"; break;
-        default: imgSrc = "/bages/rover-bage.svg"; // Fallback
+        case "owner":
+            return "/bages/owner-bage.svg";
+        case "main_leader":
+            return "/bages/main-vedouci-bage.svg";
+        case "leader":
+            return "/bages/vedouci-bage.svg";
+        case "rover":
+        default:
+            return "/bages/rover-bage.svg";
     }
+};
+
+const getInitials = (name?: string, email?: string) => {
+    if (name?.trim()) {
+        const parts = name.trim().split(/\s+/).slice(0, 2);
+        return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "U";
+    }
+
+    return email?.[0]?.toUpperCase() ?? "U";
+};
+
+const toErrorMessage = (error: unknown, fallback: string) => {
+    if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+        return error.message;
+    }
+
+    return fallback;
+};
+
+function LeaderAvatar({ leader }: { leader: LeaderRecord }) {
+    const initials = getInitials(leader.name, leader.email);
+
+    if (leader.image) {
+        return <img src={leader.image} alt={leader.name || leader.email || "Vedoucí"} className={styles.avatarImage} />;
+    }
+
+    return <span className={styles.avatarInitials}>{initials}</span>;
+}
+
+function RoleBadge({ role }: { role: string }) {
+    const roleMeta = getRoleMeta(role);
 
     return (
         <img
-            src={imgSrc}
-            alt={role}
-            style={{
-                height: "28px",
-                objectFit: "contain",
-                verticalAlign: "middle"
-            }}
+            src={getRoleBadgeSrc(role)}
+            alt={roleMeta.label}
+            title={roleMeta.label}
+            className={styles.roleBadge}
         />
     );
-};
+}
 
 export default function TroopLeadersPage() {
     const params = useParams();
@@ -44,7 +120,9 @@ export default function TroopLeadersPage() {
     const troopId = params.troopId as Id<"troops">;
     const { showError, showSuccess } = useFeedback();
 
-    const leaders = useQuery(api.troops.getLeaders, { troopId });
+    const troop = useQuery(api.troops.getById, { id: troopId });
+    const leaders = useQuery(api.troops.getLeaders, { troopId }) as LeaderRecord[] | undefined;
+    const viewer = useQuery(api.users.viewer, {});
     const addLeader = useMutation(api.troops.addLeader);
     const removeLeader = useMutation(api.troops.removeLeader);
     const updateRole = useMutation(api.troops.updateRole);
@@ -52,83 +130,94 @@ export default function TroopLeadersPage() {
     const [email, setEmail] = useState("");
     const [selectedRole, setSelectedRole] = useState("rover");
     const [isAdding, setIsAdding] = useState(false);
+    const [pendingRoleUserId, setPendingRoleUserId] = useState<Id<"users"> | null>(null);
+    const [pendingRemoveUserId, setPendingRemoveUserId] = useState<Id<"users"> | null>(null);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [selectedLeaderForInfo, setSelectedLeaderForInfo] = useState<LeaderRecord | null>(null);
 
-    // Permissions check (client side for UI only)
-    const currentUser = leaders?.find(l => l.email === "MY_EMAIL???");
-    // We don't easily know current user ID here without another query, 
-    // but the backend validates everything.
-    // For now, we show buttons to everyone, and they will fail if unauthorized.
-    // Or we could fetch current user.
+    const canManageLeaders = useMemo(() => {
+        if (!viewer || !troop || !leaders) return false;
+        if (troop.ownerId === viewer._id) return true;
 
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
+        return leaders.some((leader) => leader._id === viewer._id && leader.role !== "owner");
+    }, [leaders, troop, viewer]);
+
+    const handleAdd = async (event: React.FormEvent) => {
+        event.preventDefault();
+        const trimmedEmail = email.trim().toLowerCase();
+
+        if (!trimmedEmail) {
+            showError({
+                title: "Chybí e-mail",
+                message: "Zadejte e-mail uživatele, kterého chcete přidat do vedení.",
+                icon: "warning",
+                canReport: false,
+            });
+            return;
+        }
+
         setIsAdding(true);
         try {
-            await addLeader({ troopId, email, role: selectedRole });
+            await addLeader({ troopId, email: trimmedEmail, role: selectedRole });
             setEmail("");
+            setSelectedRole("rover");
+            setIsAddModalOpen(false);
             showSuccess({
-                title: "✅ Úspěch",
-                message: "Vedoucí byl přidán do týmu!",
+                title: "Vedoucí přidán",
+                message: "Nový člen vedení byl úspěšně přidán do oddílu.",
                 duration: 3000,
             });
-        } catch (error: any) {
-            console.error(error);
-            const errorMsg = error?.message || "Nepodařilo se přidat vedoucího";
-            
-            let userMessage = "";
-            let isUserError = false;
-            
-            if (errorMsg.includes("nebyl nalezen")) {
-                userMessage = "👤 Uživatel nebyl nalezen. Vytvořte si účet na skautREG nebo zkuste jiný e-mail.";
-                isUserError = true;
-            } else if (errorMsg.includes("už v týmu")) {
-                userMessage = "⚠️ Uživatel je již v týmu vedení.";
-                isUserError = true;
-            } else if (errorMsg.includes("oprávnění")) {
-                userMessage = "🔐 Pouze majitel nebo hlavní vedoucí může přidávat členy do vedení.";
-                isUserError = true;
-            } else {
-                userMessage = errorMsg;
-            }
+        } catch (error) {
+            const errorMessage = toErrorMessage(error, "Nepodařilo se přidat vedoucího.");
+            const isUserError =
+                errorMessage.includes("nebyl nalezen") ||
+                errorMessage.includes("už v týmu") ||
+                errorMessage.includes("oprávnění") ||
+                errorMessage.includes("přihlásit");
 
             showError({
-                title: "❌ Chyba",
-                message: userMessage,
+                title: "Přidání se nepovedlo",
+                message: errorMessage,
                 icon: "error",
                 canReport: !isUserError,
-                details: error?.message,
+                details: errorMessage,
             });
         } finally {
             setIsAdding(false);
         }
     };
 
-    const handleRemove = async (userId: Id<"users">) => {
+    const handleRemove = async (leader: LeaderRecord) => {
         showError({
-            title: "⚠️ Potvrzení",
-            message: "Opravdu chcete odebrat tohoto člena z vedení?",
+            title: "Odebrat člena vedení?",
+            message: `Opravdu chcete odebrat ${leader.name || leader.email || "tohoto uživatele"} z vedení oddílu?`,
             icon: "warning",
             buttons: [
                 {
                     label: "Ano, odebrat",
+                    variant: "danger",
                     onClick: async () => {
+                        setPendingRemoveUserId(leader._id);
                         try {
-                            await removeLeader({ troopId, userId });
+                            await removeLeader({ troopId, userId: leader._id });
                             showSuccess({
-                                title: "✅ Úspěch",
-                                message: "Člen byl odstraněn z vedení.",
-                                duration: 2000,
+                                title: "Člen odebrán",
+                                message: "Člen vedení byl úspěšně odebrán.",
+                                duration: 2500,
                             });
-                        } catch (error: any) {
+                        } catch (error) {
+                            const errorMessage = toErrorMessage(error, "Nepodařilo se odebrat člena vedení.");
                             showError({
-                                title: "❌ Chyba",
-                                message: error?.message || "Nepodařilo se odebrat člena.",
+                                title: "Odebrání se nepovedlo",
+                                message: errorMessage,
                                 icon: "error",
                                 canReport: true,
+                                details: errorMessage,
                             });
+                        } finally {
+                            setPendingRemoveUserId(null);
                         }
                     },
-                    variant: "danger",
                 },
                 {
                     label: "Zrušit",
@@ -139,141 +228,267 @@ export default function TroopLeadersPage() {
         });
     };
 
-    const handleRoleChange = async (userId: Id<"users">, newRole: string) => {
+    const handleRoleChange = async (leader: LeaderRecord, newRole: string) => {
+        if (leader.role === "owner" || !newRole || newRole === leader.role) {
+            return;
+        }
+
+        setPendingRoleUserId(leader._id);
         try {
-            await updateRole({ troopId, userId, newRole });
+            await updateRole({ troopId, userId: leader._id, newRole });
             showSuccess({
-                title: "✅ Role změněna",
-                message: "Role byla úspěšně aktualizována.",
-                duration: 2000,
+                title: "Role změněna",
+                message: `${leader.name || leader.email || "Členovi"} byla nastavena role ${getRoleMeta(newRole).label.toLowerCase()}.`,
+                duration: 2500,
             });
-        } catch (error: any) {
+        } catch (error) {
+            const errorMessage = toErrorMessage(error, "Nepodařilo se změnit roli.");
             showError({
-                title: "❌ Chyba",
-                message: error?.message || "Nepodařilo se změnit roli.",
+                title: "Změna role se nepovedla",
+                message: errorMessage,
                 icon: "error",
                 canReport: true,
+                details: errorMessage,
             });
+        } finally {
+            setPendingRoleUserId(null);
         }
+    };
+
+    if (troop === undefined || leaders === undefined || viewer === undefined) {
+        return <div className={styles.loadingState}>Načítám vedení oddílu...</div>;
     }
 
-    if (leaders === undefined) return <div>Načítám vedení...</div>;
+    if (troop === null) {
+        return <div className={styles.loadingState}>Oddíl nebyl nalezen.</div>;
+    }
 
     return (
-        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-            <div className="u-flex u-justify-between u-items-center u-mb-4">
-                <h1 className="u-text-lg u-font-bold">Vedení Oddílu & Role</h1>
-                <Button variant="outline" onClick={() => router.push(`/troop/${troopId}`)}>Zpět na Dashboard</Button>
-            </div>
+        <div className={styles.page}>
+            <div className={styles.shell}>
+                <div className={styles.headerBar}>
+                    <div className={styles.headerInfo}>
+                        <div className={styles.headerBadge}>
+                            {troop.logo ? (
+                                <img src={troop.logo} alt={troop.name} className={styles.headerLogoImage} />
+                            ) : (
+                                <span className={styles.headerLogoFallback}>{getInitials(troop.name)}</span>
+                            )}
+                        </div>
 
-            <div style={{ height: 'var(--border-width)', backgroundColor: 'var(--border-color)', margin: '0 -2rem 2rem -2rem' }} />
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem" }}>
-                {/* List */}
-                <div style={{ flex: "2 1 400px", minWidth: "300px", backgroundColor: "white", padding: "1.5rem", borderRadius: "8px", border: "var(--border-width) solid var(--border-color)" }}>
-                    <h2 className="u-font-bold u-mb-4" style={{ fontSize: "1.1rem" }}>Aktuální Tým ({leaders.length})</h2>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        {leaders.map((leader: any) => (
-                            <div key={leader._id} style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                paddingBottom: "0.75rem",
-                                borderBottom: "1px solid #eee",
-                                gap: "1rem"
-                            }}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.25rem" }}>
-                                        <span style={{ fontWeight: "900", fontSize: "1.5rem", color: "#000" }}>
-                                            {leader.name || "Uživatel"}
-                                        </span>
-                                        <RoleBadge role={leader.role} />
-                                    </div>
-                                    <div style={{ fontSize: "0.9rem", color: "#52525b", fontWeight: "500" }}>{leader.email}</div>
-                                </div>
-
-                                {/* Allow editing for everyone, but careful with Owner deletion */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <select
-                                        value={leader.role === 'owner' ? "" : leader.role}
-                                        onChange={(e) => {
-                                            const newRole = e.target.value;
-                                            if (newRole === "") return; // Don't allow empty seleciton for now
-
-                                            // If currently 'owner' (implicit), we need to ADD them to leaders table to set explicit role
-                                            if (leader.role === 'owner') {
-                                                addLeader({ troopId, email: leader.email!, role: newRole })
-                                                    .then(() => alert("Role nastavena!"))
-                                                    .catch(err => alert("Chyba: " + err.message));
-                                            } else {
-                                                handleRoleChange(leader._id, newRole);
-                                            }
-                                        }}
-                                        style={{ padding: "0.25rem", borderRadius: "4px", border: "1px solid #ddd", fontSize: "0.85rem" }}
-                                    >
-                                        {/* If they are owner, show 'Majitel' as default option effectively */}
-                                        {leader.role === 'owner' && <option value="" disabled>Vybrat roli...</option>}
-                                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                                    </select>
-
-                                    {/* Show delete button unless it's the base 'owner' role (nothing to delete) */}
-                                    {leader.role !== 'owner' && (
-                                        <button
-                                            onClick={() => handleRemove(leader._id)}
-                                            style={{ color: "#991b1b", background: "none", border: "none", cursor: "pointer", fontSize: "1.2rem", lineHeight: 1 }}
-                                            title="Odebrat / Resetovat roli"
-                                        >
-                                            &times;
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                        <div className={styles.headerCopy}>
+                            <div className={styles.kicker}>Vedení oddílu</div>
+                            <h1 className={styles.title}>{troop.name}</h1>
+                        </div>
                     </div>
-                </div>
 
-                {/* Invite Form */}
-                <div style={{ flex: "1 1 300px", minWidth: "300px", backgroundColor: "white", padding: "1.5rem", borderRadius: "8px", border: "var(--border-width) solid var(--border-color)", height: "fit-content" }}>
-                    <h2 className="u-font-bold u-mb-4" style={{ fontSize: "1.1rem" }}>Přidat Člena</h2>
-                    <p style={{ fontSize: "0.9rem", marginBottom: "1rem", color: "#666" }}>
-                        Pozvěte další uživatele do vedení a přidělte jim roli.
-                    </p>
-                    <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                        <div>
-                            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.25rem" }}>E-mail</label>
-                            <input
-                                type="email"
-                                required
-                                placeholder="jan.novak@email.cz"
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                style={{ width: "100%", padding: "0.75rem", border: "1px solid #ddd", borderRadius: "4px" }}
-                            />
-                        </div>
-
-                        <div>
-                            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.25rem" }}>Role</label>
-                            <Select
-                                value={selectedRole}
-                                onChange={setSelectedRole}
-                                options={ROLES}
-                            />
-                        </div>
-
-                        <Button type="submit" disabled={isAdding}>
-                            {isAdding ? "Přidávám..." : "Přidat do týmu"}
+                    <div className={styles.headerActions}>
+                        {canManageLeaders && (
+                            <button
+                                type="button"
+                                className={styles.plusButton}
+                                onClick={() => setIsAddModalOpen(true)}
+                                aria-label="Přidat člena vedení"
+                            >
+                                +
+                            </button>
+                        )}
+                        <Button variant="outline" onClick={() => router.push(`/troop/${troopId}`)}>
+                            Zpět na oddíl
                         </Button>
-                    </form>
-
-                    <div style={{ marginTop: "2rem", fontSize: "0.8rem", color: "#666", lineHeight: 1.4 }}>
-                        <strong>Vysvětlení rolí:</strong>
-                        <ul style={{ paddingLeft: "1.2rem", marginTop: "0.5rem" }}>
-                            <li><strong>HL. Vedoucí:</strong> Má stejná práva jako majitel (správa týmu).</li>
-                            <li><strong>Vedoucí / Rover:</strong> Mohou vidět a spravovat členy a výpravy.</li>
-                        </ul>
                     </div>
                 </div>
+
+                <div className={styles.contentGrid}>
+                    <section className={styles.sectionCard}>
+                        <div className={styles.sectionHeader}>
+                            <h2 className={styles.sectionTitle}>Aktuální tým</h2>
+                        </div>
+
+                        <div className={styles.listWrap}>
+                            {leaders.map((leader) => {
+                                const isRoleUpdating = pendingRoleUserId === leader._id;
+                                const isRemoving = pendingRemoveUserId === leader._id;
+
+                            return (
+                                <article key={leader._id} className={styles.leaderRow}>
+                                    <div className={styles.leaderMain}>
+                                            <div className={styles.avatarWrap}>
+                                                <LeaderAvatar leader={leader} />
+                                            </div>
+
+                                            <div className={styles.leaderIdentity}>
+                                            <div className={styles.leaderTopRow}>
+                                                <h3 className={styles.leaderName}>{leader.name || "Uživatel bez jména"}</h3>
+                                                <RoleBadge role={leader.role} />
+                                            </div>
+                                            <div className={styles.leaderEmail}>{leader.email || "Bez e-mailu"}</div>
+                                        </div>
+                                        </div>
+
+                                        <div className={styles.leaderActions}>
+                                            {canManageLeaders ? (
+                                                <>
+                                                    {leader.role === "owner" ? (
+                                                        <div className={styles.ownerState}>
+                                                            <RoleBadge role={leader.role} />
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                onClick={() => setSelectedLeaderForInfo(leader)}
+                                                            >
+                                                                Info
+                                                            </Button>
+                                                            <select
+                                                                className={styles.roleSelect}
+                                                                value={leader.role}
+                                                                onChange={(event) => handleRoleChange(leader, event.target.value)}
+                                                                disabled={isRoleUpdating || isRemoving}
+                                                            >
+                                                                {ROLE_OPTIONS.map((roleOption) => (
+                                                                    <option key={roleOption.value} value={roleOption.value}>
+                                                                        {roleOption.label}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                onClick={() => handleRemove(leader)}
+                                                                disabled={isRoleUpdating || isRemoving}
+                                                            >
+                                                                {isRemoving ? "Odebírám..." : "Odebrat"}
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => setSelectedLeaderForInfo(leader)}
+                                                >
+                                                    Info
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    </section>
+                </div>
             </div>
+
+            {isAddModalOpen && canManageLeaders && (
+                <div className={styles.modalOverlay} onClick={() => setIsAddModalOpen(false)}>
+                    <div className={styles.modalCard} onClick={(event) => event.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <h2 className={styles.sectionTitle}>Přidat člena</h2>
+                            <button
+                                type="button"
+                                className={styles.closeButton}
+                                onClick={() => setIsAddModalOpen(false)}
+                                aria-label="Zavřít"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <form className={styles.inviteForm} onSubmit={handleAdd}>
+                            <label className={styles.controlGroup}>
+                                <span className={styles.controlLabel}>E-mail uživatele</span>
+                                <input
+                                    className={styles.input}
+                                    type="email"
+                                    required
+                                    placeholder="jan.novak@email.cz"
+                                    value={email}
+                                    onChange={(event) => setEmail(event.target.value)}
+                                    disabled={isAdding}
+                                />
+                            </label>
+
+                            <label className={styles.controlGroup}>
+                                <span className={styles.controlLabel}>Role</span>
+                                <Select value={selectedRole} onChange={setSelectedRole} options={ROLE_OPTIONS} />
+                            </label>
+
+                            <Button type="submit" disabled={isAdding}>
+                                {isAdding ? "Přidávám do vedení..." : "Přidat do vedení"}
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {selectedLeaderForInfo && (
+                <div className={styles.modalOverlay} onClick={() => setSelectedLeaderForInfo(null)}>
+                    <div className={styles.modalCard} onClick={(event) => event.stopPropagation()}>
+                        <div className={styles.modalHeader}>
+                            <div>
+                                <h2 className={styles.sectionTitle}>{selectedLeaderForInfo.name || "Detail vedoucího"}</h2>
+                                <div className={styles.modalSubtitle}>{selectedLeaderForInfo.email || "Bez e-mailu"}</div>
+                            </div>
+                            <button
+                                type="button"
+                                className={styles.closeButton}
+                                onClick={() => setSelectedLeaderForInfo(null)}
+                                aria-label="Zavřít"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className={styles.infoGrid}>
+                            <div className={styles.infoItem}>
+                                <span className={styles.infoLabel}>Datum narození</span>
+                                <strong>{selectedLeaderForInfo.birthDate || "Není vyplněno"}</strong>
+                            </div>
+                            <div className={styles.infoItem}>
+                                <span className={styles.infoLabel}>Adresa</span>
+                                <strong>{selectedLeaderForInfo.address || "Není vyplněno"}</strong>
+                            </div>
+                            <div className={styles.infoItem}>
+                                <span className={styles.infoLabel}>Osobní e-mail</span>
+                                <strong>{selectedLeaderForInfo.personalEmail || selectedLeaderForInfo.email || "Není vyplněno"}</strong>
+                            </div>
+                            <div className={styles.infoItem}>
+                                <span className={styles.infoLabel}>Osobní kontakt</span>
+                                <strong>{selectedLeaderForInfo.personalPhone || "Není vyplněno"}</strong>
+                            </div>
+
+                            {selectedLeaderForInfo.role === "rover" ? (
+                                <>
+                                    <div className={styles.infoItem}>
+                                        <span className={styles.infoLabel}>Rodič 1</span>
+                                        <strong>{selectedLeaderForInfo.parent1Name || "Není vyplněno"}</strong>
+                                        <span>{selectedLeaderForInfo.parent1Phone || selectedLeaderForInfo.parent1Email || "Bez kontaktu"}</span>
+                                    </div>
+                                    <div className={styles.infoItem}>
+                                        <span className={styles.infoLabel}>Rodič 2</span>
+                                        <strong>{selectedLeaderForInfo.parent2Name || "Není vyplněno"}</strong>
+                                        <span>{selectedLeaderForInfo.parent2Phone || selectedLeaderForInfo.parent2Email || "Bez kontaktu"}</span>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className={styles.infoItem}>
+                                    <span className={styles.infoLabel}>Kontakt</span>
+                                    <strong>{selectedLeaderForInfo.emergencyContactName || "Není vyplněno"}</strong>
+                                    <span>
+                                        {selectedLeaderForInfo.emergencyContactPhone ||
+                                            selectedLeaderForInfo.emergencyContactEmail ||
+                                            "Bez kontaktu"}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
