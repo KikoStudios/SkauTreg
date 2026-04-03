@@ -1,5 +1,22 @@
 # SkauTreg
 
+## What is SkauTreg?
+
+**SkauTreg** is a modern, all-in-one web application for managing Czech Scout troops (_skautské oddíly_). It is designed to make everyday troop administration easier for Scout leaders by providing tools for:
+
+- **Member management** — maintain complete member profiles, contact information, and guardian details
+- **Trip & activity planning** — create and manage expeditions with transport coordination via IDOS integration
+- **Calendar & attendance** — view all upcoming events and track participation
+- **RSVP system** — public registration links for members to sign up or opt out of events
+- **Email communication** — send emails directly from the app using Gmail OAuth or SMTP (Seznam, Centrum, O2)
+- **Meeting notes (Rada)** — collaborative real-time note-taking for troop council meetings
+- **Scout base database** — integrated lookup for Czech Scout base locations
+- **Troop administration** — manage troop info, leadership hierarchy, and settings
+
+The app is primarily in Czech and is built for the Czech Scout organization (_Junák – svaz skautů a skautek České republiky_).
+
+---
+
 SkauTreg je moderní aplikace pro komplexní správu skautských oddílů. Cílem je usnadnit vedoucím každodenní veci od správy členů, přes plánování výprav, až po řešení docházky a registrací. Vše je navrženo jednoduše a přehledně.
 
 ## Jak to funguje (Technologie)
