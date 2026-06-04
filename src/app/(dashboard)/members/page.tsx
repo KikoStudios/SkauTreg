@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useFeedback } from "@/context/FeedbackContext";
+import Image from "next/image";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -609,9 +610,9 @@ export default function MembersPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", padding: "0 2rem 2rem", boxSizing: "border-box" }}>
             {/* Top Title Bar */}
-            <div className="headingContainer">
+            <div className="headingContainer" style={{ margin: "0 -2rem 1.25rem", padding: "1rem 2rem", borderBottom: "3px solid #000" }}>
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Členové</h1>
             </div>
 
@@ -702,6 +703,7 @@ export default function MembersPage() {
                 .controls-row {
                     display: flex;
                     align-items: center;
+                    padding-top: 0.75rem;
                     margin-bottom: 2rem;
                     flex-wrap: wrap;
                     gap: 1rem;
@@ -898,17 +900,34 @@ export default function MembersPage() {
                             {editingMemberId && (
                                 <button
                                     onClick={handleDelete}
+                                    aria-label="Smazat člena"
+                                    title="Smazat člena"
                                     style={{
                                         backgroundColor: "#fca5a5",
                                         border: "2px solid #000",
                                         borderRadius: "6px",
-                                        padding: "0.25rem 0.75rem",
+                                        width: "64px",
+                                        height: "54px",
+                                        padding: "15px",
                                         fontWeight: "bold",
                                         cursor: "pointer",
-                                        boxShadow: "2px 2px 0 0 #000"
+                                        boxShadow: "2px 2px 0 0 #000",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center"
                                     }}
                                 >
-                                    Smazat
+                                    <Image
+                                        src="/cross-icon.svg"
+                                        alt=""
+                                        width={20}
+                                        height={20}
+                                        aria-hidden="true"
+                                        style={{
+                                            display: "block",
+                                            objectFit: "contain"
+                                        }}
+                                    />
                                 </button>
                             )}
                         </div>

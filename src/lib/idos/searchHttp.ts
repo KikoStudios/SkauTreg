@@ -233,7 +233,7 @@ async function fetchConnPagingNext(
   try {
     res = await session.request(endpoint.toString(), {
       method: "POST",
-      timeoutMs: 6000,
+      timeoutMs: 10000,
       body: bodyParams.toString(),
       headers: {
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -286,7 +286,7 @@ async function fetchConnMoreConnections(
   try {
     res = await session.request(url.toString(), {
       method: "POST",
-      timeoutMs: 6000,
+      timeoutMs: 10000,
       body: bodyParams.toString(),
       headers: {
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -335,7 +335,7 @@ async function fetchPriceOffer(
     if (!endpoint.searchParams.has("callback")) endpoint.searchParams.set("callback", "cb");
     const res = await session.request(endpoint.toString(), {
       method: "POST",
-      timeoutMs: 6000,
+      timeoutMs: 10000,
       body: bodyParams.toString(),
       headers: {
         "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -381,7 +381,7 @@ export async function searchTripsHttpStream(opts: {
   const searchUrl = buildSearchUrl(from, to, date, time, arrival);
 
   const session = new HttpSession();
-  const firstRes = await session.get(searchUrl, 6000);
+  const firstRes = await session.get(searchUrl, 10000);
   if (firstRes.status < 200 || firstRes.status >= 300) throw new Error(`Failed to load search results (${firstRes.status}).`);
 
   let pageHtml = firstRes.text;
@@ -397,79 +397,14 @@ export async function searchTripsHttpStream(opts: {
   }
 
   const seen = new Set<string>();
-  const outTrips: SearchTrip[] = [];
+  let emittedTrips = 0;
   const baseAjaxBaseUrl = makeFareAjaxBaseUrl(bootstrap, origin);
   const absCombId = typeof (bootstrap as any)?.raw?.searchItem?.sCombId === "string" ? (bootstrap as any).raw.searchItem.sCombId : undefined;
   const searchDate = typeof (bootstrap as any)?.raw?.searchItem?.oConn?.oUserInput?.dtSearchDate === "string"
     ? (bootstrap as any).raw.searchItem.oConn.oUserInput.dtSearchDate
     : undefined;
 
-  const addTripsFromHtml = (html: string) => {
-    const handle = bootstrap.handle;
-    const ajaxBaseUrl = makeFareAjaxBaseUrl(bootstrap, origin) || baseAjaxBaseUrl;
-    const pageTrips = parseConnectionsSearch(html, searchUrl) as SearchTrip[];
-    for (const trip of pageTrips) {
-      if (typeof handle === "number") trip.handle = handle;
-      trip.ajaxBaseUrl = ajaxBaseUrl;
-      trip.ajaxBaseUrlAlt = makeFareAjaxBaseUrlAlt(bootstrap, origin) || undefined;
-      const key = computeDedupKey(trip);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      outTrips.push(trip);
-    }
-  };
-
-  addTripsFromHtml(pageHtml);
-
-  const maxPresses = 200;
-  let presses = 0;
-  let allowNext = true;
-  const allIds0 = extractListedConnectionIdsFromHtml(pageHtml);
-  let pagingConnId =
-    (allIds0.length ? allIds0[allIds0.length - 1] : undefined) ??
-    (typeof bootstrap.connIds?.[bootstrap.connIds.length - 1] === "number" ? bootstrap.connIds[bootstrap.connIds.length - 1] : undefined);
-  let lastPagingConnId: number | undefined = undefined;
-  let noNewStreak = 0;
-
-  while (
-    allowNext &&
-    presses < maxPresses &&
-    typeof bootstrap.handle === "number" &&
-    typeof pagingConnId === "number" &&
-    outTrips.length < limit
-  ) {
-    let hit: { newHtml: string; allowNext: boolean } | null = null;
-
-    if (hasPagingNextButton(pageHtml)) {
-      hit = await fetchConnPagingNext(session.clone(), searchUrl, pageHtml, bootstrap, !!arrival);
-    }
-
-    if (!hit && absCombId && searchDate) {
-      hit = await fetchConnMoreConnections(session.clone(), searchUrl, { handle: bootstrap.handle, connId: pagingConnId, absCombId, searchDate });
-    }
-
-    if (!hit) break;
-    presses++;
-    allowNext = hit.allowNext;
-    pageHtml += `\n${hit.newHtml}`;
-    addTripsFromHtml(hit.newHtml);
-
-    const newIds = extractListedConnectionIdsFromHtml(hit.newHtml);
-    if (newIds.length) pagingConnId = newIds[newIds.length - 1];
-    else {
-      const allIds = extractListedConnectionIdsFromHtml(pageHtml);
-      if (allIds.length) pagingConnId = allIds[allIds.length - 1];
-    }
-
-    if (typeof pagingConnId === "number" && pagingConnId === lastPagingConnId) noNewStreak++;
-    else noNewStreak = 0;
-    lastPagingConnId = pagingConnId;
-
-    if (noNewStreak >= 3) break;
-  }
-
-  const finalTrips = outTrips.slice(0, limit);
-  for (const trip of finalTrips) {
+  const emitTrip = async (trip: SearchTrip) => {
     try {
       const fare = typeof trip.handle === "number" && typeof trip.connId === "number"
         ? {
@@ -497,7 +432,74 @@ export async function searchTripsHttpStream(opts: {
       trip.priceIsic = trip.priceIsic || "N/A";
       trip.price = trip.priceAdult || "N/A";
     }
+
     await onTrip(trip);
+    emittedTrips += 1;
+  };
+
+  const addTripsFromHtml = async (html: string) => {
+    const handle = bootstrap.handle;
+    const ajaxBaseUrl = makeFareAjaxBaseUrl(bootstrap, origin) || baseAjaxBaseUrl;
+    const pageTrips = parseConnectionsSearch(html, searchUrl) as SearchTrip[];
+    for (const trip of pageTrips) {
+      if (emittedTrips >= limit) break;
+      if (typeof handle === "number") trip.handle = handle;
+      trip.ajaxBaseUrl = ajaxBaseUrl;
+      trip.ajaxBaseUrlAlt = makeFareAjaxBaseUrlAlt(bootstrap, origin) || undefined;
+      const key = computeDedupKey(trip);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      await emitTrip(trip);
+    }
+  };
+
+  await addTripsFromHtml(pageHtml);
+
+  const maxPresses = 200;
+  let presses = 0;
+  let allowNext = true;
+  const allIds0 = extractListedConnectionIdsFromHtml(pageHtml);
+  let pagingConnId =
+    (allIds0.length ? allIds0[allIds0.length - 1] : undefined) ??
+    (typeof bootstrap.connIds?.[bootstrap.connIds.length - 1] === "number" ? bootstrap.connIds[bootstrap.connIds.length - 1] : undefined);
+  let lastPagingConnId: number | undefined = undefined;
+  let noNewStreak = 0;
+
+  while (
+    allowNext &&
+    presses < maxPresses &&
+    typeof bootstrap.handle === "number" &&
+    typeof pagingConnId === "number" &&
+    emittedTrips < limit
+  ) {
+    let hit: { newHtml: string; allowNext: boolean } | null = null;
+
+    if (hasPagingNextButton(pageHtml)) {
+      hit = await fetchConnPagingNext(session.clone(), searchUrl, pageHtml, bootstrap, !!arrival);
+    }
+
+    if (!hit && absCombId && searchDate) {
+      hit = await fetchConnMoreConnections(session.clone(), searchUrl, { handle: bootstrap.handle, connId: pagingConnId, absCombId, searchDate });
+    }
+
+    if (!hit) break;
+    presses++;
+    allowNext = hit.allowNext;
+    pageHtml += `\n${hit.newHtml}`;
+    await addTripsFromHtml(hit.newHtml);
+
+    const newIds = extractListedConnectionIdsFromHtml(hit.newHtml);
+    if (newIds.length) pagingConnId = newIds[newIds.length - 1];
+    else {
+      const allIds = extractListedConnectionIdsFromHtml(pageHtml);
+      if (allIds.length) pagingConnId = allIds[allIds.length - 1];
+    }
+
+    if (typeof pagingConnId === "number" && pagingConnId === lastPagingConnId) noNewStreak++;
+    else noNewStreak = 0;
+    lastPagingConnId = pagingConnId;
+
+    if (noNewStreak >= 3) break;
   }
 }
 
@@ -507,7 +509,7 @@ async function fetchResultsHtmlForHandle(session: HttpSession, searchUrl: string
   const h = bootstrap.handle;
   const url = new URL("/vlakyautobusymhdvse/spojeni/vysledky/", pageUrl.origin);
   url.searchParams.set("h", String(h));
-  const res = await session.get(url.toString(), 4000);
+  const res = await session.get(url.toString(), 8000);
   if (res.status < 200 || res.status >= 300) return null;
   return res.text;
 }

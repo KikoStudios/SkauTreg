@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { normalizeLeaderRole } from "./lib/memberEmails";
 
 export const create = mutation({
     args: {
@@ -217,7 +218,7 @@ export const addLeader = mutation({
         await ctx.db.insert("troop_leaders", {
             troopId: args.troopId,
             userId: userToAdd._id,
-            role: args.role
+            role: normalizeLeaderRole(args.role) ?? "leader"
         });
     }
 });
@@ -249,7 +250,7 @@ export const updateRole = mutation({
 
         if (!leaderRecord) throw new Error("👤 Vedoucí nebyl nalezen.");
 
-        await ctx.db.patch(leaderRecord._id, { role: args.newRole });
+        await ctx.db.patch(leaderRecord._id, { role: normalizeLeaderRole(args.newRole) ?? leaderRecord.role });
     }
 });
 
@@ -304,7 +305,7 @@ export const getLeaders = query({
                 if (!user) return null;
                 return {
                     ...user,
-                    role: record.role, // "main_leader", "leader", "rover"
+                    role: normalizeLeaderRole(record.role), // "main_leader", "leader", "rover"
                     isOwner: user._id === troop.ownerId
                 }
             })

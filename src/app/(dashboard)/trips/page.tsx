@@ -7,6 +7,8 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import TripForm, { TripFormData } from "../../../components/TripForm";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import { useFeedback } from "@/context/FeedbackContext";
+import { getErrorDetails } from "@/lib/errors";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -35,6 +37,7 @@ const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function TripsPage() {
+    const { showError, showSuccess } = useFeedback();
     const troops = useQuery(api.troops.getByUser);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -79,6 +82,11 @@ export default function TripsPage() {
                 ...data
             });
             setShowAddModal(false);
+            showSuccess({
+                title: "Uloženo",
+                message: "Výprava byla vytvořena.",
+                duration: 2500,
+            });
         } catch (error) {
             console.error(error);
             alert("Chyba při vytváření výpravy");
@@ -124,7 +132,6 @@ export default function TripsPage() {
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div className="headingContainer">
-                <Breadcrumbs />
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Výpravy</h1>
             </div>
 

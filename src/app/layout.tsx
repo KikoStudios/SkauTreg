@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { FeedbackProvider } from "../context/FeedbackContext";
 import ErrorModal from "../components/ErrorModal";
@@ -9,7 +8,7 @@ import SuccessModal from "../components/SuccessModal";
 
 export const metadata: Metadata = {
   title: "SkauTreg - Správa skautských středisek s mailovým systémem",
-  description: "Kompletní systém pro správu skautských oddílů. Spravujte členy, plánujte výpravy, komunikujte pomocí integrovaného mailového systému (SkautReg Mailing System) a organizujte všechno na jednom místě.",
+  description: "Kompletní systém pro správu skautských oddílů. Spravujte členy, plánujte výpravy, komunikujte pomocí integrovaného mailového systému a organizujte všechno na jednom místě.",
   icons: {
     icon: "/icons/logo-icon.png",
     apple: "/icons/logo-icon.png",

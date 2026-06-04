@@ -117,7 +117,7 @@ export class HttpSession {
 
   async request(url: string, opts?: HttpRequestOptions): Promise<HttpResponse> {
     const method = opts?.method || "GET";
-    const timeoutMs = opts?.timeoutMs ?? 900;
+    const timeoutMs = opts?.timeoutMs ?? 5000;
     const controller = new AbortController();
     const to = setTimeout(() => controller.abort(), timeoutMs);
 

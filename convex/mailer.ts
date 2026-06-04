@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { getMemberEmailTargets, normalizeLeaderRole, normalizeMemberContactFields } from "./lib/memberEmails";
 
 const getEnv = (key: string) => {
   const value = process.env[key];
@@ -146,7 +147,10 @@ export const sendTripEmail = action({
     if (!troop) throw new Error("Troop not found");
 
     const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: dashboard.trip.troopId });
-    const canSend = leaders?.some((l: any) => l?._id === user._id && (l.role === "owner" || l.role === "main_leader"));
+    const canSend = leaders?.some((l: any) => {
+      const role = normalizeLeaderRole(l.role);
+      return l?._id === user._id && (role === "owner" || role === "main_leader" || role === "leader");
+    });
     if (!canSend) throw new Error("Nemáte oprávnění rozesílat emaily.");
 
     // Use troop's OAuth if available, otherwise fallback to global
@@ -172,14 +176,15 @@ export const sendTripEmail = action({
     const failed: Array<{ email: string; error: string }> = [];
 
     for (const p of dashboard.participants) {
-      const email = p.member?.email;
-      if (!email) {
+      const member = normalizeMemberContactFields(p.member);
+      const emails = getMemberEmailTargets(member);
+      if (emails.length === 0) {
         skippedCount++;
         continue;
       }
 
       const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
-      const memberName = p.member?.name || "";
+      const memberName = member?.name || "";
       
       // Replace smart tags - no @userlink support
       let html = args.body
@@ -187,18 +192,20 @@ export const sendTripEmail = action({
         .replace(/<user\.name>/g, memberName)
         .replace(/\n/g, "<br/>");
 
-      try {
-        await sendGmailMessage({
-          accessToken,
-          from: `${fromName} <${senderEmail}>`,
-          to: email,
-          subject: args.subject,
-          html,
-          replyTo,
-        });
-        sentCount++;
-      } catch (err: any) {
-        failed.push({ email, error: err?.message || "Failed" });
+      for (const email of emails) {
+        try {
+          await sendGmailMessage({
+            accessToken,
+            from: `${fromName} <${senderEmail}>`,
+            to: email,
+            subject: args.subject,
+            html,
+            replyTo,
+          });
+          sentCount++;
+        } catch (err: any) {
+          failed.push({ email, error: err?.message || "Failed" });
+        }
       }
     }
 
@@ -395,9 +402,10 @@ export const sendFromDraft = action({
 
       // Check permissions - vedoucí (normal leader) and main_leader can send
       const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: trip.trip.troopId });
-      const canSend = leaders?.some((l: any) => 
-        l?._id === user._id && (l.role === "owner" || l.role === "main_leader" || l.role === "vedouci")
-      );
+      const canSend = leaders?.some((l: any) => {
+        const role = normalizeLeaderRole(l.role);
+        return l?._id === user._id && (role === "owner" || role === "main_leader" || role === "leader");
+      });
       
       if (!canSend) {
         return {
@@ -467,14 +475,15 @@ export const sendFromDraft = action({
         : trip.participants;
 
       for (const p of participantsToSend) {
-        const email = p.member?.email;
-        if (!email) {
+        const member = normalizeMemberContactFields(p.member);
+        const emails = getMemberEmailTargets(member);
+        if (emails.length === 0) {
           skippedCount++;
           continue;
         }
 
         const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
-        const memberName = p.member?.name || "";
+        const memberName = member?.name || "";
         
         // Replace smart tags
         let bodyText = draft.body
@@ -490,31 +499,31 @@ ${bodyText.replace(/\n/g, "<br/>")}
 </body>
 </html>`;
 
-        try {
-          if (accessToken) {
-            // Use Gmail
-            await sendGmailMessage({
-              accessToken,
-              from: `${fromName} <${senderEmail}>`,
-              to: email,
-              subject: draft.subject,
-              html,
-              replyTo,
-            });
-          } else if (smtpConfig) {
-            // Use SMTP
-            await sendSmtpMessage({
-              ...smtpConfig,
-              from: `${fromName} <${senderEmail}>`,
-              to: email,
-              subject: draft.subject,
-              html,
-              replyTo,
-            });
+        for (const email of emails) {
+          try {
+            if (accessToken) {
+              await sendGmailMessage({
+                accessToken,
+                from: `${fromName} <${senderEmail}>`,
+                to: email,
+                subject: draft.subject,
+                html,
+                replyTo,
+              });
+            } else if (smtpConfig) {
+              await sendSmtpMessage({
+                ...smtpConfig,
+                from: `${fromName} <${senderEmail}>`,
+                to: email,
+                subject: draft.subject,
+                html,
+                replyTo,
+              });
+            }
+            sentCount++;
+          } catch (err: any) {
+            failed.push({ email, error: err?.message || "Failed" });
           }
-          sentCount++;
-        } catch (err: any) {
-          failed.push({ email, error: err?.message || "Failed" });
         }
       }
 

@@ -10,8 +10,10 @@ import Button from "../../../../components/Button";
 import EmailDraftsTab from "../../../../components/EmailDraftsTab";
 import { useFeedback } from "../../../../context/FeedbackContext";
 import TransportTab from "../../../../components/trip/TransportTab";
+import FinanceTab from "../../../../components/trip/FinanceTab";
+import { normalizeMemberContactFields } from "../../../../lib/memberEmails";
 
-type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace' | 'emaily';
+type TabType = 'info' | 'zakladna' | 'doprava' | 'finance' | 'ucastnici' | 'dokumentace' | 'emaily';
 
 const BENEFIT_OPTIONS = [
     "žákovský průkaz ČR",
@@ -463,21 +465,6 @@ export default function TripDashboardPage() {
 
     return (
         <div style={{ width: "100%", position: "relative", padding: "0 2rem 2rem" }}>
-            {/* Top Title Bar */}
-            <div style={{
-                backgroundColor: "white",
-                borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
-                margin: "0 -2rem 1rem -2rem",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.5rem"
-            }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Výpravy</h1>
-            </div>
-
             {/* Controls Row & Info */}
             <div style={{ marginBottom: "2rem" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "2rem", flexWrap: "wrap" }}>
@@ -519,7 +506,7 @@ export default function TripDashboardPage() {
                         onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
                         onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
                     >
-                        <img src="/delete-icon.svg" alt="Delete" style={{ width: "20px", height: "20px" }} /> Smazat
+                        <img src="/cross-icon.svg" alt="" aria-hidden="true" style={{ width: "16px", height: "16px", display: "block" }} /> Smazat
                     </button>
                     </div>
                 </div>
@@ -604,6 +591,26 @@ export default function TripDashboardPage() {
                         }}
                     >
                         Doprava
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('finance')}
+                        style={{
+                            padding: "1rem 1.5rem",
+                            backgroundColor: activeTab === 'finance' ? "white" : "#f0f0f0",
+                            border: activeTab === 'finance' ? "3px solid #000" : "2px solid #999",
+                            borderBottom: activeTab === 'finance' ? "none" : "2px solid #999",
+                            borderRadius: "12px 12px 0 0",
+                            fontWeight: "900",
+                            fontSize: "1rem",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                            transition: "all 0.2s",
+                            marginBottom: "-3px",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0
+                        }}
+                    >
+                        Finance
                     </button>
                     <button
                         onClick={() => setActiveTab('ucastnici')}
@@ -1446,6 +1453,13 @@ export default function TripDashboardPage() {
                 </div>
             )}
 
+            {/* Tab Content - FINANCE */}
+            {activeTab === 'finance' && (
+                <div>
+                    <FinanceTab tripId={tripId} />
+                </div>
+            )}
+
             {/* Tab Content - ÚČASTNÍCI */}
             {activeTab === 'ucastnici' && (
                 <div>
@@ -1475,7 +1489,9 @@ export default function TripDashboardPage() {
                                     <tr key={p._id} style={{ borderBottom: index === validParticipants.length - 1 ? "none" : "2px solid #000" }}>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <div style={{ fontWeight: "800", fontSize: "1rem" }}>{p.member?.name}</div>
-                                            <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Rodič: {p.member?.parentPhone}</div>
+                                            <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>
+                                                Kontakt: {normalizeMemberContactFields(p.member)?.guardianPhone || "Bez telefonu"}
+                                            </div>
                                         </td>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <span style={{
@@ -1623,7 +1639,12 @@ export default function TripDashboardPage() {
                         boxShadow: "6px 6px 0 0 #000"
                     }}>
                         <h3 style={{ fontSize: "1.4rem", fontWeight: "900", margin: "0 0 1.5rem 0", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                            <span style={{ fontSize: "1.8rem" }}>📓</span> Připojené zápisy z rad
+                            <img
+                                src="/notepad.png"
+                                alt=""
+                                style={{ width: "1.8rem", height: "1.8rem", objectFit: "contain", display: "block" }}
+                            />
+                            <span>Připojené zápisy z rad</span>
                         </h3>
                         
                         {tripDocs === undefined ? (

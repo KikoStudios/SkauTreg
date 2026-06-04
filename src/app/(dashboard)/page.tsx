@@ -91,13 +91,12 @@ export default function Home() {
     <div>
       {/* Header */}
       <div className="headingContainer">
-        <Breadcrumbs />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0, marginLeft: "1.5rem" }}>
             Přehled
           </h1>
           <Link href="/troop">
-            <Button variant="outline">Spravovat oddíly</Button>
+            <Button variant="outline" style={{ marginRight: "1.5rem" }}>Spravovat oddíly</Button>
           </Link>
         </div>
       </div>

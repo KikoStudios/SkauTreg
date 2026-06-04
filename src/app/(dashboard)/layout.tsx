@@ -3,13 +3,12 @@
 import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
 import styles from "./DashboardLayout.module.css";
 import ProfileModal from "../../components/ProfileModal";
 import { CommandMenu } from "../../components/CommandMenu";
-import Breadcrumbs from "../../components/Breadcrumbs";
 import { UpdateNotification } from "../../components/UpdateNotification";
 
 export default function DashboardLayout({
@@ -37,10 +36,6 @@ function DashboardLayoutInner({
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
 
     const convexAuthReady = useMemo(() => !isLoading && isAuthenticated, [isLoading, isAuthenticated]);
-
-    useEffect(() => {
-        console.log("DashboardLayout auth check:", { isLoading, isAuthenticated, isClerkLoaded, isSignedIn });
-    }, [isLoading, isAuthenticated, isClerkLoaded, isSignedIn]);
 
     if (isLoading) {
         return (
@@ -118,7 +113,7 @@ function DashboardLayoutInner({
                         ☰
                     </button>
                     <img src="/Logo-light.svg" alt="SkautReg" className={styles.mobileLogo} />
-                    <div style={{ width: "40px" }}></div> {/* Spacer for balancing */}
+                    <div style={{ width: "1px" }}></div> {/* Spacer for balancing */}
                 </div>
 
                 <Sidebar 

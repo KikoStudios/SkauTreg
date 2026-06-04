@@ -5,6 +5,8 @@ import { api } from "../../../../convex/_generated/api";
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import { useFeedback } from "@/context/FeedbackContext";
+import { getErrorDetails } from "@/lib/errors";
 
 // Components & Styles
 const Header = () => (
@@ -147,6 +149,7 @@ const radioLabelStyle = {
 };
 
 export default function PublicRSVPPage() {
+    const { showError, showSuccess } = useFeedback();
     const params = useParams();
     const accessKey = params.accessKey as string;
 
@@ -214,6 +217,11 @@ export default function PublicRSVPPage() {
             });
             setStatus(chosenStatus);
             setIsSuccess(true);
+            showSuccess({
+                title: "Uloženo",
+                message: "Odpověď byla uložena.",
+                duration: 2500,
+            });
         } catch (error) {
             console.error("Failed to submit RSVP", error);
             alert("Něco se pokazilo. Zkuste to prosím znovu.");

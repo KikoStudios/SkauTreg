@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { api } from "./_generated/api";
+import { getMemberEmailTargets, normalizeMemberContactFields } from "./lib/memberEmails";
 
 // Create a new email draft for a trip
 export const create = mutation({
@@ -164,13 +165,15 @@ export const getRecipients = query({
 
         const recipients = await Promise.all(
             participations.map(async (p) => {
-                const member = await ctx.db.get(p.memberId);
+                const member = normalizeMemberContactFields(await ctx.db.get(p.memberId));
+                const emails = getMemberEmailTargets(member);
                 return {
                     memberId: member?._id,
                     name: member?.name,
-                    email: member?.guardianEmail,
+                    email: emails[0],
+                    emails,
                     accessKey: p.accessKey,
-                    hasEmail: !!member?.guardianEmail,
+                    hasEmail: emails.length > 0,
                 };
             })
         );

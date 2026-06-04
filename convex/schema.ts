@@ -127,7 +127,44 @@ export default defineSchema({
             placeholder: v.optional(v.string()),
             options: v.optional(v.array(v.string()))
         }))),
+        financeSettings: v.optional(v.object({
+            currency: v.string(), // "CZK"
+            manualPricePerParticipant: v.optional(v.number()),
+            paymentDueDate: v.optional(v.string()),
+            useManualParticipantPrice: v.optional(v.boolean()),
+            notes: v.optional(v.string()),
+        })),
     }).index("by_troop", ["troopId"]),
+
+    trip_budget_items: defineTable({
+        tripId: v.id("trips"),
+        category: v.string(),
+        subcategory: v.string(),
+        name: v.string(),
+        plannedAmount: v.optional(v.number()),
+        actualAmount: v.optional(v.number()),
+        quantity: v.optional(v.number()),
+        unitLabel: v.optional(v.string()),
+        note: v.optional(v.string()),
+        sortOrder: v.number(),
+        createdAt: v.string(),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_category", ["tripId", "category"]),
+
+    trip_member_payments: defineTable({
+        tripId: v.id("trips"),
+        memberId: v.id("members"),
+        status: v.string(), // "unpaid" | "partial" | "paid" | "excused"
+        expectedAmount: v.optional(v.number()),
+        paidAmount: v.optional(v.number()),
+        paidAt: v.optional(v.string()),
+        note: v.optional(v.string()),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_member", ["tripId", "memberId"]),
 
     transport_routes: defineTable({
         tripId: v.id("trips"),

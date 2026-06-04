@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from "@clerk/nextjs/server";
+import { fetchMutation } from "convex/nextjs";
+import { api } from "../../../../../../convex/_generated/api";
 
 /**
  * Gmail OAuth Callback Handler
@@ -153,11 +156,41 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Success: Redirect to settings page with connection params
+    if (!troopId) {
+      return NextResponse.redirect(
+        new URL(
+          getRedirectUrl("gmail_error=Chybí identifikace oddílu pro dokončení propojení"),
+          req.url
+        )
+      );
+    }
+
+    const authData = await auth();
+    const token = await authData.getToken();
+
+    if (!authData.userId || !token) {
+      return NextResponse.redirect(
+        new URL(
+          getRedirectUrl("gmail_error=Relace vypršela. Přihlaste se znovu a opakujte propojení."),
+          req.url
+        )
+      );
+    }
+
+    await fetchMutation(
+      api.troops.connectEmailProvider,
+      {
+        troopId: troopId as any,
+        provider: "gmail",
+        email,
+        refreshToken,
+      },
+      { token }
+    );
+
     const successParams = new URLSearchParams({
       gmail_connected: 'true',
       email,
-      refresh_token: refreshToken,
     });
     if (returnAction) {
       successParams.set('returnAction', returnAction);

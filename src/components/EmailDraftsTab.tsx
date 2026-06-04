@@ -653,7 +653,9 @@ export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps
                                         />
                                         <div>
                                             <div style={{ fontWeight: "700", fontSize: "0.95rem" }}>{member.name}</div>
-                                            <div style={{ fontSize: "0.8rem", color: "#666", fontWeight: "600" }}>{member.email}</div>
+                                            <div style={{ fontSize: "0.8rem", color: "#666", fontWeight: "600" }}>
+                                                {Array.isArray((member as any).emails) ? (member as any).emails.join(", ") : member.email}
+                                            </div>
                                         </div>
                                     </div>
                                 )) : (

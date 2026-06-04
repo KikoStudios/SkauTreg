@@ -8,7 +8,6 @@ export default function RadyPage() {
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div className="headingContainer">
-                <Breadcrumbs />
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Dokumentace</h1>
             </div>
 

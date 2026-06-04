@@ -35,13 +35,11 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
 
         let gmailConnected: string | null = null;
         let email: string | null = null;
-        let refreshToken: string | null = null;
         let gmailError: string | null = null;
 
         // Try useSearchParams hook first
         gmailConnected = searchParams?.get('gmail_connected');
         email = searchParams?.get('email');
-        refreshToken = searchParams?.get('refresh_token');
         gmailError = searchParams?.get('gmail_error');
 
         // Fallback: read from window.location.search
@@ -49,12 +47,8 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
             const urlParams = new URLSearchParams(window.location.search);
             gmailConnected = urlParams.get('gmail_connected');
             email = urlParams.get('email');
-            refreshToken = urlParams.get('refresh_token');
             gmailError = urlParams.get('gmail_error');
-            console.log('Fallback params from window.location:', { gmailConnected, email, gmailError });
         }
-
-        console.log('OAuth callback detected:', { gmailConnected, email, gmailError });
 
         if (gmailError) {
             showError({
@@ -68,9 +62,15 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
             return;
         }
 
-        if (gmailConnected === 'true' && email && refreshToken) {
-            console.log('Calling handleOAuthCallback with:', { email, refreshToken });
-            handleOAuthCallback(email, refreshToken);
+        if (gmailConnected === 'true') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            showSuccess({
+                title: "Úspěch",
+                message: email
+                    ? `Gmail účet ${email} byl připojen.`
+                    : "Gmail účet byl připojen.",
+                duration: 4000,
+            });
         }
 
         setParamsProcessed(true);
@@ -80,9 +80,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     const handleOAuthCallback = async (email: string, refreshToken: string) => {
         setIsConnecting(true);
         try {
-            console.log('Saving Gmail connection:', { email });
-            const result = await connectGmail({ troopId, email, refreshToken });
-            console.log('connectGmail result:', result);
+            await connectGmail({ troopId, email, refreshToken });
             // Clean URL
             window.history.replaceState({}, document.title, window.location.pathname);
             showSuccess({
@@ -91,7 +89,6 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 duration: 4000,
             });
         } catch (error: any) {
-            console.error('connectGmail error:', error);
             showError({
                 title: "❌ Chyba při uložení",
                 message: "Nepodařilo se uložit Gmail propojení. Zkuste znovu.",

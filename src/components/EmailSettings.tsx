@@ -72,7 +72,6 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
     // Check if returning from OAuth providers
     useEffect(() => {
         const gmailConnected = searchParams?.get("gmail_connected");
-        const refreshToken = searchParams?.get("refresh_token");
         const email = searchParams?.get("email");
         const gmailError = searchParams?.get("gmail_error");
 
@@ -87,24 +86,14 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
         }
 
 
-        if (gmailConnected === "true" && refreshToken && email) {
-            const saveGmailConnection = async () => {
-                try {
-                    await connectEmailProvider({
-                        troopId,
-                        provider: "gmail",
-                        email,
-                        refreshToken,
-                    });
-                } catch (error: any) {
-                    showError({
-                        title: "Gmail connect error",
-                        message: error?.message || "Failed to connect Gmail.",
-                    });
-                }
-            };
-
-            saveGmailConnection();
+        if (gmailConnected === "true") {
+            showSuccess({
+                title: "Úspěch",
+                message: email
+                    ? `Gmail účet ${email} byl připojen.`
+                    : "Gmail účet byl připojen.",
+                duration: 4000,
+            });
             shouldCleanUrl = true;
         }
 

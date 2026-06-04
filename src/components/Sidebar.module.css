@@ -106,13 +106,14 @@
 }
 
 .logoArea {
-    padding: 1.5rem;
+    padding: 0.5rem;
+    padding-top: 1rem;
     border-bottom: var(--border-width) solid #333;
 }
 
 .logo {
     color: white;
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 700;
     letter-spacing: -0.05em;
     margin: 0;
@@ -135,11 +136,11 @@
 .navItem {
     display: flex;
     align-items: center;
-    padding: 0.75rem 1.5rem;
-    font-size: 0.95rem;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.875rem;
     font-weight: 500;
     transition: all 0.2s;
-    gap: 0.75rem;
+    gap: 0.6rem;
     color: var(--sidebar-text);
     text-decoration: none;
     cursor: pointer;
@@ -164,7 +165,7 @@
 
 /* Maintain exact aesthetic of the image where active item has just color change or subtle indication */
 .icon {
-    width: 32px;
+    width: 24px;
     display: flex;
     justify-content: center;
 }
@@ -176,8 +177,8 @@
 }
 
 .sectionLabel {
-    padding: 0.5rem 1.5rem;
-    font-size: 0.75rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.7rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;

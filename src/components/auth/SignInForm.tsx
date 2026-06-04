@@ -45,7 +45,6 @@ export default function SignInForm() {
                 await setActive({ session: result.createdSessionId });
                 router.push("/home");
             } else {
-                console.log("Sign in result:", result);
                 setError("Authentication incomplete. Please try again.");
             }
         } catch (err: any) {

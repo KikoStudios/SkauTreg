@@ -199,10 +199,9 @@ export default function TroopsPage() {
     return (
         <div style={{ position: "relative", minHeight: "80vh", paddingBottom: "2rem" }} onClick={() => setShowCreateForm(false)}>
             {/* Standard Header */}
-            <div className="headingContainer">
-                <Breadcrumbs />
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-                    <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Moje Oddíly</h1>
+            <div className="headingContainer" style={{ height: "64px", minHeight: "64px", padding: "0 2rem", display: "flex", flexDirection: "row", alignItems: "center", boxSizing: "border-box" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", gap: "1rem" }}>
+                    <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0, lineHeight: 1 }}>Oddíly</h1>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -211,6 +210,7 @@ export default function TroopsPage() {
                         style={{
                             width: "48px",
                             height: "48px",
+                            flexShrink: 0,
                             borderRadius: "50%",
                             backgroundColor: "white",
                             border: "2px solid #000",
@@ -221,7 +221,7 @@ export default function TroopsPage() {
                             alignItems: "center",
                             justifyContent: "center",
                             cursor: "pointer",
-                            paddingBottom: "6px",
+                            padding: "0 0 6px 0",
                             transition: "transform 0.1s"
                         }}
                         onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}

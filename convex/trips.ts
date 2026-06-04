@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { normalizeLeaderRole, normalizeMemberContactFields } from "./lib/memberEmails";
 
 function parseDateParts(value?: string | null) {
     if (!value) return null;
@@ -161,7 +162,7 @@ export const getDashboard = query({
                 const member = await ctx.db.get(p.memberId);
                 return {
                     ...p,
-                    member,
+                    member: normalizeMemberContactFields(member),
                 };
             })
         );
@@ -197,7 +198,7 @@ export const getDashboard = query({
                         if (!user) return null;
                         return {
                             ...user,
-                            role: record.role,
+                            role: normalizeLeaderRole(record.role),
                             isOwner: user._id === troop.ownerId,
                         };
                     })

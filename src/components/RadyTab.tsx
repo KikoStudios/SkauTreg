@@ -388,7 +388,7 @@ export default function RadyTab() {
                 onMouseLeave={(e) => e.currentTarget.style.background = "white"}
                 title="Smazat radu"
             >
-                🗑️
+                <img src="/delete-icon.svg" alt="Smazat radu" style={{ width: "1.25rem", height: "1.25rem" }} />
             </button>
         </div>
     );
@@ -558,7 +558,10 @@ export default function RadyTab() {
                     width: fit-content;
                 }
                 .folder-icon {
-                    font-size: 1.5rem;
+                    width: 2rem;
+                    height: 2rem;
+                    object-fit: contain;
+                    display: block;
                 }
                 .trip-name {
                     font-weight: 900;
@@ -604,11 +607,7 @@ export default function RadyTab() {
                         return (
                             <Fragment key={tripId}>
                                 <div className="trip-folder" style={{ 
-                                    border: `3px solid ${accentColor}`,
-                                    borderRadius: "16px",
-                                    marginBottom: "1.5rem",
-                                    overflow: "hidden",
-                                    boxShadow: `6px 6px 0 0 ${accentColor}33`
+                                    marginBottom: "1.5rem"
                                 }}>
                                     <div className="trip-folder-header" style={{
                                         background: `${accentColor}15`,
@@ -619,7 +618,11 @@ export default function RadyTab() {
                                         gap: "1rem"
                                     }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                            <span style={{ fontSize: "2rem" }}>📂</span>
+                                            <img
+                                                src="/slozka.png"
+                                                alt=""
+                                                className="folder-icon"
+                                            />
                                             <div>
                                                 <div style={{ fontSize: "0.75rem", fontWeight: "900", color: accentColor, textTransform: "uppercase", letterSpacing: "0.1em" }}>Výprava</div>
                                                 <div style={{ fontSize: "1.25rem", fontWeight: "900", color: "#000" }}>{trip?.name || "Neznámá výprava"}</div>

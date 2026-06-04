@@ -6,6 +6,19 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import styles from "./page.module.css";
 
+const getInitials = (name?: string) => {
+  if (!name?.trim()) return "O";
+
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "O"
+  );
+};
+
 export default function HomePage() {
   const { isSignedIn } = useAuth();
   const strediskoName =
@@ -68,12 +81,23 @@ export default function HomePage() {
             {troops && troops.length > 0 ? (
               <>
                 {troops.slice(0, 4).map((troop) => (
-                  <img 
-                    key={troop._id} 
-                    className={styles.badge} 
-                    src={troop.logo || "/bages/rover-bage.svg"} 
-                    alt={troop.name} 
-                  />
+                  troop.logo ? (
+                    <img
+                      key={troop._id}
+                      className={styles.badge}
+                      src={troop.logo}
+                      alt={troop.name}
+                    />
+                  ) : (
+                    <div
+                      key={troop._id}
+                      className={`${styles.badge} ${styles.badgeInitials}`}
+                      aria-label={troop.name}
+                      title={troop.name}
+                    >
+                      {getInitials(troop.name)}
+                    </div>
+                  )
                 ))}
                 {troops.length > 4 && (
                   <div className={styles.badgePlus}>
