@@ -10,7 +10,9 @@ Aplikace je navržena jako **serverless** řešení, což znamená, že nemusím
 *   **Convex** - slouží jako náš backend a realtime databáze.
 *   **Clerk** - zajišťuje bezpečné přihlašování a správu uživatelů.
 *   **Browserless** - atomatizace iDOS integrace **v budoucnu self hostable**
-
+## BIG CHANGES
+tenhle program mi trochu prerusta pres hlavu je potreba udelat spoustu ux a ui zmen aby aplikace dokazala accomidaitnout vsechno 
+tohle ale muze trvat dele 
 ## Feature Implementation Checklist
 
 Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
@@ -33,6 +35,8 @@ Zde je přehled funkcí. Ty, které jsou již hotové, jsou zaškrtnuté.
 - [x] **Mailing** posilani mailu z skautregu s pripojenim k google mailu
 - [x] **Rada managment** zapisy z rad
 - [ ] **Git kontrola** kdyz rover edituje casti veci musi bit accpnuty vedoucimy
+- [ ] **Harmonogram gen** getnerator harmonogramu obousmerny kdyz mate harmonogram udela checklist programu kdyz nemate z programu podle constraintu vygeneruje harmonogram
+- [ ] **Jidelnicky a FoodConstrains** 
 
 ## Backend 
 - [ ] **Clerk self host alternativa** Idealne SuperTokens nebo ConvexAuth
