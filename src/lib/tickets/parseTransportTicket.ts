@@ -8,6 +8,7 @@ type Overview = {
   fareType?: string;
   platform?: string;
   seat?: string;
+  service?: string;
 };
 
 export type ParsedTransportTicket = {
@@ -16,6 +17,7 @@ export type ParsedTransportTicket = {
     pageNumber: number;
     overview?: Overview;
     eTicketCodes: string[];
+    referenceCodes: string[];
     platforms: string[];
     seats: string[];
   }>;
@@ -30,7 +32,10 @@ export type ParsedTransportTicket = {
     fareType?: string;
     platform?: string;
     seat?: string;
+    seats: string[];
+    service?: string;
     codes: string[];
+    referenceCodes: string[];
     pageNumbers: number[];
   }>;
 };
@@ -53,26 +58,29 @@ function extractETicketCodes(text: string): string[] {
   const labelRe = /\b(k[oó]d|kod)\s*e-?\s*(j[ií]zdenk[ay]|jizdenk[ay])\s*[:\-]?\s*([A-Z0-9]{5,10})\b/gi;
   for (const m of t.matchAll(labelRe)) {
     const code = String(m[3]).toUpperCase();
-    if (!/[0-9]/.test(code)) continue;
     out.add(code);
   }
 
   const checkInRe = /\b(odbavovac[ií]\s*k[oó]d|check-?\s*in\s*code)\s*[:\-]?\s*([A-Z0-9]{5,10})\b/gi;
   for (const m of t.matchAll(checkInRe)) {
     const code = String(m[2]).toUpperCase();
-    if (!/[0-9]/.test(code)) continue;
     out.add(code);
   }
 
   const kodemRe = /\b(k[oó]dem|kodem)\s*[:\-]?\s*([A-Z0-9]{5,10})\b/gi;
   for (const m of t.matchAll(kodemRe)) {
     const code = String(m[2]).toUpperCase();
-    if (!/[0-9]/.test(code)) continue;
     out.add(code);
   }
 
-  for (const m of t.matchAll(/\b[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}\b/gi)) out.add(m[0].toUpperCase());
+  return Array.from(out);
+}
 
+function extractReferenceCodes(text: string): string[] {
+  const t = normalizeForRegex(text);
+  const out = new Set<string>();
+  const labelled = /\b(?:k[oó]d|kod)\s+IDOS(?:\.cz)?\s*[:\-]?\s*([A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4})\b/gi;
+  for (const m of t.matchAll(labelled)) out.add(String(m[1]).toUpperCase());
   return Array.from(out);
 }
 
@@ -150,6 +158,9 @@ function extractOverview(text: string): Overview | undefined {
 
   const departTime = m[1];
   const departDate = m[2];
+  const service = normalizeWs(m[3]);
+  const platform = String(m[4]).toUpperCase();
+  const seat = String(m[5]).replace(/\s+/g, "").toUpperCase();
   const rowStart = m.index;
   const rowEnd = rowStart + m[0].length;
 
@@ -171,9 +182,18 @@ function extractOverview(text: string): Overview | undefined {
   const from = normalizeWs((cut >= 0 ? before.slice(cut) : before).trim());
 
   const fareType = extractFareType(t);
-  const platform = extractPlatforms(t)[0];
-  const seat = extractSeats(t)[0];
-  return { from: from || undefined, to: to || undefined, departTime, departDate, arriveTime, arriveDate, fareType, platform, seat };
+  return {
+    from: from || undefined,
+    to: to || undefined,
+    departTime,
+    departDate,
+    arriveTime,
+    arriveDate,
+    fareType,
+    platform,
+    seat,
+    service,
+  };
 }
 
 async function importPdfJs(): Promise<any> {
@@ -219,9 +239,7 @@ function buildGroups(pages: ParsedTransportTicket["pages"]) {
       o?.departTime,
       o?.arriveDate,
       o?.arriveTime,
-      o?.platform,
-      o?.seat,
-      o?.fareType,
+      o?.service,
     ];
     const key = keyParts.filter(Boolean).join("|") || (p.eTicketCodes[0] ?? `page-${p.pageNumber}`);
     const existing = map.get(key);
@@ -237,17 +255,25 @@ function buildGroups(pages: ParsedTransportTicket["pages"]) {
         fareType: o?.fareType,
         platform: o?.platform,
         seat: o?.seat,
+        seats: o?.seat ? [o.seat] : [...p.seats],
+        service: o?.service,
         codes: [...p.eTicketCodes],
+        referenceCodes: [...p.referenceCodes],
         pageNumbers: [p.pageNumber],
       });
     } else {
       existing.codes.push(...p.eTicketCodes);
+      existing.referenceCodes.push(...p.referenceCodes);
+      existing.seats.push(...(o?.seat ? [o.seat] : p.seats));
       existing.pageNumbers.push(p.pageNumber);
     }
   }
 
   for (const g of map.values()) {
     g.codes = Array.from(new Set(g.codes.filter(Boolean)));
+    g.referenceCodes = Array.from(new Set(g.referenceCodes.filter(Boolean)));
+    g.seats = Array.from(new Set(g.seats.filter(Boolean)));
+    g.seat = g.seats[0];
     g.pageNumbers = Array.from(new Set(g.pageNumbers)).sort((a, b) => a - b);
   }
 
@@ -263,14 +289,16 @@ export async function parseTransportTicketFromPdfBytes(bytes: Uint8Array, filena
     const page = await doc.getPage(i);
     const text = await extractTextFromPage(pdfjs, page);
     const eTicketCodes = extractETicketCodes(text);
-    const platforms = extractPlatforms(text);
-    const seats = extractSeats(text);
+    const referenceCodes = extractReferenceCodes(text);
     const overview = extractOverview(text);
+    const platforms = overview?.platform ? [overview.platform] : extractPlatforms(text);
+    const seats = overview?.seat ? [overview.seat] : extractSeats(text);
 
     pages.push({
       pageNumber: i,
       overview,
       eTicketCodes,
+      referenceCodes,
       platforms,
       seats,
     });

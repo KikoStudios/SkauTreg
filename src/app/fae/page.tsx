@@ -7,12 +7,21 @@ import { useState, useEffect } from "react";
 import { useFeedback } from "@/context/FeedbackContext";
 import styles from "./page.module.css";
 import { SupernotesCard } from "@/lib/supernotes";
+import { useSearchParams } from "next/navigation";
 type Tab = "errors" | "features" | "submit" | "notes";
 type Status = "all" | "open" | "planned" | "completed" | "rejected";
 
 export default function FeedbackPage() {
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<Tab>("features");
     const [selectedStatus, setSelectedStatus] = useState<Status>("open");
+
+    useEffect(() => {
+        const requestedTab = searchParams.get("tab");
+        if (requestedTab === "errors" || requestedTab === "features" || requestedTab === "submit" || requestedTab === "notes") {
+            setActiveTab(requestedTab);
+        }
+    }, [searchParams]);
 
     // Supernotes state
     const [supernotesCards, setSupernotesCards] = useState<SupernotesCard[]>([]);

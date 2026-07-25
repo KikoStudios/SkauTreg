@@ -1,28 +1,31 @@
 "use client";
 
-import React from "react";
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useQuery } from "convex/react";
+import {
+    CalendarDays,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    CircleUserRound,
+    Compass,
+    Flag,
+    FolderKanban,
+    House,
+    Lightbulb,
+    MapPinned,
+    Search,
+    Settings,
+    TentTree,
+    Users,
+    X,
+} from "lucide-react";
+import { api } from "../../convex/_generated/api";
 import { useProfileModal } from "../context/ProfileModalContext";
 import styles from "./Sidebar.module.css";
-
-const navItems = [
-    { label: "Domů", icon: <img src="/icons/home-icon.svg" alt="Domů" style={{ width: "24px", height: "auto" }} />, href: "/home" },
-    { label: "Oddíly", icon: <img src="/icons/oddil-icon.svg" alt="Oddíly" style={{ width: "24px", height: "auto" }} />, href: "/troop" },
-    { label: "Členové", icon: <img src="/icons/clenove-icon.svg" alt="Členové" style={{ width: "24px", height: "auto" }} />, href: "/members" },
-    { label: "Rady", icon: <img src="/icons/rady-icon-light.svg" alt="Rady" style={{ width: "24px", height: "auto" }} />, href: "/rady" },
-    { label: "Výpravy", icon: <img src="/icons/vypravy-icon.svg" alt="Výpravy" style={{ width: "24px", height: "auto" }} />, href: "/trips" },
-    { label: "Kalendář", icon: <img src="/icons/kalendar-white.svg" alt="Kalendář" style={{ width: "24px", height: "auto" }} />, href: "/calendar" },
-];
-
-const toolsItems = [
-    { label: "Vyhledávač Základen", icon: <img src="/icons/wall-light.svg" alt="Vyhledávač" style={{ width: "24px", height: "auto" }} />, href: "/tools/basefinder" },
-];
-
-const bottomItems = [
-    { label: "Nastavení", icon: <img src="/icons/nastaveni-icon.svg" alt="Nastavení" style={{ width: "24px", height: "auto" }} />, href: "/settings" },
-    { label: "Nápady & Chyby", icon: <img src="/icons/upload-icon.svg" alt="Nápady" style={{ width: "24px", height: "auto" }} />, href: "/fae" },
-];
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -31,95 +34,189 @@ interface SidebarProps {
     onToggleCollapse?: () => void;
 }
 
+type ProjectItem = {
+    label: string;
+    Icon: typeof House;
+    href: string;
+    activePath?: string;
+    exact?: boolean;
+    children?: Array<{ label: string; href: string }>;
+};
+
+const globalItems = [
+    { label: "Přehled", Icon: House, href: "/home" },
+    { label: "Všechny oddíly", Icon: FolderKanban, href: "/troop" },
+    { label: "Kalendář", Icon: CalendarDays, href: "/calendar" },
+];
+
 export default function Sidebar({ isOpen = false, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
     const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const troops = useQuery(api.troops.getByUser) || [];
     const { openProfile } = useProfileModal();
+    const [floatingMenu, setFloatingMenu] = useState<{ top: number; left: number; label: string; children: Array<{ label: string; href: string }> } | null>(null);
+    const closeMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const routeTroopId = pathname?.match(/^\/troop\/([^/]+)/)?.[1] || pathname?.match(/^\/settings\/([^/]+)/)?.[1] || searchParams.get("troopId");
+    const activeTroop = troops.find((troop) => troop._id === routeTroopId) || troops[0];
 
-    const isActive = (href: string) => pathname === href || pathname?.startsWith(`${href}/`);
+    const isActive = (href: string, exact = false) => exact ? pathname === href : pathname === href || pathname?.startsWith(`${href}/`);
+    const close = () => onClose?.();
+    const showSubmenu = (event: React.MouseEvent<HTMLElement>, label: string, children: Array<{ label: string; href: string }>) => {
+        if (window.innerWidth <= 768) return;
+        if (closeMenuTimer.current) clearTimeout(closeMenuTimer.current);
+        const rect = event.currentTarget.getBoundingClientRect();
+        const menuHeight = children.length * 36 + 16;
+        setFloatingMenu({
+            top: Math.max(8, Math.min(rect.top, window.innerHeight - menuHeight - 8)),
+            left: rect.right + 6,
+            label,
+            children,
+        });
+    };
+    const scheduleSubmenuClose = () => {
+        closeMenuTimer.current = setTimeout(() => setFloatingMenu(null), 120);
+    };
+    const keepSubmenuOpen = () => {
+        if (closeMenuTimer.current) clearTimeout(closeMenuTimer.current);
+    };
+
+    const projectItems: ProjectItem[] = activeTroop ? [
+        { label: "Přehled oddílu", Icon: Compass, href: `/troop/${activeTroop._id}`, exact: true },
+        { label: "Členové", Icon: Users, href: `/members?troopId=${activeTroop._id}`, activePath: "/members" },
+        { label: "Výpravy", Icon: TentTree, href: `/trips?troopId=${activeTroop._id}`, activePath: "/trips" },
+        { label: "Rady a zápisy", Icon: Flag, href: `/troop/${activeTroop._id}/meetings` },
+        { label: "Vedení", Icon: CircleUserRound, href: `/troop/${activeTroop._id}/leaders` },
+        {
+            label: "Nastavení oddílu",
+            Icon: Settings,
+            href: `/settings/${activeTroop._id}?section=general`,
+            activePath: `/settings/${activeTroop._id}`,
+            children: [
+                { label: "Základní údaje", href: `/settings/${activeTroop._id}?section=general` },
+                { label: "Vzhled a logo", href: `/settings/${activeTroop._id}?section=branding` },
+                { label: "E-mailové připojení", href: `/settings/${activeTroop._id}?section=gmail` },
+                { label: "Nebezpečná zóna", href: `/settings/${activeTroop._id}?section=danger` },
+            ],
+        },
+    ] : [];
 
     return (
         <>
-            <div
-                className={`${styles.overlay} ${isOpen ? styles.visible : ""}`}
-                onClick={onClose}
-            />
-
-            <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""} ${isCollapsed ? styles.collapsed : ""}`}>
+            <div className={`${styles.overlay} ${isOpen ? styles.visible : ""}`} onClick={close} />
+            <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""} ${isCollapsed ? styles.collapsed : ""}`} aria-label="Hlavní navigace">
                 <div className={styles.logoArea}>
-                    <img src="/Logo-light.svg" alt="SkautReg" style={{ width: "100%", height: "auto", maxWidth: "180px" }} />
-                    <button className={styles.closeButton} onClick={onClose}>×</button>
+                    <Link href="/" onClick={close} className={styles.logoLink} aria-label="SkautReg – přehled">
+                        <img src="/Logo-light.svg" alt="SkautReg" className={styles.logoImage} />
+                    </Link>
+                    <button className={styles.closeButton} onClick={close} aria-label="Zavřít menu"><X size={24} strokeWidth={2.5} /></button>
                 </div>
 
-                <button className={styles.collapseButton} onClick={onToggleCollapse} title={isCollapsed ? "Rozbalit sidebar" : "Skrýt sidebar"}>
-                    {isCollapsed ? "›" : "‹"}
+                <button className={styles.collapseButton} onClick={onToggleCollapse} title={isCollapsed ? "Rozbalit navigaci" : "Skrýt navigaci"}>
+                    {isCollapsed ? <ChevronRight size={22} /> : <ChevronLeft size={22} />}
                 </button>
 
                 <nav className={styles.nav}>
-                    <ul className={styles.navList}>
-                        {navItems.map((item) => (
-                            <li key={item.label}>
-                                <Link
-                                    href={item.href}
-                                    className={`${styles.navItem} ${isActive(item.href) ? styles.active : ""}`}
-                                    onClick={onClose}
-                                >
-                                    <span className={styles.icon}>{item.icon}</span>
-                                    {item.label}
+                    <div className={styles.navScroll}>
+                        <button className={styles.sidebarSearch} onClick={() => window.dispatchEvent(new Event("skautreg:open-command"))}>
+                            <Search size={18} strokeWidth={2.4} />
+                            <span>Hledat v aplikaci</span>
+                            <kbd>⌘K</kbd>
+                        </button>
+                        <div className={styles.sectionLabel}>Organizace</div>
+                        <ul className={styles.navList}>
+                            {globalItems.map(({ label, Icon, href }) => (
+                                <li key={href}>
+                                    <Link href={href} className={`${styles.navItem} ${isActive(href, href === "/home" || href === "/troop") ? styles.active : ""}`} onClick={close}>
+                                        <Icon className={styles.icon} size={20} strokeWidth={2.25} />
+                                        <span>{label}</span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+
+                        <div className={styles.projectSection}>
+                            {activeTroop ? (
+                                <>
+                                <details className={styles.projectPicker}>
+                                    <summary className={styles.projectSummary} title="Přepnout projekt">
+                                        <span className={styles.projectMark}>
+                                            {activeTroop.logo ? <img src={activeTroop.logo} alt="" /> : activeTroop.name.slice(0, 2).toUpperCase()}
+                                        </span>
+                                        <span className={styles.projectCopy}>
+                                            <strong>{activeTroop.name}</strong>
+                                            <small>Kliknutím přepnete projekt</small>
+                                        </span>
+                                        <ChevronDown className={styles.projectChevron} size={18} />
+                                    </summary>
+                                    <div className={styles.projectOptions}>
+                                        {troops.map((troop) => (
+                                            <Link key={troop._id} href={`/troop/${troop._id}`} onClick={close} className={troop._id === activeTroop._id ? styles.selectedProject : ""}>
+                                                <span className={styles.optionMark}>{troop.logo ? <img src={troop.logo} alt="" /> : troop.name.slice(0, 2).toUpperCase()}</span>
+                                                <span>{troop.name}</span>
+                                                {troop._id === activeTroop._id && <small>Aktivní</small>}
+                                            </Link>
+                                        ))}
+                                        <Link href="/troop?create=true" onClick={close} className={styles.addProject}>+ Nový oddíl</Link>
+                                    </div>
+                                </details>
+                                    <ul className={`${styles.navList} ${styles.projectNav}`}>
+                                        {projectItems.map(({ label, Icon, href, activePath, exact, children }) => (
+                                            <li
+                                                key={href}
+                                                className={children ? styles.navWithSubmenu : undefined}
+                                                onMouseEnter={children ? (event) => showSubmenu(event, label, children) : undefined}
+                                                onMouseLeave={children ? scheduleSubmenuClose : undefined}
+                                            >
+                                                <Link href={href} className={`${styles.navItem} ${styles.projectItem} ${isActive(activePath || href, exact) ? styles.active : ""}`} onClick={close}>
+                                                    <Icon className={styles.icon} size={19} strokeWidth={2.25} />
+                                                    <span>{label}</span>
+                                                    {children && <ChevronRight className={styles.submenuChevron} size={15} />}
+                                                </Link>
+                                                {children && <div className={styles.inlineSubmenu} aria-label={`Části: ${label}`}>
+                                                    {children.map((child) => <Link key={child.href} href={child.href} onClick={close}>{child.label}</Link>)}
+                                                </div>}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            ) : (
+                                <Link href="/troop?create=true" className={styles.emptyProject} onClick={close}>
+                                    <span>Vytvořte první oddíl</span>
+                                    <ChevronRight size={18} />
                                 </Link>
-                            </li>
-                        ))}
-                    </ul>
+                            )}
+                        </div>
 
-                    <div className={styles.separator} />
+                        <div className={styles.sectionLabel}>Nástroje</div>
+                        <ul className={styles.navList}>
+                            <li><Link href="/tools/basefinder" className={`${styles.navItem} ${isActive("/tools/basefinder") ? styles.active : ""}`} onClick={close}><MapPinned className={styles.icon} size={20} /><span>Vyhledávač základen</span></Link></li>
+                            <li><Link href="/fae" className={`${styles.navItem} ${isActive("/fae") ? styles.active : ""}`} onClick={close}><Lightbulb className={styles.icon} size={20} /><span>Nápady a chyby</span></Link></li>
+                        </ul>
+                    </div>
 
-                    <div className={styles.sectionLabel}>Nástroje</div>
-                    <ul className={styles.navList}>
-                        {toolsItems.map((item) => (
-                            <li key={item.label}>
-                                <Link
-                                    href={item.href}
-                                    className={`${styles.navItem} ${isActive(item.href) ? styles.active : ""}`}
-                                    onClick={onClose}
-                                >
-                                    <span className={styles.icon}>{item.icon}</span>
-                                    {item.label}
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <div className={styles.separator} />
-
-                    <ul className={styles.navList}>
-                        {bottomItems.map((item) => (
-                            <li key={item.label}>
-                                <Link
-                                    href={item.href}
-                                    className={`${styles.navItem} ${isActive(item.href) ? styles.active : ""}`}
-                                    onClick={onClose}
-                                >
-                                    <span className={styles.icon}>{item.icon}</span>
-                                    {item.label}
-                                </Link>
-                            </li>
-                        ))}
-                        <li>
-                            <button
-                                onClick={() => {
-                                    openProfile();
-                                    if (onClose) onClose();
-                                }}
-                                className={styles.navItem}
-                            >
-                                <span className={styles.icon}>
-                                    <img src="/icons/ucet-icon.svg" alt="Profil" style={{ width: "32px", height: "auto" }} />
-                                </span>
-                                Profil
-                            </button>
-                        </li>
-                    </ul>
+                    <div className={styles.sidebarFooter}>
+                        <button onClick={() => { openProfile(); close(); }} className={styles.profileButton}>
+                            <span className={styles.profileAvatar}><CircleUserRound size={21} /></span>
+                            <span><strong>Můj profil</strong><small>Účet a předvolby</small></span>
+                            <ChevronRight size={17} />
+                        </button>
+                    </div>
                 </nav>
             </aside>
+            {floatingMenu && createPortal(
+                <div
+                    className={styles.floatingSubmenu}
+                    style={{ top: floatingMenu.top, left: floatingMenu.left }}
+                    aria-label={`Části: ${floatingMenu.label}`}
+                    onMouseEnter={keepSubmenuOpen}
+                    onMouseLeave={scheduleSubmenuClose}
+                >
+                    {floatingMenu.children.map((child) => (
+                        <Link key={child.href} href={child.href} onClick={() => { setFloatingMenu(null); close(); }}>{child.label}</Link>
+                    ))}
+                </div>,
+                document.body
+            )}
         </>
     );
 }

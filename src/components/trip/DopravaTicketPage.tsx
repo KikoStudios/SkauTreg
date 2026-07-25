@@ -76,7 +76,10 @@ type ParsedGroup = {
   fareType?: string;
   platform?: string;
   seat?: string;
+  seats?: string[];
+  service?: string;
   codes?: string[];
+  referenceCodes?: string[];
   pageNumbers?: number[];
 };
 
@@ -191,6 +194,7 @@ export default function DopravaTicketPage(props: {
   const uploadTicket = useMutation(api.transportTickets.upload);
   const removeTicket = useMutation(api.transportTickets.remove);
   const updatePriceOverview = useMutation(api.transportTickets.updatePriceOverview);
+  const updateParsed = useMutation(api.transportTickets.updateParsed);
 
   const ticketsByRoute = useMemo(() => {
     const m = new Map<string, TransportTicket[]>();
@@ -209,9 +213,15 @@ export default function DopravaTicketPage(props: {
 
   const [activeTicketIdByRoute, setActiveTicketIdByRoute] = useState<Record<string, string>>({});
   const [ticketPickerRouteId, setTicketPickerRouteId] = useState<string | null>(null);
+  const [siteOrigin, setSiteOrigin] = useState("");
   const [editRouteId, setEditRouteId] = useState<string | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
+  const [reparsingTicketIds, setReparsingTicketIds] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setSiteOrigin(window.location.origin);
+  }, []);
 
   // Edit modal state
   const [editDraft, setEditDraft] = useState<{
@@ -299,6 +309,32 @@ export default function DopravaTicketPage(props: {
     }
   };
 
+  const handleReparseTicket = async (ticket: TransportTicket) => {
+    if (!ticket.url) return;
+    const ticketKey = String(ticket._id);
+    setReparsingTicketIds((current) => ({ ...current, [ticketKey]: true }));
+    try {
+      const source = await fetch(ticket.url);
+      if (!source.ok) throw new Error("Soubor se nepodařilo načíst.");
+      const blob = await source.blob();
+      const form = new FormData();
+      form.append("file", blob, ticket.name);
+      const response = await fetch("/api/tickets/parse", { method: "POST", body: form });
+      if (!response.ok) throw new Error("Jízdenku se nepodařilo znovu přečíst.");
+      const payload = await response.json() as { parsed?: unknown };
+      if (!payload.parsed) throw new Error("V souboru nebyly nalezeny údaje jízdenky.");
+      await updateParsed({ ticketId: ticket._id, parsed: payload.parsed });
+      showSuccess({ title: "Údaje obnoveny", message: "Jízdenka byla znovu načtena.", duration: 1800 });
+    } catch (error) {
+      showError({
+        title: "Jízdenku se nepodařilo načíst",
+        message: error instanceof Error ? error.message : "Zkuste to prosím znovu.",
+      });
+    } finally {
+      setReparsingTicketIds((current) => ({ ...current, [ticketKey]: false }));
+    }
+  };
+
   const assignFromIdosLink = async (opts?: { onSuccess?: () => void }) => {
     setIsAssigningLink(true);
     setLinkError(null);
@@ -376,8 +412,12 @@ export default function DopravaTicketPage(props: {
                 <span>{toLabel}</span>
               </div>
               <div className={styles.unassignedBody}>
-                <div className={styles.unassignedTitle}>Trasa není přiřazena</div>
-                <div className={styles.unassignedHint}>Klikni sem a vlož odkaz z IDOS pro přiřazení trasy.</div>
+                <img src="/illustrations/ill-no-route.png" alt="" aria-hidden="true" />
+                <div className={styles.unassignedCopy}>
+                  <div className={styles.unassignedTitle}>Trasa není přiřazena</div>
+                  <div className={styles.unassignedHint}>Vlož odkaz z IDOS a cesta se přehledně doplní sem.</div>
+                  <button type="button" className={styles.assignBtn}>Přiřadit trasu</button>
+                </div>
               </div>
             </div>
           );
@@ -388,6 +428,9 @@ export default function DopravaTicketPage(props: {
         const list = ticketsByRoute.get(routeId) || [];
         const activeId = activeTicketIdByRoute[routeId] || (list[0] ? String(list[0]._id) : "");
         const activeTicket = list.find((t) => String(t._id) === activeId) || null;
+        const publicTicketUrl = activeTicket?.shareEnabled !== false && activeTicket?.shareSlug && siteOrigin
+          ? `${siteOrigin}/ticket/${encodeURIComponent(activeTicket.shareSlug)}`
+          : null;
         const overview = normalizePriceOverview(activeTicket?.priceOverview, route, {
           kidCount: attendanceCounts?.kidCount,
           adultCount: attendanceCounts?.adultCount,
@@ -476,36 +519,45 @@ export default function DopravaTicketPage(props: {
                 )}
               </div>
 
+              <div className={styles.ticketQrPanel}>
+                <span>Jízdenky</span>
+                <button
+                  type="button"
+                  className={styles.ticketQrTile}
+                  onClick={() => setTicketPickerRouteId(routeId)}
+                  aria-label={publicTicketUrl ? "Spravovat nahrané jízdenky" : "Nahrát jízdenku"}
+                  title={publicTicketUrl ? "Spravovat nahrané jízdenky" : "Nahrát jízdenku"}
+                >
+                  {publicTicketUrl ? (
+                    <img src={`/api/qr?size=240&data=${encodeURIComponent(publicTicketUrl)}`} alt="QR kód veřejné stránky s jízdenkou" />
+                  ) : (
+                    <span><b>+</b>Nahrát lístek</span>
+                  )}
+                </button>
+                <small>{list.length === 0 ? "Kliknutím nahrajete" : list.length === 1 ? "1 nahraný lístek" : `${list.length} nahraných lístků`}</small>
+              </div>
+
                 <div className={styles.pricesPanel}>
                   <div className={styles.priceTypeList}>
                     {([
-                      { key: "kid", icon: "/bages/kid-icon.svg", unit: overview.kidUnitCzk, count: overview.kidCount, total: kidTotal },
-                      { key: "adult", icon: "/bages/adult-icon.svg", unit: overview.adultUnitCzk, count: overview.adultCount, total: adultTotal },
-                      { key: "student", icon: "/bages/student-icon.svg", unit: overview.studentUnitCzk, count: overview.studentCount, total: studentTotal },
+                      { key: "kid", label: "Dítě", icon: "/bages/kid-icon.svg", unit: overview.kidUnitCzk, count: overview.kidCount, total: kidTotal },
+                      { key: "adult", label: "Dospělý", icon: "/bages/adult-icon.svg", unit: overview.adultUnitCzk, count: overview.adultCount, total: adultTotal },
+                      { key: "student", label: "Student", icon: "/bages/student-icon.svg", unit: overview.studentUnitCzk, count: overview.studentCount, total: studentTotal },
                     ] as const).map((row) => (
                       <div key={row.key} className={styles.priceTypeRow}>
                         <div className={styles.ageIcon}>
                           <img src={row.icon} alt="" className={styles.ageIconImg} />
                         </div>
-                        <div className={styles.priceTypeLeft}>
-                          <div className={styles.priceUnitText}>{formatKc(row.unit)}</div>
-                          <div className={styles.typeTotalPill}>{formatKc(row.total)}</div>
+                        <div className={styles.priceTypeLabel}>
+                          <small>{row.label}</small>
+                          <strong>{formatKc(row.unit)}</strong>
                         </div>
                         <div className={styles.typeCountPill}>{typeof row.count === "number" ? `${row.count}x` : "—"}</div>
+                        <div className={styles.typeTotalPill}>{formatKc(row.total)}</div>
                       </div>
                     ))}
                   </div>
 
-                <div className={styles.rightActions}>
-                  <button
-                    className={styles.openBtn}
-                    onClick={() => {
-                      setTicketPickerRouteId(routeId);
-                    }}
-                  >
-                    Otevřít
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -617,8 +669,13 @@ export default function DopravaTicketPage(props: {
                         : g.departTime || g.departDate || "";
                     const metaParts = [
                       time,
+                      g.service ? `Spoj ${g.service}` : null,
                       g.platform ? `Nástupiště ${g.platform}` : null,
-                      g.seat ? `Sedadlo ${g.seat}` : null,
+                      g.seats?.length
+                        ? `Sedadla ${g.seats.join(", ")}`
+                        : g.seat
+                          ? `Sedadlo ${g.seat}`
+                          : null,
                       g.fareType ? g.fareType : null,
                     ].filter(Boolean);
                     const meta = metaParts.join(" · ") || "Bez detailů";
@@ -671,6 +728,16 @@ export default function DopravaTicketPage(props: {
                                   Otevřít PDF
                                 </a>
                               )}
+                              <button
+                                className={styles.btn}
+                                disabled={reparsingTicketIds[String(t._id)]}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleReparseTicket(t);
+                                }}
+                              >
+                                {reparsingTicketIds[String(t._id)] ? "Načítám…" : "Znovu načíst údaje"}
+                              </button>
                               <button
                                 className={styles.btn}
                                 onClick={async (e) => {

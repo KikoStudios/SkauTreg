@@ -1,57 +1,81 @@
 "use client";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
-import Button from "../../components/Button";
+
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { useState } from "react";
-import Breadcrumbs from "../../components/Breadcrumbs";
+import { useQuery } from "convex/react";
+import {
+  ChartNoAxesColumn,
+  ClipboardList,
+  HelpCircle,
+  House,
+  Lightbulb,
+  Search,
+  Settings,
+  ShieldCheck,
+  Tent,
+  Users,
+} from "lucide-react";
+import { api } from "../../../convex/_generated/api";
+import {
+  Button,
+  Card,
+  EmptyStateCard,
+  Field,
+  PageActions,
+  PageContent,
+  PageHeader,
+  PageTitle,
+  StatCard,
+  TableScroller,
+  TextInput,
+} from "../../components/ui";
 
 const helpTopics = [
   {
-    icon: "🏘️",
-    title: "Správa Oddílů",
+    Icon: House,
+    title: "Správa oddílů",
     description: "Vytvářejte a spravujte své skautské oddíly",
     keywords: ["oddíl", "vytvoření", "správa", "vedoucí"],
   },
   {
-    icon: "👥",
-    title: "Správa Členů",
+    Icon: Users,
+    title: "Správa členů",
     description: "Přidávejte členy, upravujte profily a spravujte role",
     keywords: ["člen", "profil", "přidání", "smazání"],
   },
   {
-    icon: "🎒",
-    title: "Správa Výprav",
+    Icon: Tent,
+    title: "Správa výprav",
     description: "Plánujte a organizujte výpravy a tábory",
     keywords: ["výprava", "tábor", "plánování", "datum"],
   },
   {
-    icon: "📋",
-    title: "Formuláře & Otázky",
+    Icon: ClipboardList,
+    title: "Formuláře a otázky",
     description: "Přidávejte vlastní otázky a formuláře k výpravám",
     keywords: ["formulář", "otázka", "textové pole", "checkbox"],
   },
   {
-    icon: "📊",
-    title: "Sledování Účastníků",
+    Icon: ChartNoAxesColumn,
+    title: "Sledování účastníků",
     description: "Sledujte přihlášky a odpovědi na otázky",
     keywords: ["účastník", "přihláška", "odpověď", "export"],
   },
   {
-    icon: "💡",
-    title: "Tipy & Triky",
+    Icon: Lightbulb,
+    title: "Tipy a triky",
     description: "Užitečné tipy pro efektivní řízení oddílu",
     keywords: ["tip", "trik", "optimalizace", "komunikace"],
   },
   {
-    icon: "🔐",
-    title: "Bezpečnost & Přihlášení",
+    Icon: ShieldCheck,
+    title: "Bezpečnost a přihlášení",
     description: "Hesla, přihlašování a ochrana účtu",
     keywords: ["heslo", "přihlášení", "obnova", "bezpečnost"],
   },
   {
-    icon: "⚙️",
-    title: "Nastavení & Profil",
+    Icon: Settings,
+    title: "Nastavení a profil",
     description: "Upravujte svůj profil a předvolby aplikace",
     keywords: ["nastavení", "profil", "preference", "jazyk"],
   },
@@ -75,12 +99,9 @@ export default function Home() {
     (topic) =>
       topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       topic.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      topic.keywords.some((k) =>
-        k.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
+      topic.keywords.some((keyword) => keyword.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
-  // Format date helper
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
     const [y, m, d] = dateStr.split("-");
@@ -89,466 +110,143 @@ export default function Home() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="headingContainer">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0, marginLeft: "1.5rem" }}>
-            Přehled
-          </h1>
-          <Link href="/troop">
-            <Button variant="outline" style={{ marginRight: "1.5rem" }}>Spravovat oddíly</Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader>
+        <PageTitle>Přehled</PageTitle>
+        <PageActions>
+          <Button href="/troop" variant="secondary">
+            Spravovat oddíly
+          </Button>
+        </PageActions>
+      </PageHeader>
 
-      <div className="dashboardContent">
-        {/* Stats Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
-          <div
-            style={{
-            backgroundColor: "white",
-            border: "4px solid #000",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            boxShadow: "6px 6px 0 0 #000",
-            transition: "all 0.15s",
-            cursor: "default",
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = "translate(3px, 3px)";
-            e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = "translate(0, 0)";
-            e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-          }}
-        >
-          <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>🏘️</div>
-          <div
-            style={{
-              fontSize: "0.85rem",
-              color: "var(--text-muted)",
-              fontWeight: "600",
-              marginBottom: "0.75rem",
-            }}
-          >
-            Vaše Oddíly
-          </div>
-          <div style={{ fontSize: "2.5rem", fontWeight: "900" }}>
-            {troops?.length || 0}
-          </div>
+      <PageContent>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "2rem" }}>
+          <StatCard href="/troop" label="Vaše oddíly" value={troops?.length || 0} icon={<House size={22} strokeWidth={3} />} />
+          <StatCard href="/trips" label="Výpravy" value={trips?.length || 0} icon={<Tent size={22} strokeWidth={3} />} />
+          <StatCard href="/members" label="Členové" value={members?.length || 0} icon={<Users size={22} strokeWidth={3} />} />
         </div>
-        <div
-          style={{
-            backgroundColor: "white",
-            border: "4px solid #000",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            boxShadow: "6px 6px 0 0 #000",
-            transition: "all 0.15s",
-            cursor: "default",
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = "translate(3px, 3px)";
-            e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = "translate(0, 0)";
-            e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-          }}
-        >
-          <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>🎒</div>
-          <div
-            style={{
-              fontSize: "0.85rem",
-              color: "var(--text-muted)",
-              fontWeight: "600",
-              marginBottom: "0.75rem",
-            }}
-          >
-            Výpravy
-          </div>
-          <div style={{ fontSize: "2.5rem", fontWeight: "900" }}>
-            {trips?.length || 0}
-          </div>
-        </div>
-        <div
-          style={{
-            backgroundColor: "white",
-            border: "4px solid #000",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            boxShadow: "6px 6px 0 0 #000",
-            transition: "all 0.15s",
-            cursor: "default",
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = "translate(3px, 3px)";
-            e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = "translate(0, 0)";
-            e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-          }}
-        >
-          <div style={{ fontSize: "1.5rem", marginBottom: "0.75rem" }}>👥</div>
-          <div
-            style={{
-              fontSize: "0.85rem",
-              color: "var(--text-muted)",
-              fontWeight: "600",
-              marginBottom: "0.75rem",
-            }}
-          >
-            Členové
-          </div>
-          <div style={{ fontSize: "2.5rem", fontWeight: "900" }}>
-            {members?.length || 0}
-          </div>
-        </div>
-      </div>
 
-      {/* Recent Trips */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h2
-          style={{
-            fontSize: "1.125rem",
-            fontWeight: "900",
-            marginBottom: "1rem",
-          }}
-        >
-          Nejbližší výpravy
-        </h2>
-        {trips && trips.length > 0 ? (
-          <div
-            style={{
-              backgroundColor: "white",
-              border: "4px solid #000",
-              borderRadius: "12px",
-              boxShadow: "6px 6px 0 0 #000",
-              overflow: "hidden",
-            }}
-          >
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr
-                  style={{
-                    borderBottom: "4px solid #000",
-                    backgroundColor: "#86efac",
-                  }}
-                >
-                  <th
-                    style={{
-                      padding: "1rem",
-                      textAlign: "left",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Název
-                  </th>
-                  <th
-                    style={{
-                      padding: "1rem",
-                      textAlign: "left",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Místo
-                  </th>
-                  <th
-                    style={{
-                      padding: "1rem",
-                      textAlign: "left",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Datum
-                  </th>
-                  <th
-                    style={{
-                      padding: "1rem",
-                      textAlign: "left",
-                      fontWeight: "700",
-                    }}
-                  >
-                    Stav
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {trips.slice(0, 5).map((trip, idx) => (
-                  <tr
-                    key={trip._id}
-                    style={{
-                      borderBottom:
-                        idx === Math.min(4, trips.length - 1)
-                          ? "none"
-                          : "4px solid #000",
-                    }}
-                  >
-                    <td style={{ padding: "1rem", fontWeight: "700" }}>
-                      <Link
-                        href={`/trips/${trip._id}`}
-                        style={{
-                          textDecoration: "underline",
-                          color: "inherit",
-                        }}
-                      >
-                        {trip.name}
-                      </Link>
-                    </td>
-                    <td style={{ padding: "1rem" }}>{trip.location}</td>
-                    <td
-                      style={{
-                        padding: "1rem",
-                        fontSize: "0.9rem",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {formatDate(trip.startDate)}
-                    </td>
-                    <td style={{ padding: "1rem" }}>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          backgroundColor: "#86efac",
-                          border: "3px solid #000",
-                          borderRadius: "8px",
-                          padding: "0.25rem 0.75rem",
-                          fontWeight: "800",
-                          fontSize: "0.85rem",
-                          boxShadow: "4px 4px 0 0 #000",
-                        }}
-                      >
-                        Plánuje se
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div
-            style={{
-              backgroundColor: "white",
-              border: "4px solid #000",
-              borderRadius: "12px",
-              padding: "2rem",
-              textAlign: "center",
-              color: "var(--text-muted)",
-              boxShadow: "6px 6px 0 0 #000",
-            }}
-          >
-            Žádné výpravy.{" "}
-            <Link href="/trips">
-              <Button
-                variant="outline"
-                style={{ display: "inline-block", marginTop: "1rem" }}
-              >
-                Vytvořit výpravu
+        <section style={{ marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: "900", marginBottom: "1rem" }}>Nejbližší výpravy</h2>
+          {trips && trips.length > 0 ? (
+            <Card padding="none" style={{ overflow: "hidden" }}>
+              <TableScroller>
+                <table style={{ width: "100%", minWidth: "720px", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "var(--border-ui)", backgroundColor: "var(--color-primary)" }}>
+                      <th style={tableHeadStyle}>Název</th>
+                      <th style={tableHeadStyle}>Místo</th>
+                      <th style={tableHeadStyle}>Datum</th>
+                      <th style={tableHeadStyle}>Stav</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trips.slice(0, 5).map((trip, idx) => (
+                      <tr key={trip._id} style={{ borderBottom: idx === Math.min(4, trips.length - 1) ? "none" : "var(--border-ui)" }}>
+                        <td style={{ padding: "1rem", fontWeight: "800" }}>
+                          <Link href={`/trips/${trip._id}`} style={{ color: "inherit", textDecoration: "underline" }}>
+                            {trip.name}
+                          </Link>
+                        </td>
+                        <td style={{ padding: "1rem" }}>{trip.location}</td>
+                        <td style={{ padding: "1rem", fontSize: "0.9rem", color: "var(--text-muted)" }}>{formatDate(trip.startDate)}</td>
+                        <td style={{ padding: "1rem" }}>
+                          <span style={statusBadgeStyle}>Plánuje se</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableScroller>
+            </Card>
+          ) : (
+            <EmptyStateCard
+              title="Žádné výpravy"
+              description="Zatím tu nejsou žádné nejbližší výpravy."
+              action={
+                <Button href="/trips" variant="secondary">
+                  Vytvořit výpravu
+                </Button>
+              }
+            />
+          )}
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: "1.125rem", fontWeight: "900", marginBottom: "1rem" }}>Nápověda a tipy</h2>
+
+          {!showHelp ? (
+            <Card padding="lg" interactive onClick={() => setShowHelp(true)} style={{ backgroundColor: "var(--color-primary)", textAlign: "center" }}>
+              <HelpCircle size={40} strokeWidth={3} style={{ marginBottom: "0.75rem" }} />
+              <div style={{ fontSize: "1.1rem", fontWeight: "900", marginBottom: "0.75rem" }}>Potřebujete pomoc?</div>
+              <Button type="button" variant="secondary" onClick={() => setShowHelp(true)}>
+                Otevřít nápovědu
               </Button>
-            </Link>
-          </div>
-        )}
-      </div>
+            </Card>
+          ) : (
+            <Card padding="lg">
+              <Field style={{ marginBottom: "1.5rem" }}>
+                <TextInput
+                  type="text"
+                  placeholder="Hledat: výprava, člen, heslo..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  autoFocus
+                />
+              </Field>
 
-      {/* Help Center */}
-      <div>
-        <h2
-          style={{
-            fontSize: "1.125rem",
-            fontWeight: "900",
-            marginBottom: "1rem",
-          }}
-        >
-          Nápověda & Tipy 💡
-        </h2>
-
-        {!showHelp ? (
-          <div
-            onClick={() => setShowHelp(true)}
-            style={{
-              backgroundColor: "#86efac",
-              border: "4px solid #000",
-              borderRadius: "12px",
-              padding: "2rem",
-              boxShadow: "6px 6px 0 0 #000",
-              textAlign: "center",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
-            onMouseDown={(e) => {
-              e.currentTarget.style.transform = "translate(4px, 4px)";
-              e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-            }}
-            onMouseUp={(e) => {
-              e.currentTarget.style.transform = "translate(0, 0)";
-              e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-            }}
-          >
-            <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>
-              ❓
-            </div>
-            <div style={{ fontSize: "1.1rem", fontWeight: "700" }}>
-              Potřebujete pomoc?
-            </div>
-            <div
-              style={{
-                fontSize: "0.9rem",
-                color: "var(--text-main)",
-                marginTop: "0.75rem",
-              }}
-            >
-              Klikněte pro otevření hledání →
-            </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              backgroundColor: "white",
-              border: "4px solid #000",
-              borderRadius: "12px",
-              padding: "1.5rem",
-              boxShadow: "6px 6px 0 0 #000",
-            }}
-          >
-            {/* Search Input */}
-            <div style={{ marginBottom: "1.5rem" }}>
-              <input
-                type="text"
-                placeholder="🔍 Hledat (např: výprava, člen, heslo)..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
-                style={{
-                  width: "100%",
-                  padding: "0.75rem 1rem",
-                  border: "4px solid #000",
-                  borderRadius: "10px",
-                  fontSize: "0.95rem",
-                  boxShadow: "6px 6px 0 0 #000",
-                  fontWeight: "600",
-                  boxSizing: "border-box",
-                  transition: "all 0.15s",
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                }}
-              />
-            </div>
-
-            {/* Search Results */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                gap: "1rem",
-                marginBottom: "1rem",
-              }}
-            >
-              {filteredTopics.length > 0 ? (
-                filteredTopics.map((topic, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      backgroundColor: "#f9f9f9",
-                      border: "4px solid #000",
-                      borderRadius: "12px",
-                      padding: "1rem",
-                      transition: "all 0.15s",
-                      cursor: "default",
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f0f0f0";
-                      e.currentTarget.style.borderColor = "#86efac";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f9f9f9";
-                      e.currentTarget.style.borderColor = "var(--border-color)";
-                    }}
-                  >
-                    <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
-                      {topic.icon}
-                    </div>
-                    <h4
-                      style={{
-                        fontSize: "0.95rem",
-                        fontWeight: "700",
-                        marginBottom: "0.25rem",
-                      }}
-                    >
-                      {topic.title}
-                    </h4>
-                    <p
-                      style={{
-                        fontSize: "0.85rem",
-                        color: "var(--text-muted)",
-                        margin: 0,
-                        lineHeight: "1.4",
-                      }}
-                    >
-                      {topic.description}
-                    </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
+                {filteredTopics.length > 0 ? (
+                  filteredTopics.map(({ Icon, ...topic }) => (
+                    <Card key={topic.title} padding="sm">
+                      <Icon size={28} strokeWidth={3} style={{ marginBottom: "0.5rem" }} />
+                      <h4 style={{ fontSize: "0.95rem", fontWeight: "900", marginBottom: "0.25rem" }}>{topic.title}</h4>
+                      <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", margin: 0, lineHeight: "1.4", fontWeight: 600 }}>
+                        {topic.description}
+                      </p>
+                    </Card>
+                  ))
+                ) : (
+                  <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "1rem", color: "var(--text-muted)" }}>
+                    <Search size={28} strokeWidth={3} style={{ marginBottom: "0.5rem" }} />
+                    <p>Žádné výsledky na &quot;{searchTerm}&quot;</p>
                   </div>
-                ))
-              ) : (
-                <div
-                  style={{
-                    gridColumn: "1 / -1",
-                    textAlign: "center",
-                    padding: "1rem",
-                    color: "var(--text-muted)",
+                )}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem", paddingTop: "1rem", borderTop: "var(--border-ui)" }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowHelp(false);
+                    setSearchTerm("");
                   }}
                 >
-                  <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
-                    🔍
-                  </div>
-                  <p>Žádné výsledky na "{searchTerm}"</p>
-                </div>
-              )}
-            </div>
-
-            {/* Close Button */}
-            <div
-              style={{
-                textAlign: "center",
-                marginTop: "1rem",
-                paddingTop: "1rem",
-                borderTop: "4px solid #000",
-              }}
-            >
-              <button
-                onClick={() => {
-                  setShowHelp(false);
-                  setSearchTerm("");
-                }}
-                style={{
-                  backgroundColor: "white",
-                  border: "4px solid #000",
-                  borderRadius: "10px",
-                  padding: "0.5rem 1.5rem",
-                  fontWeight: "700",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  boxShadow: "6px 6px 0 0 #000",
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.transform = "translate(3px, 3px)";
-                  e.currentTarget.style.boxShadow = "2px 2px 0 0 #000";
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.transform = "translate(0, 0)";
-                  e.currentTarget.style.boxShadow = "6px 6px 0 0 #000";
-                }}
-              >
-                Zavřít
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+                  Zavřít
+                </Button>
+              </div>
+            </Card>
+          )}
+        </section>
+      </PageContent>
     </div>
-  </div>
-);
+  );
 }
+
+const tableHeadStyle: CSSProperties = {
+  padding: "1rem",
+  textAlign: "left",
+  fontWeight: "900",
+};
+
+const statusBadgeStyle: CSSProperties = {
+  display: "inline-block",
+  backgroundColor: "var(--color-primary)",
+  border: "var(--border-ui)",
+  borderRadius: "var(--radius-md)",
+  padding: "0.25rem 0.75rem",
+  fontWeight: "900",
+  fontSize: "0.85rem",
+  boxShadow: "var(--shadow-md)",
+};

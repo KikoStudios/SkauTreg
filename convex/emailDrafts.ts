@@ -167,13 +167,21 @@ export const getRecipients = query({
             participations.map(async (p) => {
                 const member = normalizeMemberContactFields(await ctx.db.get(p.memberId));
                 const emails = getMemberEmailTargets(member);
+                const contacts = member ? [
+                    member.email ? { name: member.name || "Člen", email: member.email, role: "member" } : null,
+                    member.guardianEmail ? { name: member.guardianName || "Rodič / zástupce", email: member.guardianEmail, role: "guardian" } : null,
+                    member.guardian2Email ? { name: member.guardian2Name || "Druhý rodič / zástupce", email: member.guardian2Email, role: "guardian" } : null,
+                ].filter(Boolean) : [];
                 return {
                     memberId: member?._id,
                     name: member?.name,
                     email: emails[0],
                     emails,
+                    contacts,
                     accessKey: p.accessKey,
                     hasEmail: emails.length > 0,
+                    participationStatus: p.status,
+                    responses: p.responses,
                 };
             })
         );

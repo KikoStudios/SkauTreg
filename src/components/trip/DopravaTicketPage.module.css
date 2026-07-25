@@ -327,24 +327,6 @@
   height: 18px;
 }
 
-.openBtn {
-  width: 154px;
-  height: var(--rt-h);
-  border: var(--rt-border) solid #000;
-  border-radius: var(--rt-radius);
-  background: #4ade80;
-  font-weight: 900;
-  font-size: 22px;
-  cursor: pointer;
-  box-shadow: 3px 3px 0 0 #000;
-  margin-top: auto;
-}
-
-.openBtn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
 .actionsRow {
   display: flex;
   gap: 10px;
@@ -423,4 +405,66 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Trip workspace refresh */
+.page { gap: 14px; padding: 0; animation: transportIn .24s ease both; }
+.routeCard { padding: 1rem 1.1rem; background: #fff; border: 2px solid #111; border-radius: 13px; box-shadow: 3px 3px 0 #111; }
+.routeCardUnassigned { min-height: 150px; display: grid; align-content: center; border: 2px dashed #111; background: #fff9e8; box-shadow: none; }
+.routeHeader { gap: .65rem; margin-bottom: .8rem; color: #343a36; font-size: .9rem; }
+.routeHeaderDate { color: #747a76; font-size: .72rem; }
+.routeHeaderBadge { padding: .32rem .55rem; color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 999px; box-shadow: 2px 2px 0 #111; font-size: .64rem; }
+.routeHeaderArrow { color: #868c88; font-size: 1rem; }
+.segmentIndex { border: 2px solid #111; border-radius: 8px; color: #fff; background: #315f3f; box-shadow: 2px 2px 0 #111; }
+.modePill, .timePill, .linePill { border: 1.5px solid #111; border-radius: 7px; box-shadow: none; font-size: .68rem; }
+.modeTrain, .timePill { background: #fff3ba; }
+.modeBus { background: #e8f1ea; }
+.modeTram { background: #ffe9ed; }
+.linePill { background: #eaf4ff; }
+.segRouteText { color: #303632; font-size: .78rem; }
+.shareCode { color: #4f5751; font-size: .75rem; }
+.ageIcon, .typeTotalPill, .typeCountPill, .paxPill, .grandTotalPill { border: 2px solid #111; box-shadow: 2px 2px 0 #111; }
+.typeTotalPill { color: #294532; background: #edf2ee; }
+.editBtn { color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 8px; box-shadow: 2px 2px 0 #111; font-size: .82rem; }
+.grandTotalPill { color: #fff; background: #315f3f; }
+.btn { border: 2px solid #111; border-radius: 8px; box-shadow: 2px 2px 0 #111; font-size: .72rem; }
+.btnGreen { color: #fff; background: #315f3f; border-color: #111; }
+.modal { border: 2px solid #111; border-radius: 13px; box-shadow: 5px 5px 0 #111; }
+.ticketTile { border: 2px solid #111; border-radius: 9px; box-shadow: 2px 2px 0 #111; }
+.ticketTileActive { background: #fff3ba; border-color: #111; }
+@keyframes transportIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Compact centered workspace composition */
+.page { width: min(100%, 1100px); min-height: calc(100dvh - 3rem); justify-content: center; gap: 12px; margin-inline: auto; padding-block: clamp(1rem, 6vh, 4rem); }
+.routeCard { min-height: 148px; padding: .8rem .9rem; border-radius: 11px; }
+.routeCardUnassigned { min-height: 132px; }
+.routeCardUnassigned .routeHeader { margin-bottom: 0; }
+.unassignedBody { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: .4rem; text-align: left; }
+.unassignedBody > img { width: 94px; height: 82px; object-fit: contain; flex: 0 0 auto; }
+.unassignedCopy { display: grid; justify-items: start; gap: .35rem; }
+.unassignedHint { max-width: 430px; margin-top: 0; font-size: .7rem; font-weight: 650; }
+.assignBtn { margin-top: .25rem; padding: .42rem .65rem; color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 7px; box-shadow: 2px 2px 0 #111; font-size: .68rem; font-weight: 850; cursor: pointer; }
+.assignBtn:active { transform: translate(2px, 2px); box-shadow: none; }
+.routeHeader { gap: .55rem; margin-bottom: .65rem; font-size: .82rem; }
+.routeGrid { grid-template-columns: minmax(0, 1fr) 138px minmax(290px, 320px); gap: 16px; align-items: center; }
+.segments { gap: 7px; }
+.ticketQrPanel { display: grid; justify-items: center; align-content: center; gap: .35rem; padding-inline: .25rem; }
+.ticketQrPanel > span { color: #68706a; font-size: .6rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.ticketQrPanel > small { color: #737a75; font-size: .58rem; font-weight: 700; text-align: center; }
+.ticketQrTile { width: 126px; height: 126px; display: grid; place-items: center; padding: 6px; overflow: hidden; color: #315f3f; background: #fff; border: 2px solid #111; border-radius: 10px; box-shadow: 2px 2px 0 #111; cursor: pointer; }
+.ticketQrTile > img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.ticketQrTile > span { display: grid; justify-items: center; gap: .2rem; font-size: .62rem; font-weight: 850; line-height: 1.15; text-align: center; }
+.ticketQrTile b { font-size: 1.35rem; line-height: 1; }
+.ticketQrTile:active { transform: translate(2px, 2px); box-shadow: none; }
+.pricesPanel { --rt-border: 2px; --rt-radius: 8px; --rt-h: 34px; --rt-font: 13px; grid-template-columns: 1fr; gap: 7px; }
+.priceTypeList { gap: 5px; }
+.priceTypeRow { grid-template-columns: 32px minmax(72px, 1fr) 48px 76px; column-gap: 7px; min-height: 38px; }
+.ageIcon { width: 32px; height: 32px; }
+.priceTypeLabel { display: grid; gap: .08rem; min-width: 0; }
+.priceTypeLabel small { color: #747a75; font-size: .56rem; font-weight: 750; }
+.priceTypeLabel strong { font-size: .76rem; white-space: nowrap; }
+.typeTotalPill { width: 76px; height: 24px; font-size: 12px; }
+.typeCountPill { width: 48px; height: 30px; font-size: 12px; }
+.rightActions { gap: 6px; }
+@media (max-width: 1100px) { .routeGrid { grid-template-columns: minmax(0, 1fr) 138px; align-items: start; } .pricesPanel { width: 100%; grid-column: 1 / -1; } }
+@media (max-width: 760px) { .page { min-height: auto; justify-content: flex-start; padding-block: .5rem 1rem; } .routeCard { min-height: 0; } .routeGrid { grid-template-columns: 1fr; } .ticketQrPanel, .pricesPanel { grid-column: 1; } .ticketQrPanel { padding-block: .4rem; } .unassignedBody { text-align: center; } .unassignedCopy { justify-items: center; } }
 

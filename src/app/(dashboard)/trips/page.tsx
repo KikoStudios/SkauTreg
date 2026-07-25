@@ -2,13 +2,12 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import TripForm, { TripFormData } from "../../../components/TripForm";
-import Breadcrumbs from "@/components/Breadcrumbs";
 import { useFeedback } from "@/context/FeedbackContext";
-import { getErrorDetails } from "@/lib/errors";
+import { Plus } from "lucide-react";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -37,7 +36,7 @@ const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function TripsPage() {
-    const { showError, showSuccess } = useFeedback();
+    const { showSuccess } = useFeedback();
     const troops = useQuery(api.troops.getByUser);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -56,21 +55,34 @@ export default function TripsPage() {
         router.replace(`${pathname}?${params.toString()}`);
     };
 
-    // Auto-select first troop if loading finishes and none selected
-    if (troops && troops.length > 0 && !selectedTroopId) {
-        setSelectedTroopId(troops[0]._id);
-    }
+    useEffect(() => {
+        if (troopIdParam) {
+            setSelectedTroopId(troopIdParam as Id<"troops">);
+        } else if (troops && troops.length > 0) {
+            setSelectedTroopId((current) => current || troops[0]._id);
+        }
+    }, [troopIdParam, troops]);
 
     // Get currently selected troop details
     const selectedTroop = troops?.find(t => t._id === selectedTroopId);
 
-    const trips = useQuery(api.trips.list as any, selectedTroopId ? { troopId: selectedTroopId } : "skip");
+    const trips = useQuery(api.trips.list, selectedTroopId ? { troopId: selectedTroopId } : "skip");
     const createTrip = useMutation(api.trips.create);
 
     const [isCreating, setIsCreating] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<"upcoming" | "old">("upcoming");
+
+    useEffect(() => {
+        const requestedTab = searchParams.get("tab");
+        if (requestedTab === "upcoming" || requestedTab === "old") {
+            setActiveTab(requestedTab);
+        }
+        if (searchParams.get("create") === "true") {
+            setShowAddModal(true);
+        }
+    }, [searchParams]);
 
     const handleCreate = async (data: TripFormData) => {
         if (!selectedTroopId) return;
@@ -107,13 +119,13 @@ export default function TripsPage() {
     }
 
     // Filter trips
-    const filteredTrips = trips?.filter((t: any) =>
+    const filteredTrips = trips?.filter((t) =>
         t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (t.location && t.location.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     // Helper function to check if trip is upcoming or old
-    const isUpcomingTrip = (trip: any) => {
+    const isUpcomingTrip = (trip: NonNullable<typeof trips>[number]) => {
         if (!trip.startDate) return true;
         const [y, m, d] = trip.startDate.split("-").map(Number);
         const tripStart = new Date(y, m - 1, d);
@@ -123,10 +135,10 @@ export default function TripsPage() {
     };
 
     // Filter by tab
-    const tabFilteredTrips = filteredTrips?.filter((t: any) => {
+    const tabFilteredTrips = filteredTrips?.filter((t) => {
         const isUpcoming = isUpcomingTrip(t);
         return activeTab === "upcoming" ? isUpcoming : !isUpcoming;
-    });
+    }) || [];
 
     return (
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
@@ -196,7 +208,7 @@ export default function TripsPage() {
                     onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
                     onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
                 >
-                    <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> ADD
+                    <Plus size={22} strokeWidth={3} /> Přidat výpravu
                 </button>
             </div>
 
@@ -216,11 +228,11 @@ export default function TripsPage() {
                 }
                 .troop-select {
                     padding: 0.75rem 3rem 0.75rem 1.5rem;
-                    border-radius: 999px;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-weight: 900;
-                    font-size: 1.5rem;
+                    border-radius: 10px;
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-weight: 800;
+                    font-size: 1rem;
                     appearance: none;
                     background-color: white;
                     cursor: pointer;
@@ -248,43 +260,50 @@ export default function TripsPage() {
                 }
                 .tabs-switcher {
                     display: flex;
-                    gap: 0.75rem;
+                    gap: 1rem;
                     align-items: center;
+                    padding: 0;
+                    background: transparent;
+                    border: 0;
+                    border-bottom: 1px solid #ccc;
+                    border-radius: 0;
                 }
                 .tab-button {
                     padding: 0.6rem 1.25rem;
-                    border-radius: 8px;
-                    border: 2px solid #000;
-                    background-color: #fff;
+                    border-radius: 0;
+                    border: 0;
+                    border-bottom: 3px solid transparent;
+                    background-color: transparent;
                     font-weight: 800;
                     font-size: 0.95rem;
                     cursor: pointer;
                     transition: transform 0.1s, box-shadow 0.1s, background-color 0.1s;
-                    box-shadow: 3px 3px 0 0 #000;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
+                    box-shadow: none;
                 }
                 .tab-button.active {
-                    background-color: #86efac;
+                    color: #166534;
+                    background-color: transparent;
+                    border-bottom-color: #16803c;
+                    box-shadow: none;
                 }
                 .search-input {
                     width: 100%;
                     padding: 0.75rem 1.5rem;
-                    border-radius: 999px;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-size: 1.2rem;
+                    border-radius: 10px;
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-size: .95rem;
                     outline: none;
                     font-weight: 500;
                 }
                 .add-button {
                     padding: 0.75rem 2rem;
-                    border-radius: 999px;
-                    background-color: white;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-size: 1.2rem;
-                    font-weight: 900;
+                    border-radius: 10px;
+                    background-color: var(--color-primary);
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-size: .9rem;
+                    font-weight: 850;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -336,11 +355,11 @@ export default function TripsPage() {
                         fontWeight: "bold",
                         color: "#888"
                     }}>
-                        Žádné výpravy nenalezeny. Klikněte na ADD pro naplánování nové.
+                        Žádné výpravy nenalezeny. Klikněte na Přidat výpravu pro naplánování nové.
                     </div>
                 ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2rem", padding: "0.5rem" }}>
-                        {tabFilteredTrips.map((trip: any) => (
+                        {tabFilteredTrips.map((trip) => (
                             <Link key={trip._id} href={`/trips/${trip._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                                 <div style={{
                                     backgroundColor: 'white',
@@ -382,7 +401,7 @@ export default function TripsPage() {
                                                 color: isUpcomingTrip(trip) ? "#075985" : "#991b1b",
                                                 border: "1px solid " + (isUpcomingTrip(trip) ? "#0284c7" : "#dc2626")
                                             }}>
-                                                {isUpcomingTrip(trip) ? "BUDE" : "SKONCILO"}
+                                                {isUpcomingTrip(trip) ? "BUDE" : "Proběhlo"}
                                             </span>
                                         </div>
                                         <h3 style={{
@@ -437,7 +456,8 @@ export default function TripsPage() {
                 <div style={{
                     position: "fixed",
                     top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: "rgba(0,0,0,0.3)",
+                    backgroundColor: "rgba(0,0,0,0.55)",
+                    backdropFilter: "blur(3px)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",

@@ -1,0 +1,43 @@
+.page { min-height: 100dvh; padding: clamp(1rem, 4vw, 2.5rem); color: #161918; background: #f5f4ef; }
+.shell { width: min(1040px, 100%); margin-inline: auto; overflow: hidden; background: #fff; border: 2px solid #111; border-radius: 14px; box-shadow: 5px 5px 0 #111; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: clamp(1.1rem, 3vw, 1.6rem); background: #fff9e8; border-bottom: 2px solid #111; }
+.header > div:first-child { min-width: 0; }
+.header span, .routeBlock span { color: #6e756f; font-size: .62rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.header h1 { margin: .25rem 0 .35rem; font-size: clamp(1.45rem, 4vw, 2rem); }
+.header p { margin: 0; color: #555c57; font-size: .82rem; font-weight: 750; }
+.header p b, .routeBlock b { margin-inline: .35rem; color: #858b87; }
+.headerMeta { flex: 0 0 88px; min-height: 72px; display: grid; place-items: center; align-content: center; color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 10px; box-shadow: 2px 2px 0 #111; }
+.headerMeta strong { font-size: 1.45rem; line-height: 1; }
+.headerMeta span { margin-top: .25rem; color: #d4e0d7; letter-spacing: 0; text-transform: none; }
+.journeyList { display: grid; gap: 1.15rem; padding: clamp(1rem, 3vw, 1.4rem); }
+.journeyCard { overflow: hidden; background: #fff; border: 2px solid #111; border-radius: 11px; box-shadow: 3px 3px 0 #111; }
+.journeyHeader { display: grid; grid-template-columns: auto minmax(220px, 1fr) minmax(430px, 1.4fr); align-items: center; gap: .85rem; padding: .85rem; background: #fafbf9; border-bottom: 2px solid #111; }
+.journeyNumber { width: 38px; height: 38px; display: grid; place-items: center; color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 8px; box-shadow: 2px 2px 0 #111; font-weight: 900; }
+.routeBlock { min-width: 0; }
+.routeBlock h2 { margin: .2rem 0 0; font-size: .93rem; line-height: 1.35; }
+.journeyFacts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+.ticketDetail { min-width: 0; display: grid; gap: .14rem; padding: .48rem .55rem; background: #fff; border: 1px solid #d9ddda; border-radius: 6px; }
+.ticketDetail span, .tableHeader, .ticketRow small { color: #767c77; font-size: .57rem; font-weight: 800; text-transform: uppercase; }
+.ticketDetail strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.tableHeader, .ticketRow { display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(140px, .9fr) minmax(165px, 1fr) minmax(170px, 1.1fr); align-items: center; column-gap: 1rem; }
+.tableHeader { padding: .55rem .85rem; background: #edf3ef; border-bottom: 1.5px solid #111; }
+.ticketRow { min-height: 78px; padding: .65rem .85rem; }
+.ticketRow + .ticketRow { border-top: 1px solid #d9ddda; }
+.seatCell, .codeCell, .pdfCell { min-width: 0; display: grid; align-content: center; justify-items: start; gap: .23rem; }
+.seatCell strong { min-width: 45px; padding: .3rem .48rem; background: #fff3ba; border: 1.5px solid #111; border-radius: 6px; font-size: .8rem; text-align: center; }
+.seatCell span { overflow: hidden; max-width: 100%; color: #656c67; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.codeCell strong { padding: .32rem .45rem; background: #edf3ef; border: 1.5px solid #111; border-radius: 6px; font-size: .72rem; letter-spacing: .04em; }
+.codeCellMuted strong { color: #465049; background: #f4f5f4; font-size: .67rem; }
+.codeCell > span, .pdfCell > span { color: #8a908b; font-size: .72rem; }
+.pdfCell a { padding: .48rem .65rem; color: #fff; background: #315f3f; border: 2px solid #111; border-radius: 7px; box-shadow: 2px 2px 0 #111; font-size: .68rem; font-weight: 850; text-decoration: none; }
+.pdfCell a:active { transform: translate(2px, 2px); box-shadow: none; }
+.pdfCell small { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1.25rem; color: #737a75; background: #f4f5f4; border-top: 2px solid #111; font-size: .65rem; }
+.footer strong { color: #315f3f; letter-spacing: .06em; }
+.statePage { min-height: 100dvh; display: grid; place-items: center; padding: 1rem; background: #f5f4ef; }
+.stateCard { width: min(480px, 100%); padding: 1.5rem; background: #fff9e8; border: 2px solid #111; border-radius: 12px; box-shadow: 4px 4px 0 #111; text-align: center; }
+.stateCard span { color: #7a807b; font-size: .65rem; font-weight: 850; text-transform: uppercase; }
+.stateCard h1 { margin: .35rem 0; font-size: 1.35rem; }
+.stateCard p { margin: 0; color: #656c67; font-size: .78rem; }
+@media (max-width: 900px) { .journeyHeader { grid-template-columns: auto 1fr; } .journeyFacts { grid-column: 1 / -1; } .tableHeader { display: none; } .ticketRow { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; } }
+@media (max-width: 560px) { .page { padding: .65rem; } .header { align-items: flex-start; } .headerMeta { flex-basis: 70px; min-height: 64px; } .journeyFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ticketRow { grid-template-columns: 1fr; padding-block: .85rem; } .seatCell span { white-space: normal; } .footer { align-items: flex-start; flex-direction: column; } }

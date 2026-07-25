@@ -144,7 +144,7 @@ function extractHiddenInputs(html: string): Record<string, string> {
 
 function extractLabeledFaresFromHtml(html: string): { adult?: string; child?: string; isic?: string } {
   const $ = cheerio.load(html);
-  const text = normalizeTextForMatch($.text());
+  const text = normalizeTextForMatch($.root().text());
 
   const pick = (label: string): string | undefined => {
     const idx = text.indexOf(label);
@@ -446,9 +446,9 @@ export async function analyzeShareLink(rawUrl: string): Promise<IdosTrip> {
 
   if (!trip.priceAdult || !trip.priceChild || !trip.priceIsic) {
     const discovered = await discoverEndpointsFromBundles(session.clone(), html, url, bootstrap, { maxBundles: 2 });
-    if (!trip.priceAdult) trip.priceAdult = await tryEndpointsForPreset(session.clone(), url, bootstrap, "adult", discovered, hiddenInputs);
-    if (!trip.priceChild) trip.priceChild = await tryEndpointsForPreset(session.clone(), url, bootstrap, "child_6_15", discovered, hiddenInputs);
-    if (!trip.priceIsic) trip.priceIsic = await tryEndpointsForPreset(session.clone(), url, bootstrap, "student_isic", discovered, hiddenInputs);
+    if (!trip.priceAdult) trip.priceAdult = (await tryEndpointsForPreset(session.clone(), url, bootstrap, "adult", discovered, hiddenInputs)) || undefined;
+    if (!trip.priceChild) trip.priceChild = (await tryEndpointsForPreset(session.clone(), url, bootstrap, "child_6_15", discovered, hiddenInputs)) || undefined;
+    if (!trip.priceIsic) trip.priceIsic = (await tryEndpointsForPreset(session.clone(), url, bootstrap, "student_isic", discovered, hiddenInputs)) || undefined;
   }
 
   const fallbackPrice = trip.price;

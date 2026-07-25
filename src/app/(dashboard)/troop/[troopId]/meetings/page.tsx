@@ -1,23 +1,26 @@
 "use client";
 
+import { useParams } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "../../../../../../convex/_generated/api";
+import { Id } from "../../../../../../convex/_generated/dataModel";
 import RadyTab from "../../../../../components/RadyTab";
+import TroopWorkspaceHeader from "../../../../../components/TroopWorkspaceHeader";
+import styles from "./MeetingsPage.module.css";
 
 export default function MeetingsPage() {
-  return (
-    <div className="dashboardContentX" style={{ width: "100%", position: "relative", overflowX: "hidden" }}>
-        {/* Top Title Bar */}
-        <div style={{
-            backgroundColor: "white",
-            borderBottom: "3px solid #000",
-            padding: "1rem 2rem",
-            margin: "0 -2rem 2rem -2rem",
-            width: "calc(100% + 4rem)",
-            display: "flex", justifyContent: "space-between", alignItems: "center"
-        }}>
-            <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Dokumentace</h1>
-        </div>
+  const params = useParams();
+  const troopId = params.troopId as Id<"troops">;
+  const troop = useQuery(api.troops.getById, { id: troopId });
 
-        <RadyTab />
+  if (!troop) return <div className={styles.loading}>Načítám pracovní prostor rad…</div>;
+
+  return (
+    <div className={styles.page}>
+      <TroopWorkspaceHeader troopId={troopId} troopName={troop.name} current="meetings" title="Rady a zápisy" description="Jedno místo pro porady, dokumentaci výprav a navazující rozhodnutí." note="Dokumentaci spojenou s konkrétní výpravou najdete také přímo v jejím pracovním prostoru. Samostatné rady používejte pro oddílová témata." />
+      <section className={styles.content}>
+        <RadyTab troopId={troopId} />
+      </section>
     </div>
   );
 }

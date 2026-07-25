@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useRouter } from "next/navigation";
-import { useState, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
+import { ImagePlus, Plus, X } from "lucide-react";
+import styles from "./TroopPage.module.css";
 
-import Breadcrumbs from "../../../components/Breadcrumbs";
 
 // Canvas Helper for Cropping
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -109,11 +110,16 @@ const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => 
 
 // Main Page Component
 export default function TroopsPage() {
+    const searchParams = useSearchParams();
     const troops = useQuery(api.troops.getByUser);
     const createTroop = useMutation(api.troops.create);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
 
     const [showCreateForm, setShowCreateForm] = useState(false);
+
+    useEffect(() => {
+        if (searchParams.get("create") === "true") setShowCreateForm(true);
+    }, [searchParams]);
 
     // Form State
     const [newName, setNewName] = useState("");
@@ -189,8 +195,8 @@ export default function TroopsPage() {
             setPreviewUrl(null);
             setImageSrc(null);
             setShowCreateForm(false);
-        } catch (error: any) {
-            alert("Error creating troop: " + error.message);
+        } catch (error: unknown) {
+            alert("Error creating troop: " + (error instanceof Error ? error.message : "Unknown error"));
         } finally {
             setIsCreating(false);
         }
@@ -227,103 +233,61 @@ export default function TroopsPage() {
                         onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
                         onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
                     >
-                        +
+                        <Plus size={25} strokeWidth={2.5} />
                     </button>
                     
-                    {/* Popover Form moved inside relative header container wrapper if needed, 
-                        but we can keep it here, it will be relative to the header. */}
                     {showCreateForm && (
-                        <div style={{
-                            position: "absolute",
-                            top: "100%",
-                            right: "2rem",
-                            zIndex: 50,
-                            backgroundColor: "white",
-                            border: "2px solid #000",
-                            borderRadius: "12px",
-                            boxShadow: "8px 8px 0 0 #000",
-                            padding: "1.5rem",
-                            width: "320px",
-                            marginTop: "1rem"
-                        }} onClick={e => e.stopPropagation()}>
-                            <h2 style={{ fontSize: "1.25rem", fontWeight: "800", marginBottom: "1rem" }}>Nový Oddíl</h2>
-                            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                {/* Logo Upload */}
-                                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                    <div style={{
-                                        width: "64px", height: "64px",
-                                        border: "2px solid #000", borderRadius: "50%",
-                                        overflow: "hidden", backgroundColor: "#f4f4f5",
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
-                                    }}>
+                        <div className={styles.createOverlay} onClick={() => setShowCreateForm(false)}>
+                          <div className={styles.createDialog} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="new-troop-title">
+                            <div className={styles.dialogHeader}>
+                              <div><span>Nový projekt</span><h2 id="new-troop-title">Vytvořit oddíl</h2><p>Základní údaje můžete kdykoliv doplnit v nastavení.</p></div>
+                              <button onClick={() => setShowCreateForm(false)} aria-label="Zavřít"><X size={22} /></button>
+                            </div>
+                            <form onSubmit={handleCreate} className={styles.createForm}>
+                                <div className={styles.logoRow}>
+                                    <div className={styles.logoPreview}>
                                         {previewUrl ? (
-                                            <img src={previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            <img src={previewUrl} alt="Náhled loga" />
                                         ) : (
-                                            <span style={{ fontSize: '0.7rem', fontWeight: 'bold' }}>LOGO</span>
+                                            <ImagePlus size={25} />
                                         )}
                                     </div>
-                                    <div>
-                                        <label style={{
-                                            display: "inline-block",
-                                            padding: "0.5rem 1rem",
-                                            border: "2px solid #000",
-                                            borderRadius: "6px",
-                                            fontWeight: "700",
-                                            fontSize: "0.8rem",
-                                            cursor: "pointer",
-                                            backgroundColor: "#e4e4e7",
-                                            boxShadow: "2px 2px 0 0 #000"
-                                        }}>
-                                            Nahrát
+                                    <div><strong>Logo oddílu</strong><small>Čtvercový obrázek, ideálně alespoň 400 × 400 px.</small>
+                                        <label className={styles.uploadButton}>Vybrat obrázek
                                             <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
                                         </label>
                                     </div>
                                 </div>
-                                <div>
-                                    <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Jméno</label>
+                                <div className={styles.formField}>
+                                    <label>Jméno oddílu</label>
                                     <input
                                         required
                                         value={newName}
                                         onChange={e => setNewName(e.target.value)}
-                                        style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
                                         placeholder="Chodci"
                                     />
                                 </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                                    <div>
-                                        <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Číslo</label>
+                                <div className={styles.formGrid}>
+                                    <div className={styles.formField}>
+                                        <label>Číslo oddílu</label>
                                         <input
                                             value={newNumber}
                                             onChange={e => setNewNumber(e.target.value)}
-                                            style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
                                             placeholder="106"
                                         />
                                     </div>
-                                    <div>
-                                        <label style={{ display: "block", fontWeight: "700", marginBottom: "0.25rem", fontSize: "0.9rem" }}>Typ</label>
+                                    <div className={styles.formField}>
+                                        <label>Typ</label>
                                         <input
                                             value={newType}
                                             onChange={e => setNewType(e.target.value)}
-                                            style={{ width: "100%", padding: "0.5rem", border: "2px solid #000", borderRadius: "6px", fontSize: "1rem", boxShadow: "4px 4px 0 0 #000" }}
                                             placeholder="Skauti"
                                         />
                                     </div>
                                 </div>
-                                <button type="submit" disabled={isCreating} style={{
-                                    marginTop: "0.5rem",
-                                    padding: "0.75rem",
-                                    backgroundColor: "#86efac",
-                                    border: "2px solid #000",
-                                    borderRadius: "6px",
-                                    fontWeight: "800",
-                                    fontSize: "1rem",
-                                    cursor: "pointer",
-                                    boxShadow: "4px 4px 0 0 #000",
-                                    width: "100%"
-                                }}>
-                                    {isCreating ? "..." : "Vytvořit"}
-                                </button>
+                                <div className={styles.dialogActions}><button type="button" onClick={() => setShowCreateForm(false)}>Zrušit</button><button type="submit" disabled={isCreating}>{isCreating ? "Vytvářím…" : "Vytvořit oddíl"}</button></div>
                             </form>
+                          </div>
                         </div>
                     )}
                 </div>

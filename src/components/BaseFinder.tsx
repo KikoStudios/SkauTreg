@@ -85,6 +85,14 @@ export default function BaseFinder() {
     const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
     const [selectedTripForAssignment, setSelectedTripForAssignment] = useState<Trip | null>(null);
 
+    useEffect(() => {
+        setSelectedBaseId(baseIdParam ? (baseIdParam as Id<"bases">) : null);
+        const requestedTab = searchParams?.get('tab');
+        if (requestedTab === 'info' || requestedTab === 'doprava') {
+            setActiveTab(requestedTab);
+        }
+    }, [baseIdParam, searchParams]);
+
     // Auto-show panel when base is selected
     useEffect(() => {
         if (selectedBaseId) {

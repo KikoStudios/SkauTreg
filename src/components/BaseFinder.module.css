@@ -55,7 +55,7 @@
 .tabNavWrapper {
     display: flex;
     align-items: stretch;
-    border-bottom: 3px solid #000;
+    border-bottom: 1px solid #c9c9cc;
     background: white;
     flex-shrink: 0;
     height: 46px;
@@ -74,12 +74,13 @@
     font-size: 16px;
     font-weight: 700;
     color: #000;
-    text-transform: uppercase;
+    font-size: 13px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    border-right: 3px solid #000;
+    border-right: none;
+    border-bottom: 3px solid transparent;
 }
 
 .tab:last-child {
@@ -87,13 +88,14 @@
 }
 
 .tabActive {
-    background: white;
+    color: #166534;
+    border-bottom-color: #16803c;
 }
 
 .fullscreenButton {
     width: 52px;
     border: none;
-    border-left: 3px solid #000;
+    border-left: 1px solid #c9c9cc;
     background: white;
     cursor: pointer;
     font-size: 24px;

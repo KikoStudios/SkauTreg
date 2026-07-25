@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
@@ -53,10 +53,13 @@ export default function MembersPage() {
         router.replace(`${pathname}?${params.toString()}`);
     };
 
-    // Auto-select first troop if loading finishes and none selected
-    if (troops && troops.length > 0 && !selectedTroopId) {
-        setSelectedTroopId(troops[0]._id);
-    }
+    useEffect(() => {
+        if (troopIdParam) {
+            setSelectedTroopId(troopIdParam as Id<"troops">);
+        } else if (troops && troops.length > 0) {
+            setSelectedTroopId((current) => current || troops[0]._id);
+        }
+    }, [troopIdParam, troops]);
 
     // Get currently selected troop details
     const selectedTroop = troops?.find(t => t._id === selectedTroopId);
@@ -99,6 +102,20 @@ export default function MembersPage() {
 
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedMemberForDetail, setSelectedMemberForDetail] = useState<any>(null);
+
+    useEffect(() => {
+        if (searchParams.get("create") === "true") {
+            openAddModal();
+            return;
+        }
+
+        const requestedMemberId = searchParams.get("memberId");
+        const requestedMember = members?.find((member) => member._id === requestedMemberId);
+        if (requestedMember) {
+            setSelectedMemberForDetail(requestedMember);
+            setShowDetailModal(true);
+        }
+    }, [members, searchParams]);
 
     // Google Groups CSV Import State
     const [showGoogleGroupsCSVModal, setShowGoogleGroupsCSVModal] = useState(false);
@@ -610,9 +627,9 @@ export default function MembersPage() {
     );
 
     return (
-        <div style={{ width: "100%", position: "relative", overflowX: "hidden", padding: "0 2rem 2rem", boxSizing: "border-box" }}>
+        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem", boxSizing: "border-box" }}>
             {/* Top Title Bar */}
-            <div className="headingContainer" style={{ margin: "0 -2rem 1.25rem", padding: "1rem 2rem", borderBottom: "3px solid #000" }}>
+            <div className="headingContainer">
                 <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Členové</h1>
             </div>
 
@@ -646,7 +663,7 @@ export default function MembersPage() {
                 <div className="search-container">
                     <input
                         type="text"
-                        placeholder="Search..."
+                        placeholder="Hledat podle jména nebo přezdívky…"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="search-input"
@@ -660,28 +677,16 @@ export default function MembersPage() {
                     onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
                     onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
                 >
-                    <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> ADD
+                    <span style={{ fontSize: "1.5rem", lineHeight: 1 }}>+</span> Přidat člena
                 </button>
 
-                {/* IMPORT Button */}
-                <button
-                    onClick={() => importFileInputRef.current?.click()}
-                    className="add-button"
-                    onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                >
-                    IMPORT
-                </button>
-
-                {/* GOOGLE GROUPS CSV Button */}
-                <button
-                    onClick={() => googleGroupsFileInputRef.current?.click()}
-                    className="add-button"
-                    onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                    onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                >
-                    G GROUPS
-                </button>
+                <details className="import-menu">
+                    <summary>Importovat</summary>
+                    <div className="import-menu-popover">
+                        <button onClick={() => importFileInputRef.current?.click()}>CSV nebo Excel</button>
+                        <button onClick={() => googleGroupsFileInputRef.current?.click()}>Google Groups CSV</button>
+                    </div>
+                </details>
 
                 <input
                     ref={importFileInputRef}
@@ -703,7 +708,7 @@ export default function MembersPage() {
                 .controls-row {
                     display: flex;
                     align-items: center;
-                    padding-top: 0.75rem;
+                    padding: 1.5rem 2rem 0;
                     margin-bottom: 2rem;
                     flex-wrap: wrap;
                     gap: 1rem;
@@ -715,11 +720,11 @@ export default function MembersPage() {
                 }
                 .troop-select {
                     padding: 0.75rem 3rem 0.75rem 1.5rem;
-                    border-radius: 999px;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-weight: 900;
-                    font-size: 1.5rem;
+                    border-radius: 10px;
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-weight: 800;
+                    font-size: 1rem;
                     appearance: none;
                     background-color: white;
                     cursor: pointer;
@@ -748,21 +753,21 @@ export default function MembersPage() {
                 .search-input {
                     width: 100%;
                     padding: 0.75rem 1.5rem;
-                    border-radius: 999px;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-size: 1.2rem;
+                    border-radius: 10px;
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-size: .95rem;
                     outline: none;
                     font-weight: 500;
                 }
                 .add-button {
                     padding: 0.75rem 2rem;
-                    border-radius: 999px;
-                    background-color: white;
-                    border: 3px solid #000;
-                    box-shadow: 4px 4px 0 0 #000;
-                    font-size: 1.2rem;
-                    font-weight: 900;
+                    border-radius: 10px;
+                    background-color: var(--color-primary);
+                    border: 2px solid #000;
+                    box-shadow: 2px 2px 0 0 #000;
+                    font-size: .9rem;
+                    font-weight: 850;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
@@ -774,12 +779,19 @@ export default function MembersPage() {
                 .add-button:first-of-type {
                     margin-left: auto;
                 }
+                .import-menu { position: relative; flex-shrink: 0; }
+                .import-menu summary { list-style: none; padding: .75rem 1rem; border: 2px solid #000; border-radius: 10px; background: #fff; box-shadow: 2px 2px 0 #000; font-size: .85rem; font-weight: 800; cursor: pointer; }
+                .import-menu summary::-webkit-details-marker { display: none; }
+                .import-menu-popover { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 20; width: 210px; display: grid; padding: .35rem; background: #fff; border: 2px solid #000; border-radius: 10px; box-shadow: 4px 4px 0 #000; }
+                .import-menu-popover button { padding: .7rem; background: transparent; border: 0; border-radius: 7px; text-align: left; font-weight: 700; cursor: pointer; }
+                .import-menu-popover button:hover { background: #f0f0ee; }
 
                 @media (max-width: 768px) {
                     .controls-row {
                         flex-direction: column;
                         align-items: stretch;
-                        gap: 1.5rem;
+                        gap: 1rem;
+                        padding: 1rem;
                     }
                     .troop-selector-container {
                         width: 100%;
@@ -799,16 +811,19 @@ export default function MembersPage() {
                         width: 100%;
                         justify-content: center;
                     }
+                    .import-menu, .import-menu summary { width: 100%; text-align: center; }
+                    .import-menu-popover { position: static; width: 100%; margin-top: .5rem; box-shadow: none; }
                 }
             `}</style>
 
             {/* Members Table */}
             <div style={{
-                border: "3px solid #000",
-                borderRadius: "16px",
-                boxShadow: "8px 8px 0 0 #000",
+                border: "2px solid #000",
+                borderRadius: "14px",
+                boxShadow: "3px 3px 0 0 #000",
                 overflow: "hidden",
-                backgroundColor: "white"
+                backgroundColor: "white",
+                margin: "0 2rem"
             }}>
                 <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>

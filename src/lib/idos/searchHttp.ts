@@ -96,6 +96,7 @@ function parseConnectionsSearch(html: string, pageUrl: string): SearchTrip[] {
       departureTime: depTime,
       arrivalTime: arrTime,
       duration: durationText,
+      distance: "N/A",
       transferCount: segments.length - 1,
       price,
       segments,

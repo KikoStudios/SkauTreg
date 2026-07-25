@@ -63,11 +63,11 @@ type NewItemDraft = {
 type NewItemState = Record<BudgetCategory, NewItemDraft>;
 
 const CATEGORY_CONFIG = [
-    { key: "transport", label: "Doprava", color: "#dbeafe", subcategories: [["outbound", "Tam"], ["return", "Zpatky"], ["local", "Mistni presuny"], ["extra", "Mimoradna doprava"]] },
-    { key: "food", label: "Jidlo", color: "#fef3c7", subcategories: [["snacks", "Svaciny"], ["breakfast", "Snidane"], ["lunch", "Obedy"], ["dinner", "Vecere"], ["drinks", "Pitny rezim"], ["shared_purchase", "Spolecny nakup"], ["reserve", "Potravinova rezerva"]] },
-    { key: "accommodation", label: "Ubytovani", color: "#dcfce7", subcategories: [["lodging", "Nocleh"], ["energy", "Energie"], ["deposit", "Kauce"], ["cleaning", "Uklid"], ["extra_fees", "Dalsi poplatky"]] },
-    { key: "materials", label: "Material", color: "#fce7f3", subcategories: [["program", "Program"], ["first_aid", "Lekarna"], ["consumables", "Spotrebni material"], ["printing", "Tisk"], ["rewards", "Odmeny"], ["repairs", "Opravy"]] },
-    { key: "other", label: "Ostatni", color: "#e5e7eb", subcategories: [["entry_fees", "Vstupy"], ["insurance", "Pojisteni"], ["reserve", "Financni rezerva"], ["unexpected", "Neocekavane vydaje"]] },
+    { key: "transport", label: "Doprava", color: "#eef1ef", subcategories: [["outbound", "Tam"], ["return", "Zpátky"], ["local", "Místní přesuny"], ["extra", "Mimořádná doprava"]] },
+    { key: "food", label: "Jídlo", color: "#f4f2ec", subcategories: [["snacks", "Svačiny"], ["breakfast", "Snídaně"], ["lunch", "Obědy"], ["dinner", "Večeře"], ["drinks", "Pitný režim"], ["shared_purchase", "Společný nákup"], ["reserve", "Potravinová rezerva"]] },
+    { key: "accommodation", label: "Ubytování", color: "#edf2ee", subcategories: [["lodging", "Nocleh"], ["energy", "Energie"], ["deposit", "Kauce"], ["cleaning", "Úklid"], ["extra_fees", "Další poplatky"]] },
+    { key: "materials", label: "Materiál", color: "#f2f0ef", subcategories: [["program", "Program"], ["first_aid", "Lékárna"], ["consumables", "Spotřební materiál"], ["printing", "Tisk"], ["rewards", "Odměny"], ["repairs", "Opravy"]] },
+    { key: "other", label: "Ostatní", color: "#f0f1f0", subcategories: [["entry_fees", "Vstupy"], ["insurance", "Pojištění"], ["reserve", "Finanční rezerva"], ["unexpected", "Neočekávané výdaje"]] },
 ] as const satisfies ReadonlyArray<{ key: BudgetCategory; label: string; color: string; subcategories: ReadonlyArray<readonly [string, string]> }>;
 
 const PAYMENT_STATUS_OPTIONS = [
@@ -267,10 +267,10 @@ export default function FinanceTab({ tripId }: FinanceTabProps) {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "1rem" }}>
                 {[
-                    ["Planovane naklady", formatCurrency(dashboard.summary.plannedTotal), "#fef3c7"],
-                    ["Skutecne naklady", formatCurrency(dashboard.summary.actualTotal), "#fee2e2"],
-                    ["Cena na ucastnika", formatCurrency(dashboard.summary.effectivePricePerParticipant), "#dbeafe"],
-                    ["Vybrano / zbyva", `${formatCurrency(dashboard.summary.collectedRevenue)} / ${formatCurrency(dashboard.summary.outstandingRevenue)}`, "#dcfce7"],
+                    ["Plánované náklady", formatCurrency(dashboard.summary.plannedTotal), "#f3f4f3"],
+                    ["Skutečné náklady", formatCurrency(dashboard.summary.actualTotal), "#f1efee"],
+                    ["Cena na účastníka", formatCurrency(dashboard.summary.effectivePricePerParticipant), "#edf1ee"],
+                    ["Vybráno / zbývá", `${formatCurrency(dashboard.summary.collectedRevenue)} / ${formatCurrency(dashboard.summary.outstandingRevenue)}`, "#e8eeea"],
                 ].map(([label, value, color]) => (
                     <div key={String(label)} style={{ ...panelStyle, backgroundColor: String(color), padding: "1.1rem" }}>
                         <div style={{ fontSize: "0.85rem", fontWeight: 800, textTransform: "uppercase", marginBottom: "0.4rem" }}>{label}</div>
@@ -280,8 +280,13 @@ export default function FinanceTab({ tripId }: FinanceTabProps) {
             </div>
 
             <div style={panelStyle}>
-                <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.45rem", fontWeight: 900, textTransform: "uppercase" }}>Zakladni prehled rozpoctu</h2>
-                <div style={{ color: "#666", marginBottom: "1rem" }}>Finance se oteviraji jako rychly prehled po hlavich a podkategoriich. Detailni polozky, platby a nastaveni jsou schovane nize v podmenu.</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1.25rem", marginBottom: "1rem" }}>
+                    <div>
+                        <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.45rem", fontWeight: 900, textTransform: "uppercase" }}>Zakladni prehled rozpoctu</h2>
+                        <div style={{ color: "#666" }}>Finance se oteviraji jako rychly prehled po hlavich a podkategoriich. Detailni polozky, platby a nastaveni jsou schovane nize v podmenu.</div>
+                    </div>
+                    <img src="/illustrations/ill-trip-budget.png" alt="" aria-hidden="true" style={{ width: "112px", height: "94px", objectFit: "contain", flex: "0 0 auto" }} />
+                </div>
                 <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "760px" }}>
                         <thead>
@@ -591,15 +596,15 @@ export default function FinanceTab({ tripId }: FinanceTabProps) {
 
 const panelStyle: CSSProperties = {
     backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "16px",
-    boxShadow: "6px 6px 0 0 #000",
+    border: "2px solid #111",
+    borderRadius: "12px",
+    boxShadow: "3px 3px 0 #111",
     padding: "1.3rem",
 };
 
 const subPanelStyle: CSSProperties = {
-    border: "2px solid #000",
-    borderRadius: "12px",
+    border: "2px solid #111",
+    borderRadius: "9px",
     padding: "1rem",
     backgroundColor: "white",
 };
@@ -628,7 +633,7 @@ const summaryMetaStyle: CSSProperties = {
 };
 
 const detailsContentStyle: CSSProperties = {
-    borderTop: "3px solid #000",
+    borderTop: "2px solid #111",
     padding: "1.2rem",
     display: "flex",
     flexDirection: "column",
@@ -656,7 +661,7 @@ const labelStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
     width: "100%",
     padding: "0.65rem 0.75rem",
-    border: "2px solid #000",
+    border: "2px solid #111",
     borderRadius: "8px",
     fontSize: "0.95rem",
     backgroundColor: "white",
@@ -664,17 +669,20 @@ const inputStyle: CSSProperties = {
 
 const actionButtonStyle: CSSProperties = {
     padding: "0.75rem 1rem",
-    border: "2px solid #000",
-    borderRadius: "10px",
-    backgroundColor: "#fde68a",
+    border: "2px solid #111",
+    borderRadius: "8px",
+    color: "white",
+    backgroundColor: "#315f3f",
     fontWeight: 900,
     cursor: "pointer",
-    boxShadow: "3px 3px 0 0 #000",
+    boxShadow: "2px 2px 0 #111",
 };
 
 const dangerButtonStyle: CSSProperties = {
     ...actionButtonStyle,
-    backgroundColor: "#fecaca",
+    color: "#8a3838",
+    backgroundColor: "#f7e9e9",
+    borderColor: "#e2bcbc",
 };
 
 const thStyle: CSSProperties = {
@@ -682,7 +690,7 @@ const thStyle: CSSProperties = {
     fontWeight: 900,
     fontSize: "0.92rem",
     textAlign: "left",
-    borderBottom: "2px solid #000",
+    borderBottom: "2px solid #111",
 };
 
 const tdStyle: CSSProperties = {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
+import { ArrowRight } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import styles from "./page.module.css";
 
@@ -46,16 +47,16 @@ export default function HomePage() {
           <div className={styles.headerActions}>
             {isSignedIn ? (
               <Link href={dashboardHref} className={styles.dashboard}>
-                <span className={styles.arrow}>➜</span>
-                <span>Dashboard</span>
+                <span className={styles.arrow}><ArrowRight size={18} strokeWidth={3} /></span>
+                <span>Přehled</span>
               </Link>
             ) : (
               <>
                 <Link href="/sign-in" className={styles.authButton}>
-                  Login
+                  Přihlásit se
                 </Link>
                 <Link href="/sign-up" className={styles.authButtonPrimary}>
-                  Register
+                  Registrovat
                 </Link>
               </>
             )}

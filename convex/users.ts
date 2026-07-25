@@ -53,6 +53,62 @@ export const viewer = query({
     },
 });
 
+/**
+ * Everything the account centre needs in one request. A user's role belongs to
+ * a troop, not to their global profile, so return each real assignment instead
+ * of asking the user to maintain a second, potentially conflicting role switch.
+ */
+export const profileOverview = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return null;
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+            .unique();
+        if (!user) return null;
+
+        const [leaderships, ownedTroops] = await Promise.all([
+            ctx.db
+                .query("troop_leaders")
+                .withIndex("by_user_troop", (q) => q.eq("userId", user._id))
+                .collect(),
+            ctx.db
+                .query("troops")
+                .filter((q) => q.eq(q.field("ownerId"), user._id))
+                .collect(),
+        ]);
+
+        const assignedTroops = await Promise.all(
+            leaderships.map(async (leadership) => {
+                const troop = await ctx.db.get(leadership.troopId);
+                if (!troop) return null;
+                return {
+                    troopId: troop._id,
+                    troopName: troop.name,
+                    role: leadership.role === "vedouci" ? "leader" : leadership.role,
+                };
+            })
+        );
+
+        const roles = [
+            ...ownedTroops.map((troop) => ({
+                troopId: troop._id,
+                troopName: troop.name,
+                role: "owner",
+            })),
+            ...assignedTroops.filter((role) => role !== null),
+        ].filter(
+            (role, index, all) =>
+                all.findIndex((candidate) => candidate.troopId === role.troopId) === index
+        );
+
+        return { user, roles };
+    },
+});
+
 export const update = mutation({
     args: {
         name: v.optional(v.string()),

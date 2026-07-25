@@ -183,6 +183,22 @@ export const updatePriceOverview = mutation({
   },
 });
 
+export const updateParsed = mutation({
+  args: {
+    ticketId: v.id("transport_tickets"),
+    parsed: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const ticket = await ctx.db.get(args.ticketId);
+    if (!ticket) throw new Error("Ticket not found");
+    await ctx.db.patch(args.ticketId, {
+      parsed: args.parsed,
+      updatedAt: new Date().toISOString(),
+    });
+    return { ok: true };
+  },
+});
+
 export const remove = mutation({
   args: { ticketId: v.id("transport_tickets") },
   handler: async (ctx, args) => {

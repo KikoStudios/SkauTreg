@@ -5,12 +5,12 @@ export const dynamic = 'force-dynamic';
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
-import Button from "../../../../components/Button";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
 import EmailSettings from "../../../../components/EmailSettings";
+import styles from "./SettingsPage.module.css";
 
 // --- Helpers for Image Upload (Copied/Adapted) ---
 async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<Blob> {
@@ -79,6 +79,7 @@ const PASTEL_COLORS = [
 export default function TroopSettingsPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const troopId = params.troopId as Id<"troops">;
 
     const troop = useQuery(api.troops.getById, { id: troopId });
@@ -106,6 +107,13 @@ export default function TroopSettingsPage() {
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const requestedSection = searchParams.get("section");
+        if (requestedSection === "general" || requestedSection === "branding" || requestedSection === "gmail" || requestedSection === "danger") {
+            setActiveTab(requestedSection);
+        }
+    }, [searchParams]);
 
     // Initialize Data
     useEffect(() => {
@@ -208,95 +216,16 @@ export default function TroopSettingsPage() {
     if (!troop) return <div>Načítám...</div>;
 
     return (
-        <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", paddingTop: "2rem", paddingBottom: "2rem", overflowX: "hidden" }}>
-            <div style={{
-                background: "linear-gradient(140deg, #fef3c7 0%, #e0e7ff 100%)",
-                border: "3px solid #000",
-                borderRadius: "16px",
-                padding: "1.5rem 2rem",
-                marginBottom: "1.5rem",
-                boxShadow: "6px 6px 0 0 #000"
-            }}>
-                <div className="settings-header" style={{ marginBottom: "0.5rem" }}>
-                    <button onClick={() => router.back()} style={{ background: "white", border: "3px solid #000", borderRadius: "10px", width: "44px", height: "44px", cursor: "pointer", fontSize: "1.3rem", fontWeight: "900", boxShadow: "3px 3px 0 0 #000" }}>←</button>
-                    <div>
-                        <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: 0, wordBreak: "break-word" }}>Nastavení Oddílu</h1>
-                        <div style={{ fontWeight: "700", color: "#374151" }}>Upravte základní informace, vzhled a e‑mailové nastavení.</div>
-                    </div>
-                </div>
-            </div>
+        <div className={styles.page}>
+            <header className={styles.pageHeader}>
+                <h1>Nastavení oddílu</h1>
+            </header>
 
-            {/* Tabs */}
-            <div className="tabs-container">
-                <button
-                    onClick={() => setActiveTab("general")}
-                    style={tabStyle(activeTab === "general")}
-                >
-                    Základní
-                </button>
-                <button
-                    onClick={() => setActiveTab("branding")}
-                    style={tabStyle(activeTab === "branding")}
-                >
-                    Vzhled & Logo
-                </button>
-                <button
-                    onClick={() => setActiveTab("gmail")}
-                    style={tabStyle(activeTab === "gmail")}
-                >
-                    E-mailové připojení
-                </button>
-                <button
-                    onClick={() => setActiveTab("danger")}
-                    style={{ ...tabStyle(activeTab === "danger"), color: activeTab === "danger" ? "red" : "inherit" }}
-                >
-                    Nebezpečná zóna
-                </button>
-            </div>
-
-            <style jsx>{`
-                .settings-header {
-                    margin-bottom: 2rem;
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                }
-                .tabs-container {
-                    display: flex;
-                    gap: 1rem;
-                    margin-bottom: 1.5rem;
-                    padding: 0.75rem;
-                    background: #fff;
-                    border: 3px solid #000;
-                    border-radius: 12px;
-                    box-shadow: 4px 4px 0 0 #000;
-                    flex-wrap: wrap; /* Wrap tabs on small screens */
-                }
-
-                @media (max-width: 600px) {
-                    .settings-header {
-                        flex-direction: row; /* Keep arrow next to title usually */
-                    }
-                    .settings-header h1 {
-                        font-size: 1.5rem !important; /* Force smaller title */
-                    }
-                    .tabs-container {
-                        gap: 0.5rem;
-                        justify-content: center; /* Center tabs when wrapped */
-                    }
-                    /* Make tabs stretch to fill lines */
-                    .tabs-container > button {
-                        flex: 1 1 auto;
-                        text-align: center;
-                        white-space: nowrap;
-                    }
-                }
-            `}</style>
-
-            <form onSubmit={handleSave}>
+            <div className={styles.settingsLayout}>
+            <form onSubmit={handleSave} className={styles.settingsContent}>
                 {/* GENERAL TAB */}
                 {activeTab === "general" && (
-                    <div style={panelStyle}>
+                    <div className={styles.settingsPanel}>
                         <div style={formGroupStyle}>
                             <label style={labelStyle}>Jméno Oddílu</label>
                             <input
@@ -359,7 +288,7 @@ export default function TroopSettingsPage() {
 
                 {/* BRANDING TAB */}
                 {activeTab === "branding" && (
-                    <div style={panelStyle}>
+                    <div className={styles.settingsPanel}>
                         {/* Logo Section */}
                         <div style={{ textAlign: "center", padding: "2rem", border: "3px dashed #ccc", borderRadius: "12px" }}>
                             <h3 style={{ fontWeight: "900", marginBottom: "1rem" }}>Logo Oddílu</h3>
@@ -415,13 +344,7 @@ export default function TroopSettingsPage() {
 
                 {/* DANGER TAB */}
                 {activeTab === "danger" && (
-                    <div style={{
-                        border: "3px solid #ef4444",
-                        backgroundColor: "#fef2f2",
-                        padding: "2rem",
-                        borderRadius: "12px",
-                        textAlign: "center"
-                    }}>
+                    <div className={`${styles.settingsPanel} ${styles.dangerPanel}`}>
                         <h3 style={{ color: "#ef4444", fontWeight: "900", fontSize: "1.5rem", marginBottom: "1rem" }}>SMAZAT ODDÍL</h3>
                         <p style={{ marginBottom: "2rem", fontWeight: "600" }}>
                             Tato akce je nevratná. Smaže oddíl, všechny členy, výpravy a historii.
@@ -440,14 +363,14 @@ export default function TroopSettingsPage() {
                                 boxShadow: "4px 4px 0 0 #b91c1c"
                             }}
                         >
-                            SMAZAT ODDÍL "{troop.name}"
+                            SMAZAT ODDÍL &quot;{troop.name}&quot;
                         </button>
                     </div>
                 )}
 
                 {/* GMAIL TAB */}
                 {activeTab === "gmail" && (
-                    <div style={panelStyle}>
+                    <div className={styles.settingsPanel}>
                         <EmailSettings 
                             troopId={troopId}
                             isAuthorized={true}
@@ -457,21 +380,7 @@ export default function TroopSettingsPage() {
 
                 {/* DANGER TAB */}
                 {activeTab !== "danger" && (
-                    <div style={{
-                        position: "sticky",
-                        bottom: 0,
-                        marginTop: "2rem",
-                        padding: "1rem",
-                        backgroundColor: "white",
-                        border: "3px solid #000",
-                        borderRadius: "12px",
-                        boxShadow: "4px 4px 0 0 #000",
-                        display: "flex",
-                        justifyContent: "center",
-                        gap: "0.5rem",
-                        zIndex: 100,
-                        flexWrap: "wrap"
-                    }}>
+                    <div className={styles.saveBar}>
                         <button
                             type="button"
                             onClick={() => router.back()}
@@ -508,6 +417,7 @@ export default function TroopSettingsPage() {
                     </div>
                 )}
             </form>
+            </div>
 
             {/* Cropper Modal */}
             {imageSrc && (
@@ -553,47 +463,25 @@ export default function TroopSettingsPage() {
 }
 
 // Styles
-const tabStyle = (active: boolean) => ({
-    padding: "0.65rem 1.25rem",
-    fontWeight: "900",
-    fontSize: "0.95rem",
-    border: "3px solid #000",
-    background: active ? "#86efac" : "#f3f4f6",
-    cursor: "pointer",
-    borderRadius: "999px",
-    boxShadow: active ? "3px 3px 0 0 #000" : "2px 2px 0 0 #000",
-    opacity: active ? 1 : 0.75,
-    textTransform: "uppercase" as const
-});
-
-const panelStyle = {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "1.5rem",
-    backgroundColor: "white",
-    border: "3px solid #000",
-    borderRadius: "14px",
-    padding: "1.5rem",
-    boxShadow: "6px 6px 0 0 #000"
-};
-
 const formGroupStyle = {
     display: "flex",
-    flexDirection: "column" as const
+    flexDirection: "column" as const,
+    gap: "0.4rem"
 };
 
 const labelStyle = {
     fontWeight: "800",
-    marginBottom: "0.5rem",
-    fontSize: "1rem"
+    marginBottom: 0,
+    fontSize: "0.82rem",
+    color: "#3f4145"
 };
 
 const inputStyle = {
     padding: "0.75rem",
-    border: "3px solid #000",
+    border: "2px solid #000",
     borderRadius: "8px",
     fontSize: "1rem",
     outline: "none",
-    boxShadow: "4px 4px 0 0 #000",
+    boxShadow: "none",
     fontWeight: "600"
 };

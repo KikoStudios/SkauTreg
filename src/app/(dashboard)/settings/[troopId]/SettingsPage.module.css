@@ -1,0 +1,17 @@
+.page { width: 100%; min-height: 100%; overflow-x: hidden; }
+.pageHeader { min-height: 72px; display: flex; align-items: center; padding: .85rem 2rem; background: #fff; border-bottom: var(--surface-border); }
+.pageHeader h1 { margin: 0; font-size: clamp(1.3rem, 2.4vw, 1.65rem); line-height: 1.1; }
+.settingsLayout { width: min(1180px, 100%); display: block; margin: 0 auto; padding: 1.5rem clamp(1rem, 3vw, 2.5rem) 3rem; }
+.settingsContent { min-width: 0; }
+.settingsPanel { display: flex; flex-direction: column; gap: 1.4rem; padding: clamp(1.25rem, 2.4vw, 2rem); background: #fff; border: 2px solid #000; border-radius: 14px; box-shadow: 4px 4px 0 #000; }
+.dangerPanel { color: #7f1d1d; background: #fff5f5; border-color: #b91c1c; box-shadow: 4px 4px 0 #b91c1c; text-align: left; }
+.saveBar { position: sticky; bottom: 1rem; z-index: 20; display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1.25rem; padding: .75rem; background: rgba(255,255,255,.94); border: 1px solid #cfcfd2; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.09); backdrop-filter: blur(10px); }
+.saveBar button { flex: 0 0 auto !important; min-width: 130px !important; border-width: 2px !important; box-shadow: none !important; }
+.saveBar button[type="submit"] { box-shadow: 2px 2px 0 #000 !important; }
+@media (max-width: 860px) {
+  .settingsLayout { padding-top: 1rem; }
+}
+@media (max-width: 600px) {
+  .pageHeader { min-height: 64px; padding: .75rem 1rem; }
+  .saveBar { bottom: .5rem; }
+}
