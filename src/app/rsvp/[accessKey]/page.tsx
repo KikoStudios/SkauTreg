@@ -156,7 +156,7 @@ export default function PublicRSVPPage() {
     const data = useQuery(api.public_rsvp.getByAccessKey, { accessKey });
     const submitRSVP = useMutation(api.public_rsvp.submit);
 
-    const [status, setStatus] = useState<string | null>(null);
+    const [status, setStatus] = useState<"attending" | "not_attending" | null>(null);
     const [responses, setResponses] = useState<any>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -165,7 +165,9 @@ export default function PublicRSVPPage() {
 
     useEffect(() => {
         if (data) {
-            if (data.currentStatus !== "pending") setStatus(data.currentStatus);
+            if (data.currentStatus === "attending" || data.currentStatus === "not_attending") {
+                setStatus(data.currentStatus);
+            }
             if (data.currentResponses) setResponses(data.currentResponses);
         }
     }, [data]);
@@ -207,7 +209,7 @@ export default function PublicRSVPPage() {
         return `https://calendar.google.com/calendar/render?${params.toString()}`;
     }, [data]);
 
-    const handleSubmit = async (chosenStatus: string) => {
+    const handleSubmit = async (chosenStatus: "attending" | "not_attending") => {
         setIsSubmitting(true);
         try {
             await submitRSVP({

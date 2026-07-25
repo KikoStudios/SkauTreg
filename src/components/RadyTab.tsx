@@ -215,7 +215,7 @@ function DeleteModal({ onClose, onConfirm, notebookTitle }: DeleteModalProps) {
                     Smazat notebook?
                 </h2>
                 <p style={{ margin: "0 0 2rem 0", color: "#666", lineHeight: 1.6 }}>
-                    Opravdu chcete smazat notebook <strong>"{notebookTitle}"</strong>? Tato akce je nevratná a smaže všechny stránky a soubory v tomto notebooku.
+                    Opravdu chcete smazat notebook <strong>&quot;{notebookTitle}&quot;</strong>? Tato akce je nevratná a smaže všechny stránky a soubory v tomto notebooku.
                 </p>
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
                     <button

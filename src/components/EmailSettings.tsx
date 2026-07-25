@@ -180,6 +180,7 @@ export default function EmailSettings({ troopId, isAuthorized }: EmailSettingsPr
         setIsTesting(true);
         try {
             const results = await testEmailConnection({
+                troopId,
                 provider: selectedProvider,
                 email: smtpEmail,
                 password: smtpPassword,

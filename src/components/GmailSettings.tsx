@@ -332,7 +332,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
             }}>
                 <div style={{ fontWeight: "900", color: "#1e3a8a", marginBottom: "0.5rem" }}>Jak funguje OAuth?</div>
                 <ol style={{ margin: 0, paddingLeft: "1.25rem", color: "#1e40af", fontWeight: "600", display: "grid", gap: "0.25rem" }}>
-                    <li>Klikněte na "Propojit s Gmailu"</li>
+                    <li>Klikněte na &quot;Propojit s Gmailem&quot;</li>
                     <li>Přihlaste se ke svému Google účtu</li>
                     <li>Udělte oprávnění pro odesílání e-mailů</li>
                     <li>Budete vráceni zpět sem</li>

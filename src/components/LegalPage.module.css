@@ -1,0 +1,26 @@
+.page { min-height: 100vh; background: #f5f5ef; color: #171717; }
+.header { padding: 1rem clamp(1rem, 4vw, 3rem); background: #fff; border-bottom: 2px solid #111; }
+.header a { color: inherit; font-weight: 900; text-decoration: none; }
+.layout { width: min(1120px, 100%); margin: 0 auto; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 2rem; padding: 2rem clamp(1rem, 4vw, 3rem) 4rem; }
+.toc { position: sticky; top: 1rem; align-self: start; max-height: calc(100vh - 2rem); overflow: auto; padding: 1rem; background: #fff; border: 2px solid #111; border-radius: 10px; }
+.toc strong { display: block; margin-bottom: .65rem; }
+.toc a { display: block; padding: .35rem 0; color: #3f4742; font-size: .86rem; text-decoration: none; }
+.toc a:hover, .toc a:focus-visible { color: #111; text-decoration: underline; outline: none; }
+.mobileToc { display: none; }
+.content { min-width: 0; }
+.content h1 { margin: 0 0 .4rem; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; }
+.lead { margin: 0 0 1rem; color: #555; }
+.review { margin: 1rem 0 1.5rem; padding: .75rem; background: #fff3bf; border: 2px solid #111; border-radius: 8px; }
+.section { margin: 0 0 1rem; padding: clamp(1rem, 3vw, 1.5rem); background: #fff; border: 2px solid #111; border-radius: 10px; box-shadow: 3px 3px 0 #111; scroll-margin-top: 1rem; }
+.section h2 { margin: 0 0 .65rem; font-size: 1.2rem; }
+.section p, .section li { line-height: 1.6; }
+.section ul { padding-left: 1.25rem; }
+.section a { overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .layout { display: block; padding-top: 1rem; }
+  .toc { display: none; }
+  .mobileToc { display: block; margin-bottom: 1rem; background: #fff; border: 2px solid #111; border-radius: 8px; }
+  .mobileToc summary { padding: .8rem; font-weight: 900; cursor: pointer; }
+  .mobileToc nav { padding: 0 .8rem .8rem; }
+  .mobileToc a { display: block; padding: .45rem 0; color: inherit; }
+}

@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { useFeedback } from "../../context/FeedbackContext";
+import FeatureGate from "../FeatureGate";
 
 type FinanceTabProps = { tripId: Id<"trips"> };
 type BudgetCategory = "transport" | "food" | "accommodation" | "materials" | "other";
@@ -264,6 +265,7 @@ export default function FinanceTab({ tripId }: FinanceTabProps) {
     };
 
     return (
+      <FeatureGate feature="finance">
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "1rem" }}>
                 {[
@@ -591,6 +593,7 @@ export default function FinanceTab({ tripId }: FinanceTabProps) {
                 </div>
             </div>
         </div>
+      </FeatureGate>
     );
 }
 

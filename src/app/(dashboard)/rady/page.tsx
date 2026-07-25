@@ -2,6 +2,7 @@
 
 import RadyTab from "../../../components/RadyTab";
 import Breadcrumbs from "../../../components/Breadcrumbs";
+import FeatureGate from "../../../components/FeatureGate";
 
 export default function RadyPage() {
     return (
@@ -12,7 +13,7 @@ export default function RadyPage() {
             </div>
 
             <div className="dashboardContent">
-                <RadyTab />
+                <FeatureGate feature="collaborativeMeetings"><RadyTab /></FeatureGate>
             </div>
         </div>
     );

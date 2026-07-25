@@ -64,10 +64,10 @@ export default function HomePage() {
         </header>
 
         <main className={styles.hero}>
-          <div className={styles.heroTitle}>
+          <h1 className={styles.heroTitle}>
             <img className={styles.hand} src="/illustrations/hand-wawy.png" alt="" />
             <span className={styles.ahoj}>Ahoj</span>
-          </div>
+          </h1>
           <div className={styles.heroSubtitle}>vítej ve skautregu pro středisko</div>
 
           <div className={styles.heroName}>{strediskoName}</div>

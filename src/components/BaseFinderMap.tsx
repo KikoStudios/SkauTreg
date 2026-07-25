@@ -4,7 +4,7 @@ import React from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 // Calculate icon size based on zoom level
@@ -169,10 +169,9 @@ export default function BaseFinderMap({ bases, selectedBaseId, onBaseSelect, sta
     const mapyApiKey = process.env.NEXT_PUBLIC_MAPY_API_KEY || "";
     const selectedBase = bases.find(b => b.id === selectedBaseId);
 
-    const selectedLocation = useMemo<[number, number] | null>(() => {
-        if (!selectedBase) return null;
-        return [selectedBase.lat, selectedBase.lng];
-    }, [selectedBase?.lat, selectedBase?.lng]);
+    const selectedLocation: [number, number] | null = selectedBase
+        ? [selectedBase.lat, selectedBase.lng]
+        : null;
 
     const center: [number, number] = selectedLocation ?? DEFAULT_CENTER;
 

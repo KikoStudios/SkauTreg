@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { useFeedback } from "../../context/FeedbackContext";
 import styles from "./DopravaTicketPage.module.css";
+import FeatureGate from "../FeatureGate";
 
 type Direction = "outbound" | "return" | "unknown";
 
@@ -268,6 +269,7 @@ export default function DopravaTicketPage(props: {
         try {
           const fd = new FormData();
           fd.append("file", file);
+          fd.append("tripId", props.tripId);
           const parseRes = await fetch("/api/tickets/parse", { method: "POST", body: fd });
           if (parseRes.ok) {
             const j: unknown = await parseRes.json();
@@ -279,7 +281,7 @@ export default function DopravaTicketPage(props: {
           // ignore
         }
 
-        const uploadUrl = await generateUploadUrl();
+        const uploadUrl = await generateUploadUrl({ tripId });
         const upRes = await fetch(uploadUrl, {
           method: "POST",
           headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -319,6 +321,7 @@ export default function DopravaTicketPage(props: {
       const blob = await source.blob();
       const form = new FormData();
       form.append("file", blob, ticket.name);
+      form.append("tripId", props.tripId);
       const response = await fetch("/api/tickets/parse", { method: "POST", body: form });
       if (!response.ok) throw new Error("Jízdenku se nepodařilo znovu přečíst.");
       const payload = await response.json() as { parsed?: unknown };
@@ -389,6 +392,7 @@ export default function DopravaTicketPage(props: {
   ];
 
   return (
+    <FeatureGate feature="transportTickets">
     <div className={styles.page}>
       {routeCards.map(({ dir, route }) => {
         if (!route) {
@@ -850,5 +854,6 @@ export default function DopravaTicketPage(props: {
         </div>
       )}
     </div>
+    </FeatureGate>
   );
 }

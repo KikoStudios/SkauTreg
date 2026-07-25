@@ -6,6 +6,7 @@ import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
 import RadyTab from "../../../../../components/RadyTab";
 import TroopWorkspaceHeader from "../../../../../components/TroopWorkspaceHeader";
+import FeatureGate from "../../../../../components/FeatureGate";
 import styles from "./MeetingsPage.module.css";
 
 export default function MeetingsPage() {
@@ -19,7 +20,7 @@ export default function MeetingsPage() {
     <div className={styles.page}>
       <TroopWorkspaceHeader troopId={troopId} troopName={troop.name} current="meetings" title="Rady a zápisy" description="Jedno místo pro porady, dokumentaci výprav a navazující rozhodnutí." note="Dokumentaci spojenou s konkrétní výpravou najdete také přímo v jejím pracovním prostoru. Samostatné rady používejte pro oddílová témata." />
       <section className={styles.content}>
-        <RadyTab troopId={troopId} />
+        <FeatureGate feature="collaborativeMeetings"><RadyTab troopId={troopId} /></FeatureGate>
       </section>
     </div>
   );

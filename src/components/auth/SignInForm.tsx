@@ -104,9 +104,9 @@ export default function SignInForm() {
             </form>
 
             <div className={styles.footer}>
-                Don't have an account?{" "}
+                Nemáte účet?{" "}
                 <Link href="/sign-up" className={styles.link}>
-                    Sign up
+                    Zaregistrovat se
                 </Link>
             </div>
         </div>

@@ -5,6 +5,7 @@ import { ConvexClientProvider } from "./ConvexClientProvider";
 import { FeedbackProvider } from "../context/FeedbackContext";
 import ErrorModal from "../components/ErrorModal";
 import SuccessModal from "../components/SuccessModal";
+import AnalyticsConsent from "../components/AnalyticsConsent";
 
 export const metadata: Metadata = {
   title: "SkauTreg - Správa skautských středisek s mailovým systémem",
@@ -32,6 +33,7 @@ export default function RootLayout({
             {children}
             <ErrorModal />
             <SuccessModal />
+            <AnalyticsConsent />
           </FeedbackProvider>
         </ConvexClientProvider>
       </body>

@@ -3,11 +3,11 @@
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useEffect, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useFeedback } from "@/context/FeedbackContext";
 import Image from "next/image";
+import Link from "next/link";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -434,24 +434,7 @@ export default function MembersPage() {
                     return fields;
                 }).filter(row => row.some(cell => cell.length > 0));
             } else {
-                // Excel: Use XLSX library
-                const buffer = await file.arrayBuffer();
-                const workbook = XLSX.read(buffer, { type: "array" });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                
-                // Force all cells to be read as text to prevent date/number conversion
-                for (const cellRef in sheet) {
-                    if (cellRef !== "!ref" && cellRef !== "!margins") {
-                        const cell = sheet[cellRef];
-                        if (cell && typeof cell.v !== 'string') {
-                            cell.t = 's'; // Force string type
-                            cell.v = String(cell.v);
-                        }
-                    }
-                }
-                
-                rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }) as string[][];
+                throw new Error("Unsupported spreadsheet format");
             }
 
             if (!rows || rows.length === 0) {
@@ -484,7 +467,7 @@ export default function MembersPage() {
             setShowImportModal(true);
         } catch (e) {
             console.error("Import parse failed:", e);
-            setImportError("Soubor se nepodařilo načíst. Zkontrolujte, že jde o CSV nebo XLSX.");
+            setImportError("Soubor se nepodařilo načíst. Použijte bezpečný CSV export.");
         } finally {
             if (importFileInputRef.current) {
                 importFileInputRef.current.value = "";
@@ -615,7 +598,7 @@ export default function MembersPage() {
         return (
             <div style={{ textAlign: "center", padding: "2rem" }}>
                 <p>Nejdříve si musíte vytvořit oddíl.</p>
-                <a href="/troop" style={{ color: "blue", textDecoration: "underline" }}>Přejít na Můj Oddíl</a>
+                <Link href="/troop" style={{ color: "blue", textDecoration: "underline" }}>Přejít na Můj Oddíl</Link>
             </div>
         );
     }
@@ -683,7 +666,7 @@ export default function MembersPage() {
                 <details className="import-menu">
                     <summary>Importovat</summary>
                     <div className="import-menu-popover">
-                        <button onClick={() => importFileInputRef.current?.click()}>CSV nebo Excel</button>
+                        <button onClick={() => importFileInputRef.current?.click()}>CSV</button>
                         <button onClick={() => googleGroupsFileInputRef.current?.click()}>Google Groups CSV</button>
                     </div>
                 </details>
@@ -691,7 +674,7 @@ export default function MembersPage() {
                 <input
                     ref={importFileInputRef}
                     type="file"
-                    accept=".csv,.xlsx,.xls"
+                    accept=".csv,text/csv"
                     style={{ display: "none" }}
                     onChange={(e) => handleImportFileChange(e.target.files)}
                 />

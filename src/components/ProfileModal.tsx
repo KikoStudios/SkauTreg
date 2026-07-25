@@ -9,10 +9,12 @@ import {
     ChevronRight,
     CircleUserRound,
     ContactRound,
+    Download,
     LogOut,
     Save,
     UserRound,
     UsersRound,
+    UserX,
     X,
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
@@ -59,7 +61,11 @@ export default function ProfileModal() {
     const { user } = useUser();
     const { signOut } = useClerk();
     const profile = useQuery(api.users.profileOverview, {});
+    const exportData = useQuery(api.users.exportMyData, {});
+    const deletionRequests = useQuery(api.dataRequests.listMine, {});
     const updateViewer = useMutation(api.users.update);
+    const requestDeletion = useMutation(api.dataRequests.requestDeletion);
+    const cancelDeletion = useMutation(api.dataRequests.cancelMine);
     const { showError, showSuccess } = useFeedback();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +94,32 @@ export default function ProfileModal() {
     const viewer = profile?.user;
     const roles = profile?.roles || [];
     const usernameChanged = Boolean(user && username !== (user.username || ""));
+    const activeDeletionRequest = deletionRequests?.find((request) =>
+        ["requested", "in_review", "blocked", "approved"].includes(request.status)
+    );
+
+    const downloadExport = () => {
+        if (!exportData) return;
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `skautreg-export-${new Date().toISOString().slice(0, 10)}.json`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleDeletionRequest = async () => {
+        try {
+            await requestDeletion({});
+            showSuccess({
+                title: "Žádost byla uložena",
+                message: "Smazání účtu probíhá kontrolovaným procesem bez odstranění dat oddílu.",
+            });
+        } catch (error) {
+            showError({ title: "Žádost se nepodařila", message: getErrorMessage(error, "Zkuste to znovu.") });
+        }
+    };
 
     const resetForm = useCallback(() => {
         setFirstName(user?.firstName || "");
@@ -280,8 +312,22 @@ export default function ProfileModal() {
                                 </Field>
                                 <Field label="Přihlašovací e-mail"><input className={styles.input} value={user?.primaryEmailAddress?.emailAddress || ""} disabled /></Field>
                                 {usernameChanged && <Field label="Potvrďte heslem" wide><input className={styles.input} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /></Field>}
-                                </div>
-                            </section>
+                                 </div>
+                                 <div className={styles.dataRights}>
+                                     <div><strong>Moje data</strong><span>Export obsahuje pouze údaje svázané s vaším účtem.</span></div>
+                                     <button type="button" className={styles.secondaryButton} onClick={downloadExport} disabled={!exportData}><Download size={16} /> Exportovat JSON</button>
+                                     {activeDeletionRequest ? (
+                                         <>
+                                             <p>Stav žádosti: <strong>{activeDeletionRequest.status}</strong>{activeDeletionRequest.ownershipBlockers?.length ? " — nejprve převeďte vlastnictví oddílu." : ""}</p>
+                                             {["requested", "in_review", "blocked"].includes(activeDeletionRequest.status) && (
+                                                 <button type="button" className={styles.secondaryButton} onClick={() => cancelDeletion({ requestId: activeDeletionRequest._id })}>Zrušit žádost</button>
+                                             )}
+                                         </>
+                                     ) : (
+                                         <button type="button" className={styles.dangerButton} onClick={handleDeletionRequest}><UserX size={16} /> Požádat o smazání účtu</button>
+                                     )}
+                                 </div>
+                             </section>
                         ) : activeSection === "personal" ? (
                             <section className={styles.section}>
                                 <SectionHeading title="Osobní údaje" />

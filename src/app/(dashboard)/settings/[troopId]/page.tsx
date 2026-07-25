@@ -83,7 +83,9 @@ export default function TroopSettingsPage() {
     const troopId = params.troopId as Id<"troops">;
 
     const troop = useQuery(api.troops.getById, { id: troopId });
+    const myRole = useQuery(api.troops.getMyRole, { troopId });
     const updateTroop = useMutation(api.troops.update);
+    const setPublicDirectoryOptIn = useMutation(api.troops.setPublicDirectoryOptIn);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
     const deleteTroop = useMutation(api.troops.deleteTroop);
 
@@ -235,6 +237,26 @@ export default function TroopSettingsPage() {
                                 required
                             />
                         </div>
+                        {myRole === "owner" && (
+                            <div style={{ ...formGroupStyle, padding: "1rem", border: "2px solid #111", borderRadius: "10px", background: "#f8fafc" }}>
+                                <label style={{ ...labelStyle, display: "flex", alignItems: "center", gap: ".65rem" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={troop.publicDirectoryOptIn === true}
+                                        onChange={(event) => setPublicDirectoryOptIn({ troopId, enabled: event.target.checked })}
+                                    />
+                                    Zobrazit oddíl ve veřejném adresáři
+                                </label>
+                                <span style={{ fontSize: ".78rem", color: "#555" }}>
+                                    Veřejně se zobrazí pouze název a logo. Číslo, typ, kontakty ani vedení se nezveřejňují.
+                                </span>
+                                {troop.publicDirectoryOptIn && (
+                                    <div style={{ marginTop: ".65rem", fontWeight: 800 }}>
+                                        Náhled: {troop.logo ? "logo · " : ""}{troop.name}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem" }}>
                             <div style={formGroupStyle}>
                                 <label style={labelStyle}>Číslo</label>
