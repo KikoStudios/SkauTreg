@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_CONVEX_URL: https://example.convex.cloud
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_ci_placeholder
+      CLERK_SECRET_KEY: sk_live_ci_placeholder
+      CREDENTIAL_ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      ANALYTICS_ID_SECRET: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      OAUTH_STATE_SECRET: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      NEXT_PUBLIC_LEGAL_OPERATOR_NAME: CI Operator
+      NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS: CI Address 1
+      NEXT_PUBLIC_PRIVACY_EMAIL: privacy@example.com
+      NEXT_PUBLIC_SECURITY_EMAIL: security@example.com
+      NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE: 2026-07-25
+      NEXT_PUBLIC_FEATURE_FINANCE: beta
+      NEXT_PUBLIC_FEATURE_TRANSPORT_TICKETS: beta
+      NEXT_PUBLIC_FEATURE_COLLABORATIVE_MEETINGS: beta
+      NEXT_PUBLIC_FEATURE_FEEDBACK_HUB: beta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run audit:prod

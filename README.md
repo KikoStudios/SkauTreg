@@ -1,82 +1,51 @@
 # SkauTreg
 
-SkauTreg je moderní aplikace pro správu skautských oddílů. Cílem je usnadnit vedoucím každodenní agendu: správu členů, plánování výprav, docházku, registrace a týmovou komunikaci.
+SkauTreg je aplikace pro správu skautských oddílů postavená na Next.js, Convexu a Clerku. Obsahuje správu členů a výprav, RSVP, schůzky, dopravu, finance a integrační nástroje.
 
-## Language Variants
+## Stav funkcí
 
-- Czech: `README.cs.md`
-- English: `README.en.md`
+- Stabilní: autentizace, dashboard, členové, oddíly, výpravy, kalendář, RSVP a nastavení.
+- Beta: finance, sdílení dopravních dokladů, kolaborativní schůzky a centrum zpětné vazby.
+- Beta funkce se řídí proměnnými `FEATURE_*_STAGE` s hodnotou `off`, `beta` nebo `stable`.
 
-## Hlavní funkce
+## Lokální spuštění
 
-### Hotovo
-- [x] Autentifikace (Clerk)
-- [x] Dashboard
-- [x] Správa členů
-- [x] Správa oddílu
-- [x] Výpravy
-- [x] Kalendář
-- [x] RSVP systém (veřejné odkazy)
-- [x] Nastavení
-- [x] Integrace s databází základen
-- [x] Integrace s IDOS
-- [x] Mailing (propojení s Google Mail)
-- [x] Rada management (zápisy z rad)
-
-### Plánováno
-- [ ] Management financí
-- [ ] Kontrola návratnosti výpravy vůči dotacím
-- [ ] Účtenky k výpravám
-- [ ] Fotky/alba po výpravě
-- [ ] Evidence plateb účastníků
-- [ ] Git kontrola změn od roverů (schválení vedoucím)
-
-### Backend roadmap
-- [ ] Clerk self-host alternativa (SuperTokens nebo ConvexAuth)
-- [ ] Browserless self-host
-
-## Technologie
-
-SkauTreg je navržen jako serverless aplikace.
-
-- **Next.js**: frontend
-- **Convex**: backend a realtime databáze
-- **Clerk**: autentifikace a správa uživatelů
-- **Browserless**: automatizace iDOS integrace (výhledově self-host)
-
-## Rychlý start
-
-1. Nainstalujte závislosti:
-   ```bash
-   npm install
-   ```
-2. Připravte prostředí:
-   - vytvořte `.env.local`
-   - doplňte proměnné podle `.env.example`
-3. Spusťte frontend:
-   ```bash
-   npm run dev
-   ```
-4. V druhém terminálu spusťte Convex:
-   ```bash
-   npx convex dev
-   ```
+1. Nainstalujte závislosti: `npm install`.
+2. Zkopírujte `.env.example` do `.env.local` a doplňte lokální hodnoty.
+3. Spusťte `npx convex dev`.
+4. V druhém terminálu spusťte `npm run dev`.
 5. Otevřete `http://localhost:3000`.
+
+## Kontroly před vydáním
+
+```bash
+npm run typecheck
+npm run lint -- --quiet
+npm test
+npm run test:e2e
+npm run audit:prod
+npm run build
+```
+
+Produkční build vyžaduje úplné právní, bezpečnostní a feature-stage proměnné popsané v `.env.example`. Testovací Clerk klíče, placeholder právní údaje, localhost callbacky a chybějící šifrovací klíč jsou v produkci odmítnuty.
+
+## Bezpečné nasazení
+
+- Nejdříve exportujte produkční Convex data a ověřte počet tabulek a checksum.
+- Schéma a migrace nasazujte nejprve do stagingu.
+- Migrace `003_secure_capabilities` a `004_encrypt_credentials` nejsou automatické; spouští je operátor po záloze a ověření počtů.
+- `npm run deploy:convex` je explicitní produkční příkaz. Nespouští se jako součást buildu ani CI.
+- Aplikační kód lze vrátit zpět; přidaná pole schématu se při rollbacku nemažou.
 
 ## Dokumentace
 
 - Dokumentační rozcestník: `docs/README.md`
-- Testování (CZ): `docs/testing/testing-guide.cs.md`
-- Testování (EN): `docs/testing/testing-guide.en.md`
-- Deployment: `docs/developer/deployment.md`
-- Uživatelská nápověda: `docs/user/getting-started.md`
-- Developer setup: `docs/developer/setup.md`
+- Vývojové prostředí: `docs/developer/setup.md`
+- Nasazení: `docs/developer/deployment.md`
 - Testování: `docs/testing/testing-guide.md`
 
-## Kontribuce
+Právní text na `/privacy` a `/tos` musí před produkčním vydáním schválit odpovědná osoba nebo právník.
 
-1. Forkněte repozitář.
-2. Vytvořte feature branch.
-3. Proveďte změny a otestujte je.
-4. Otevřete Pull Request.
-5. Chyby a nápady hlaste přes Issues.
+## Licence
+
+Projekt je licencován pod licencí MIT. Viz `LICENSE`.
