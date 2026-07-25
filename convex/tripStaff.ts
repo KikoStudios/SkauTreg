@@ -1,9 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireTripLeader, requireTripViewer } from "./lib/auth";
 
 export const listByTrip = query({
   args: { tripId: v.id("trips") },
   handler: async (ctx, args) => {
+    await requireTripViewer(ctx, args.tripId);
     const rows = await ctx.db
       .query("trip_staff")
       .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -27,6 +29,7 @@ export const addUser = mutation({
     role: v.string(),
   },
   handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
     const trip = await ctx.db.get(args.tripId);
     if (!trip) throw new Error("Trip not found");
 
@@ -61,6 +64,7 @@ export const addExternal = mutation({
     saveAsPreset: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
     const trip = await ctx.db.get(args.tripId);
     if (!trip) throw new Error("Trip not found");
 
@@ -112,11 +116,15 @@ export const addExternal = mutation({
 export const addFromPreset = mutation({
   args: { tripId: v.id("trips"), presetId: v.id("leader_presets") },
   handler: async (ctx, args) => {
+    const authorization = await requireTripLeader(ctx, args.tripId);
     const trip = await ctx.db.get(args.tripId);
     if (!trip) throw new Error("Trip not found");
 
     const preset = await ctx.db.get(args.presetId);
     if (!preset) throw new Error("Preset not found");
+    if (preset.troopId !== authorization.trip.troopId) {
+      throw new Error("Preset does not belong to this troop");
+    }
 
     const existing = await ctx.db
       .query("trip_staff")
@@ -148,6 +156,9 @@ export const addFromPreset = mutation({
 export const remove = mutation({
   args: { tripStaffId: v.id("trip_staff") },
   handler: async (ctx, args) => {
+    const staff = await ctx.db.get(args.tripStaffId);
+    if (!staff) return;
+    await requireTripLeader(ctx, staff.tripId);
     await ctx.db.delete(args.tripStaffId);
   },
 });

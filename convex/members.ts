@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { normalizeMemberContactFields } from "./lib/memberEmails";
+import { requireTroopEditor, requireTroopViewer } from "./lib/auth";
+import { generateSecureToken } from "./lib/tokens";
 
 export const create = mutation({
     args: {
@@ -17,6 +19,7 @@ export const create = mutation({
         address: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        await requireTroopEditor(ctx, args.troopId);
         const memberId = await ctx.db.insert("members", {
             troopId: args.troopId,
             name: args.name,
@@ -37,12 +40,13 @@ export const create = mutation({
             .collect();
 
         for (const trip of trips) {
-            const accessKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const accessKey = generateSecureToken();
             await ctx.db.insert("participations", {
                 tripId: trip._id,
                 memberId,
                 status: "pending",
                 accessKey,
+                secureAccessKey: accessKey,
                 responses: {},
             });
         }
@@ -54,6 +58,7 @@ export const create = mutation({
 export const list = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.troopId);
         const members = await ctx.db
             .query("members")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
@@ -80,6 +85,9 @@ export const update = mutation({
     },
     handler: async (ctx, args) => {
         const { id, ...fields } = args;
+        const member = await ctx.db.get(id);
+        if (!member) throw new Error("Member not found");
+        await requireTroopEditor(ctx, member.troopId);
         await ctx.db.patch(id, fields);
     },
 });
@@ -87,6 +95,9 @@ export const update = mutation({
 export const remove = mutation({
     args: { id: v.id("members") },
     handler: async (ctx, args) => {
+        const member = await ctx.db.get(args.id);
+        if (!member) return;
+        await requireTroopEditor(ctx, member.troopId);
         await ctx.db.delete(args.id);
     },
 });

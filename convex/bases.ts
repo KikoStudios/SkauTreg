@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { requireDataAdmin } from "./lib/auth";
 import { v } from "convex/values";
 
 const baseInput = v.object({
@@ -164,6 +165,7 @@ export const upsertBaseWithStations = mutation({
     stations: v.array(stationInput),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     // Upsert base by zakladnyId
     const existingBase = await ctx.db
       .query("bases")
@@ -332,6 +334,7 @@ export const updateStationCoordinates = mutation({
     lng: v.number(),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     const station = await ctx.db.get(args.stationId);
     if (!station) {
       throw new Error("Station not found");
@@ -363,6 +366,7 @@ export const updateBaseStationCoordinates = mutation({
     lng: v.number(),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     const baseStation = await ctx.db.get(args.baseStationId);
     if (!baseStation) {
       throw new Error("Base station not found");
@@ -451,6 +455,7 @@ export const updateBaseDetails = mutation({
     }),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     const base = await ctx.db.get(args.baseId);
     if (!base) {
       throw new Error("Base not found");
@@ -465,6 +470,7 @@ export const updateBaseDetails = mutation({
 export const upsertBase = mutation({
   args: { base: baseInput },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     const existingBase = await ctx.db
       .query("bases")
       .withIndex("by_zakladny_id", (q) => q.eq("zakladnyId", args.base.zakladnyId))
@@ -495,6 +501,7 @@ export const upsertStation = mutation({
     }),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     const existingStation = await ctx.db
       .query("stations")
       .withIndex("by_osm_id", (q) => q.eq("osmId", args.station.osmId))
@@ -524,6 +531,7 @@ export const linkBaseToStation = mutation({
     transportModes: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    await requireDataAdmin(ctx);
     // Check if link already exists
     const existing = await ctx.db
       .query("base_stations")

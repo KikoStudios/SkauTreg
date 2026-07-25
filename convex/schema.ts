@@ -38,6 +38,7 @@ export default defineSchema({
         accentColor: v.optional(v.string()), // Hex code (pastel preferred)
         contactEmail: v.optional(v.string()),
         infoEmail: v.optional(v.string()),
+        publicDirectoryOptIn: v.optional(v.boolean()),
         
         // Email provider integration (OAuth or SMTP)
         emailProvider: v.optional(v.object({
@@ -59,6 +60,7 @@ export default defineSchema({
             // Metadata
             connectedAt: v.string(), // ISO timestamp
             connectedBy: v.id("users"), // User who connected
+            requiresReconnect: v.optional(v.boolean()),
         })),
         
         // Legacy Gmail OAuth (deprecated, keeping for backward compatibility)
@@ -196,6 +198,7 @@ export default defineSchema({
         shareEnabled: v.optional(v.boolean()),
         shareSlug: v.optional(v.string()),
         shareUpdatedAt: v.optional(v.string()),
+        shareExpiresAt: v.optional(v.string()),
         priceOverview: v.optional(v.object({
             // v2 (preferred): unit prices + counts
             kidUnitCzk: v.optional(v.number()),
@@ -221,12 +224,15 @@ export default defineSchema({
         memberId: v.id("members"),
         status: v.string(), // "attending", "not_attending", "pending"
         accessKey: v.string(), // unique random key for public link
+        secureAccessKey: v.optional(v.string()),
+        legacyAccessExpiresAt: v.optional(v.string()),
         responses: v.optional(v.any()), // flexible JSON for form answers
         lateCancellation: v.optional(v.boolean()),
         lateCancellationAt: v.optional(v.string()),
     })
         .index("by_trip", ["tripId"])
-        .index("by_access_key", ["accessKey"]),
+        .index("by_access_key", ["accessKey"])
+        .index("by_secure_access_key", ["secureAccessKey"]),
 
     trip_staff: defineTable({
         tripId: v.id("trips"),
@@ -504,6 +510,7 @@ export default defineSchema({
         updatedAt: v.string(), // ISO timestamp
         testStatus: v.optional(v.string()), // "pending", "success", "failed"
         testError: v.optional(v.string()), // Error message if test failed
+        requiresReconnect: v.optional(v.boolean()),
     })
         .index("by_troop", ["troopId"])
         .index("by_service", ["troopId", "serviceType"]),
@@ -594,5 +601,32 @@ export default defineSchema({
         dismissedVersions: v.optional(v.array(v.string())), // Versions user explicitly dismissed
     })
         .index("by_user", ["userId"]),
+
+    data_requests: defineTable({
+        userId: v.id("users"),
+        requestType: v.literal("deletion"),
+        status: v.union(
+            v.literal("requested"),
+            v.literal("in_review"),
+            v.literal("blocked"),
+            v.literal("approved"),
+            v.literal("completed"),
+            v.literal("cancelled"),
+            v.literal("rejected")
+        ),
+        requestedAt: v.string(),
+        updatedAt: v.string(),
+        completedAt: v.optional(v.string()),
+        ownershipBlockers: v.optional(v.array(v.id("troops"))),
+        resolutionNote: v.optional(v.string()),
+    })
+        .index("by_user", ["userId"])
+        .index("by_status", ["status"]),
+
+    rate_limits: defineTable({
+        key: v.string(),
+        windowStartedAt: v.number(),
+        count: v.number(),
+    }).index("by_key", ["key"]),
 
 });

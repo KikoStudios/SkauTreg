@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
 import { getMemberEmailTargets, normalizeMemberContactFields } from "./lib/memberEmails";
+import { requireTripLeader, requireTroopEditor, requireTroopManager } from "./lib/auth";
 
 // Create a new email draft for a trip
 export const create = mutation({
@@ -11,20 +11,7 @@ export const create = mutation({
         body: v.string(),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro vytvoření konceptu.");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen. Zkuste se odhlásit a přihlásit znovu.");
-
-        const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("🚗 Výprava nebyla nalezena. Zkuste načíst stránku znovu.");
+        const { user } = await requireTripLeader(ctx, args.tripId);
 
         const now = new Date().toISOString();
 
@@ -50,11 +37,9 @@ export const update = mutation({
         body: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro úpravu konceptu.");
-
         const draft = await ctx.db.get(args.id);
         if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná byl smazán.");
+        await requireTripLeader(ctx, draft.tripId);
 
         if (draft.status === "sent") {
             throw new Error("📨 Nelze upravit již odeslaný e-mail. Vytvořte nový koncept.");
@@ -74,6 +59,7 @@ export const remove = mutation({
     handler: async (ctx, args) => {
         const draft = await ctx.db.get(args.id);
         if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná již byl smazán.");
+        await requireTripLeader(ctx, draft.tripId);
 
         await ctx.db.delete(args.id);
     },
@@ -83,6 +69,7 @@ export const remove = mutation({
 export const listByTrip = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const drafts = await ctx.db
             .query("email_drafts")
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -111,6 +98,7 @@ export const getById = query({
     handler: async (ctx, args) => {
         const draft = await ctx.db.get(args.id);
         if (!draft) return null;
+        await requireTripLeader(ctx, draft.tripId);
 
         const creator = await ctx.db.get(draft.createdBy);
         const sender = draft.sentBy ? await ctx.db.get(draft.sentBy) : null;
@@ -130,17 +118,10 @@ export const markAsSent = mutation({
         recipientCount: v.number(),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro označení konceptu jako odeslaného.");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen.");
+        const draft = await ctx.db.get(args.id);
+        if (!draft) throw new Error("Koncept nebyl nalezen.");
+        const { user, troop } = await requireTripLeader(ctx, draft.tripId);
+        await requireTroopManager(ctx, troop._id);
 
         await ctx.db.patch(args.id, {
             status: "sent",
@@ -155,8 +136,7 @@ export const markAsSent = mutation({
 export const getRecipients = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
-        const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("🚗 Výprava nebyla nalezena.");
+        await requireTripLeader(ctx, args.tripId);
 
         const participations = await ctx.db
             .query("participations")
@@ -178,7 +158,7 @@ export const getRecipients = query({
                     email: emails[0],
                     emails,
                     contacts,
-                    accessKey: p.accessKey,
+                    accessKey: p.secureAccessKey || p.accessKey,
                     hasEmail: emails.length > 0,
                     participationStatus: p.status,
                     responses: p.responses,
@@ -199,6 +179,7 @@ export const getRecipients = query({
 export const listSentByTroop = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopEditor(ctx, args.troopId);
         const trips = await ctx.db
             .query("trips")
             .filter((q) => q.eq(q.field("troopId"), args.troopId))

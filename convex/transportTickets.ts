@@ -1,35 +1,15 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import { requireTripLeader, requireTripViewer } from "./lib/auth";
+import { generateSecureToken } from "./lib/tokens";
 
-const SHARE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-function getRandomBytes(length: number): Uint8Array {
-  const bytes = new Uint8Array(length);
-  const c = (globalThis as unknown as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } }).crypto;
-  if (c?.getRandomValues) {
-    c.getRandomValues(bytes);
-    return bytes;
-  }
-
-  // Fallback (should not happen in Convex runtime): not cryptographically secure.
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = Math.floor(Math.random() * 256);
-  }
-  return bytes;
-}
-
-function generateShareSlug(): string {
-  const bytes = getRandomBytes(8);
-  const chars = Array.from(bytes, (b) => SHARE_ALPHABET[b % SHARE_ALPHABET.length]);
-  return `${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}`;
-}
-
-async function generateUniqueShareSlug(ctx: any): Promise<string> {
+async function generateUniqueShareSlug(ctx: MutationCtx): Promise<string> {
   for (let i = 0; i < 15; i++) {
-    const slug = generateShareSlug();
+    const slug = generateSecureToken();
     const existing = await ctx.db
       .query("transport_tickets")
-      .withIndex("by_share_slug", (q: any) => q.eq("shareSlug", slug))
+      .withIndex("by_share_slug", (q) => q.eq("shareSlug", slug))
       .first();
     if (!existing) return slug;
   }
@@ -37,7 +17,9 @@ async function generateUniqueShareSlug(ctx: any): Promise<string> {
 }
 
 export const generateUploadUrl = mutation({
-  handler: async (ctx) => {
+  args: { tripId: v.id("trips") },
+  handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -45,6 +27,7 @@ export const generateUploadUrl = mutation({
 export const listByTrip = query({
   args: { tripId: v.id("trips") },
   handler: async (ctx, args) => {
+    await requireTripViewer(ctx, args.tripId);
     const files = await ctx.db
       .query("transport_tickets")
       .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -62,6 +45,9 @@ export const listByTrip = query({
 export const listByRoute = query({
   args: { routeId: v.id("transport_routes") },
   handler: async (ctx, args) => {
+    const route = await ctx.db.get(args.routeId);
+    if (!route) return [];
+    await requireTripViewer(ctx, route.tripId);
     const files = await ctx.db
       .query("transport_tickets")
       .withIndex("by_route", (q) => q.eq("routeId", args.routeId))
@@ -86,10 +72,12 @@ export const upload = mutation({
     parsed: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
+    if (args.routeId) {
+      const route = await ctx.db.get(args.routeId);
+      if (!route || route.tripId !== args.tripId) throw new Error("Route does not belong to this trip");
+    }
     const now = new Date().toISOString();
-    // Sharing is enabled by default so the QR is immediately available.
-    const shareSlug = await generateUniqueShareSlug(ctx);
-
     return await ctx.db.insert("transport_tickets", {
       tripId: args.tripId,
       routeId: args.routeId,
@@ -97,8 +85,7 @@ export const upload = mutation({
       name: args.name,
       contentType: args.contentType,
       parsed: args.parsed,
-      shareEnabled: true,
-      shareSlug,
+      shareEnabled: false,
       shareUpdatedAt: now,
       createdAt: now,
       updatedAt: now,
@@ -107,16 +94,21 @@ export const upload = mutation({
 });
 
 export const enableShare = mutation({
-  args: { ticketId: v.id("transport_tickets") },
+  args: {
+    ticketId: v.id("transport_tickets"),
+    expiresAt: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
+    const { trip } = await requireTripLeader(ctx, ticket.tripId);
 
     const shareSlug = ticket.shareSlug || (await generateUniqueShareSlug(ctx));
     await ctx.db.patch(args.ticketId, {
       shareEnabled: true,
       shareSlug,
+      shareExpiresAt: args.expiresAt ?? trip.endDate ?? trip.startDate,
       shareUpdatedAt: now,
       updatedAt: now,
     });
@@ -130,22 +122,28 @@ export const disableShare = mutation({
     const now = new Date().toISOString();
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
+    await requireTripLeader(ctx, ticket.tripId);
     await ctx.db.patch(args.ticketId, { shareEnabled: false, updatedAt: now });
     return { ok: true };
   },
 });
 
 export const regenerateShareSlug = mutation({
-  args: { ticketId: v.id("transport_tickets") },
+  args: {
+    ticketId: v.id("transport_tickets"),
+    expiresAt: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
+    const { trip } = await requireTripLeader(ctx, ticket.tripId);
 
     const shareSlug = await generateUniqueShareSlug(ctx);
     await ctx.db.patch(args.ticketId, {
       shareEnabled: true,
       shareSlug,
+      shareExpiresAt: args.expiresAt ?? ticket.shareExpiresAt ?? trip.endDate ?? trip.startDate,
       shareUpdatedAt: now,
       updatedAt: now,
     });
@@ -167,6 +165,7 @@ export const updatePriceOverview = mutation({
     const now = new Date().toISOString();
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
+    await requireTripLeader(ctx, ticket.tripId);
 
     await ctx.db.patch(args.ticketId, {
       priceOverview: {
@@ -183,6 +182,14 @@ export const updatePriceOverview = mutation({
   },
 });
 
+export const authorizeParsing = query({
+  args: { tripId: v.id("trips") },
+  handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
+    return true;
+  },
+});
+
 export const updateParsed = mutation({
   args: {
     ticketId: v.id("transport_tickets"),
@@ -191,6 +198,7 @@ export const updateParsed = mutation({
   handler: async (ctx, args) => {
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
+    await requireTripLeader(ctx, ticket.tripId);
     await ctx.db.patch(args.ticketId, {
       parsed: args.parsed,
       updatedAt: new Date().toISOString(),
@@ -204,6 +212,7 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const ticket = await ctx.db.get(args.ticketId);
     if (!ticket) return;
+    await requireTripLeader(ctx, ticket.tripId);
     await ctx.storage.delete(ticket.storageId);
     await ctx.db.delete(args.ticketId);
   },

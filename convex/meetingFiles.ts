@@ -1,6 +1,14 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+    requireCurrentUser,
+    requireMeetingEditor,
+    requireMeetingFileEditor,
+    requireMeetingFileViewer,
+    requireMeetingViewer,
+    requireTripViewer,
+} from "./lib/auth";
 
 export const upload = mutation({
     args: {
@@ -10,16 +18,8 @@ export const upload = mutation({
         type: v.string(),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        // Find user
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        await requireMeetingEditor(ctx, args.meetingId);
+        const user = await requireCurrentUser(ctx);
 
         return await ctx.db.insert("meeting_files", {
             meetingId: args.meetingId,
@@ -32,7 +32,9 @@ export const upload = mutation({
 });
 
 export const generateUploadUrl = mutation({
-    handler: async (ctx) => {
+    args: { meetingId: v.id("meetings") },
+    handler: async (ctx, args) => {
+        await requireMeetingEditor(ctx, args.meetingId);
         return await ctx.storage.generateUploadUrl();
     },
 });
@@ -40,6 +42,7 @@ export const generateUploadUrl = mutation({
 export const list = query({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
+        await requireMeetingViewer(ctx, args.meetingId);
         const files = await ctx.db
             .query("meeting_files")
             .withIndex("by_meeting", q => q.eq("meetingId", args.meetingId))
@@ -58,6 +61,7 @@ export const list = query({
 export const listByTrip = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         // 1. Get all meetings for this trip
         const meetings = await ctx.db
             .query("meetings")
@@ -99,15 +103,8 @@ export const addAnnotation = mutation({
         drawingData: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        await requireMeetingFileEditor(ctx, args.fileId);
+        const user = await requireCurrentUser(ctx);
 
         return await ctx.db.insert("meeting_annotations", {
             fileId: args.fileId,
@@ -127,6 +124,7 @@ export const addAnnotation = mutation({
 export const getAnnotations = query({
     args: { fileId: v.id("meeting_files") },
     handler: async (ctx, args) => {
+        await requireMeetingFileViewer(ctx, args.fileId);
         const annotations = await ctx.db
             .query("meeting_annotations")
             .withIndex("by_file", q => q.eq("fileId", args.fileId))
@@ -142,8 +140,7 @@ export const getAnnotations = query({
 export const deleteFile = mutation({
     args: { fileId: v.id("meeting_files") },
     handler: async (ctx, args) => {
-        const file = await ctx.db.get(args.fileId);
-        if (!file) throw new Error("File not found");
+        const { file } = await requireMeetingFileEditor(ctx, args.fileId);
 
         // Delete from storage
         await ctx.storage.delete(file.storageId);
@@ -166,6 +163,9 @@ export const deleteFile = mutation({
 export const resolveAnnotation = mutation({
     args: { annotationId: v.id("meeting_annotations") },
     handler: async (ctx, args) => {
+        const annotation = await ctx.db.get(args.annotationId);
+        if (!annotation) throw new Error("Annotation not found");
+        await requireMeetingFileEditor(ctx, annotation.fileId);
         await ctx.db.patch(args.annotationId, { resolved: true });
     }
 });

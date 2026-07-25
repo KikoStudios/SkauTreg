@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireCurrentUser, requireDataAdmin } from "./lib/auth";
 
 // ERROR REPORTS
 export const createErrorReport = mutation({
@@ -10,15 +11,10 @@ export const createErrorReport = mutation({
         userNotes: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        const userId = identity ? 
-            (await ctx.db.query("users")
-                .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-                .unique())?._id 
-            : undefined;
+        const user = await requireCurrentUser(ctx);
 
         const reportId = await ctx.db.insert("error_reports", {
-            userId,
+            userId: user._id,
             errorMessage: args.errorMessage,
             errorStack: args.errorStack,
             url: args.url,
@@ -35,14 +31,7 @@ export const createErrorReport = mutation({
 export const getErrorReports = query({
     args: {},
     handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return [];
-
-        const user = await ctx.db.query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .unique();
-
-        if (!user) return [];
+        await requireDataAdmin(ctx);
 
         const reports = await ctx.db.query("error_reports")
             .collect();
@@ -66,14 +55,7 @@ export const createFeatureRequest = mutation({
         category: v.optional(v.string()), // "bug", "feature", "improvement"
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db.query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .unique();
-
-        if (!user) throw new Error("User not found");
+        const user = await requireCurrentUser(ctx);
 
         const requestId = await ctx.db.insert("feature_requests", {
             userId: user._id,
@@ -94,6 +76,7 @@ export const getFeatureRequests = query({
         status: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const currentUser = await requireCurrentUser(ctx);
         let requests;
 
         if (args.status && args.status.length > 0) {
@@ -108,15 +91,7 @@ export const getFeatureRequests = query({
         requests.sort((a, b) => b.votes - a.votes);
 
         // Add user info and check if current user voted
-        const identity = await ctx.auth.getUserIdentity();
-        let currentUserId: any = null;
-
-        if (identity) {
-            const user = await ctx.db.query("users")
-                .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-                .unique();
-            currentUserId = user?._id;
-        }
+        const currentUserId = currentUser._id;
 
         return Promise.all(requests.map(async (request) => {
             const author = await ctx.db.get(request.userId);
@@ -134,7 +109,7 @@ export const getFeatureRequests = query({
 
             return {
                 ...request,
-                author: author ? { name: author.name || "", email: author.email || "" } : { name: "Unknown", email: "" },
+                author: author ? { name: author.name || "" } : { name: "Unknown" },
                 userVote,
             };
         }));
@@ -147,14 +122,7 @@ export const voteOnFeature = mutation({
         vote: v.number(), // 1 for upvote, -1 for downvote, 0 to remove vote
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db.query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .unique();
-
-        if (!user) throw new Error("User not found");
+        const user = await requireCurrentUser(ctx);
 
         const request = await ctx.db.get(args.requestId);
         if (!request) throw new Error("Request not found");
@@ -204,23 +172,12 @@ export const updateFeatureStatus = mutation({
         status: v.string(), // "open", "planned", "completed", "rejected"
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db.query("users")
-            .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .unique();
-
-        if (!user) throw new Error("User not found");
+        await requireDataAdmin(ctx);
 
         const request = await ctx.db.get(args.requestId);
         if (!request) throw new Error("Request not found");
 
         // Only admin or owner can update status (for now, just owner)
-        if (request.userId !== user._id && user.email !== "admin@skautreg.app") {
-            throw new Error("Nemáte oprávnění měnit stav");
-        }
-
         await ctx.db.patch(args.requestId, {
             status: args.status,
             updatedAt: new Date().toISOString(),

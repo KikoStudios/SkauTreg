@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { requireTripLeader, requireTripViewer } from "./lib/auth";
 
 const FINANCE_CURRENCY = "CZK";
 const PAYMENT_STATUSES = ["unpaid", "partial", "paid", "excused"] as const;
@@ -175,6 +176,7 @@ async function getFinanceState(ctx: QueryCtx | MutationCtx, tripId: Id<"trips">)
 export const getDashboard = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         const state = await getFinanceState(ctx, args.tripId);
         return {
             financeSettings: state.financeSettings,
@@ -188,6 +190,7 @@ export const getDashboard = query({
 export const listBudgetItems = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         const items = await ctx.db
             .query("trip_budget_items")
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -199,6 +202,7 @@ export const listBudgetItems = query({
 export const listPayments = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         const state = await getFinanceState(ctx, args.tripId);
         return state.payments;
     },
@@ -214,6 +218,7 @@ export const updateFinanceSettings = mutation({
         notes: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const trip = await ctx.db.get(args.tripId);
         if (!trip) throw new Error("Výprava nebyla nalezena.");
 
@@ -244,6 +249,7 @@ export const addBudgetItem = mutation({
         note: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const name = args.name.trim();
         if (!name) throw new Error("Název položky je povinný.");
         assertCategory(args.category);
@@ -287,6 +293,7 @@ export const updateBudgetItem = mutation({
     handler: async (ctx, args) => {
         const item = await ctx.db.get(args.itemId);
         if (!item) throw new Error("Položka rozpočtu nebyla nalezena.");
+        await requireTripLeader(ctx, item.tripId);
 
         const patch: Partial<BudgetItemDoc> = {
             updatedAt: nowIso(),
@@ -315,6 +322,9 @@ export const updateBudgetItem = mutation({
 export const removeBudgetItem = mutation({
     args: { itemId: v.id("trip_budget_items") },
     handler: async (ctx, args) => {
+        const item = await ctx.db.get(args.itemId);
+        if (!item) return;
+        await requireTripLeader(ctx, item.tripId);
         await ctx.db.delete(args.itemId);
     },
 });
@@ -326,6 +336,7 @@ export const reorderBudgetItems = mutation({
         itemIds: v.array(v.id("trip_budget_items")),
     },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         assertCategory(args.category);
         const items = await ctx.db
             .query("trip_budget_items")
@@ -351,6 +362,7 @@ export const reorderBudgetItems = mutation({
 export const ensurePaymentRows = mutation({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const state = await getFinanceState(ctx, args.tripId);
         const participations = await ctx.db
             .query("participations")
@@ -393,6 +405,7 @@ export const updateMemberPayment = mutation({
     handler: async (ctx, args) => {
         const payment = await ctx.db.get(args.paymentId);
         if (!payment) throw new Error("Platba nebyla nalezena.");
+        await requireTripLeader(ctx, payment.tripId);
 
         const patch: Partial<PaymentDoc> = {
             updatedAt: nowIso(),
@@ -417,6 +430,7 @@ export const updateMemberPayment = mutation({
 export const bulkSetExpectedAmounts = mutation({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const state = await getFinanceState(ctx, args.tripId);
         let updatedCount = 0;
 

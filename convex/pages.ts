@@ -1,12 +1,20 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+    requireMeetingEditor,
+    requireMeetingViewer,
+    requirePageEditor,
+    requirePageViewer,
+    requireTripViewer,
+} from "./lib/auth";
 
 export const getByMeeting = query({
     args: {
         meetingId: v.id("meetings"),
     },
     handler: async (ctx, args) => {
+        await requireMeetingViewer(ctx, args.meetingId);
         return await ctx.db
             .query("meeting_pages")
             .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
@@ -19,6 +27,7 @@ export const getPagesByTrip = query({
         tripId: v.id("trips"),
     },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         // 1. Get all meetings for this trip
         const meetings = await ctx.db
             .query("meetings")
@@ -51,6 +60,7 @@ export const create = mutation({
         title: v.string(),
     },
     handler: async (ctx, args) => {
+        await requireMeetingEditor(ctx, args.meetingId);
         // Determine order
         const existing = await ctx.db
             .query("meeting_pages")
@@ -70,6 +80,7 @@ export const create = mutation({
 export const remove = mutation({
     args: { pageId: v.id("meeting_pages") },
     handler: async (ctx, args) => {
+        await requirePageEditor(ctx, args.pageId);
         await ctx.db.delete(args.pageId);
     }
 });
@@ -81,9 +92,10 @@ export const update = mutation({
         title: v.optional(v.string())
     },
     handler: async (ctx, args) => {
-        const update: any = {};
-        if (args.title) update.title = args.title;
-        await ctx.db.patch(args.pageId, update);
+        await requirePageEditor(ctx, args.pageId);
+        if (args.title !== undefined) {
+            await ctx.db.patch(args.pageId, { title: args.title });
+        }
     }
 });
 
@@ -93,22 +105,9 @@ export const updateTitle = mutation({
         title: v.string()
     },
     handler: async (ctx, args) => {
+        await requirePageEditor(ctx, args.pageId);
         await ctx.db.patch(args.pageId, { title: args.title });
     }
-});
-
-export const updateContent = mutation({
-    args: {
-        pageId: v.id("meeting_pages"),
-        content: v.string(),
-    },
-    handler: async (ctx, args) => {
-        // For now, just log (schema doesn't have content field yet)
-        // You can add content field to schema if you want to persist it
-        console.log(`Saving content for page ${args.pageId}: ${args.content.substring(0, 50)}...`);
-        // TODO: Add content field to meeting_pages schema
-        // await ctx.db.patch(args.pageId, { content: args.content });
-    },
 });
 
 export const get = query({
@@ -116,6 +115,7 @@ export const get = query({
         pageId: v.id("meeting_pages"),
     },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.pageId);
+        const { page } = await requirePageViewer(ctx, args.pageId);
+        return page;
     },
 });

@@ -1,6 +1,7 @@
 
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { requireTroopViewer } from "./lib/auth";
 
 export const search = query({
     args: {
@@ -8,23 +9,34 @@ export const search = query({
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        const { troop } = await requireTroopViewer(ctx, args.troopId);
         const q = args.query.toLowerCase();
-        const suggestions: any[] = [];
+        const suggestions: Array<{
+            id: string;
+            label: string;
+            sublabel?: string;
+            type: string;
+            icon: string;
+            image?: string;
+        }> = [];
 
-        // 1. Search Users
-        const users = await ctx.db
-            .query("users")
+        // Only expose users who are members of this troop's leadership.
+        const leadership = await ctx.db
+            .query("troop_leaders")
+            .withIndex("by_troop", (index) => index.eq("troopId", args.troopId))
             .collect();
+        const userIds = new Set([troop.ownerId, ...leadership.map((row) => row.userId)]);
+        const users = (await Promise.all([...userIds].map((id) => ctx.db.get(id))))
+            .filter((user) => user !== null);
 
         const matchedUsers = users
             .filter(u =>
-                (u.name && u.name.toLowerCase().includes(q)) ||
-                (u.email && u.email.toLowerCase().includes(q))
+                Boolean(u.name?.toLowerCase().includes(q))
             )
             .slice(0, 5)
             .map(u => ({
                 id: u._id,
-                label: u.name || u.email || "Unknown",
+                label: u.name || "Uživatel",
                 type: "user",
                 icon: "👤",
                 image: u.image
@@ -97,9 +109,20 @@ export const search = query({
         suggestions.push(...matchedStations);
 
         // 6. Search Files
-        const files = await ctx.db
-            .query("meeting_files")
+        const troopMeetings = await ctx.db
+            .query("meetings")
+            .withIndex("by_troop", (index) => index.eq("troopId", args.troopId))
             .collect();
+        const files = (
+            await Promise.all(
+                troopMeetings.map((meeting) =>
+                    ctx.db
+                        .query("meeting_files")
+                        .withIndex("by_meeting", (index) => index.eq("meetingId", meeting._id))
+                        .collect(),
+                ),
+            )
+        ).flat();
 
         const matchedFiles = files
             .filter(f =>

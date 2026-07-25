@@ -53,7 +53,7 @@ export function parseConnections(html: string): IdosTrip[] {
       return [];
     }
 
-    connectionElements.each((_idx: number, el: cheerio.Element) => {
+    connectionElements.each((_idx, el) => {
       const $connection = $(el);
 
       const timeElements = $connection.find("p.time");
@@ -67,7 +67,7 @@ export function parseConnections(html: string): IdosTrip[] {
 
       const segments: Segment[] = [];
 
-      $connection.find("h3 span").each((_segIdx: number, vehicleEl: cheerio.Element) => {
+      $connection.find("h3 span").each((_segIdx, vehicleEl) => {
         const $vehicleSpan = $(vehicleEl);
         const vehicleName = $vehicleSpan.text().trim();
 

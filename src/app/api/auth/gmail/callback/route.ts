@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@clerk/nextjs/server";
 import { fetchMutation } from "convex/nextjs";
 import { api } from "../../../../../../convex/_generated/api";
+import { verifyOAuthState } from "../../../../../lib/oauthState";
+import type { Id } from "../../../../../../convex/_generated/dataModel";
 
 /**
  * Gmail OAuth Callback Handler
@@ -25,17 +27,20 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
   const redirectUri = `${req.nextUrl.origin}/api/auth/gmail/callback`;
 
-  // Parse state to get troopId and returnAction early for use in all redirects
-  let troopId = null;
+  const authData = await auth();
+  let troopId: string | null = null;
   let returnAction = "";
-  if (state) {
-    try {
-      const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
-      troopId = decoded.troopId;
-      returnAction = decoded.returnAction || "";
-    } catch (e) {
-      console.error('Failed to decode state:', e);
+  try {
+    if (!state) throw new Error("Missing state");
+    const decoded = verifyOAuthState(state);
+    const nonce = req.cookies.get("skautreg_oauth_nonce")?.value;
+    if (!nonce || nonce !== decoded.nonce || authData.userId !== decoded.userId) {
+      throw new Error("State mismatch");
     }
+    troopId = decoded.troopId;
+    returnAction = decoded.returnAction;
+  } catch {
+    return NextResponse.redirect(new URL("/settings?gmail_error=Neplatný nebo expirovaný OAuth požadavek", req.url));
   }
 
   const getRedirectUrl = (errorOrParams: string) => {
@@ -93,8 +98,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      console.error('Token exchange error:', errorData);
+      const errorData = await tokenResponse.json() as { error_description?: string };
       return NextResponse.redirect(
         new URL(
           getRedirectUrl(`gmail_error=${encodeURIComponent(
@@ -165,8 +169,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const authData = await auth();
-    const token = await authData.getToken();
+    const token = await authData.getToken({ template: "convex" });
 
     if (!authData.userId || !token) {
       return NextResponse.redirect(
@@ -180,7 +183,7 @@ export async function GET(req: NextRequest) {
     await fetchMutation(
       api.troops.connectEmailProvider,
       {
-        troopId: troopId as any,
+        troopId: troopId as Id<"troops">,
         provider: "gmail",
         email,
         refreshToken,
@@ -196,16 +199,10 @@ export async function GET(req: NextRequest) {
       successParams.set('returnAction', returnAction);
     }
 
-    return NextResponse.redirect(
-      new URL(getRedirectUrl(successParams.toString()), req.url)
-    );
-  } catch (error: any) {
-    console.error('Gmail callback error:', error);
-    return NextResponse.redirect(
-      new URL(
-        getRedirectUrl(`gmail_error=${encodeURIComponent(error.message || 'Neznámá chyba')}`),
-        req.url
-      )
-    );
+    const response = NextResponse.redirect(new URL(getRedirectUrl(successParams.toString()), req.url));
+    response.cookies.delete("skautreg_oauth_nonce");
+    return response;
+  } catch {
+    return NextResponse.redirect(new URL(getRedirectUrl("gmail_error=Propojení se nepodařilo"), req.url));
   }
 }

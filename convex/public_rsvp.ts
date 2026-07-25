@@ -1,15 +1,71 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 
-// Public query: No auth required, identified by unique accessKey
+async function findParticipationByCapability(
+    ctx: QueryCtx | MutationCtx,
+    accessKey: string,
+) {
+    const secure = await ctx.db
+        .query("participations")
+        .withIndex("by_secure_access_key", (q) => q.eq("secureAccessKey", accessKey))
+        .unique();
+    if (secure) return secure;
+
+    const legacy = await ctx.db
+        .query("participations")
+        .withIndex("by_access_key", (q) => q.eq("accessKey", accessKey))
+        .unique();
+    if (!legacy) return null;
+    if (legacy.legacyAccessExpiresAt && Date.now() > Date.parse(legacy.legacyAccessExpiresAt)) {
+        return null;
+    }
+    return legacy;
+}
+
+function validateResponses(
+    responses: unknown,
+    customFields: Array<{ label: string; type: string; options?: string[] }> | undefined,
+) {
+    if (responses === undefined) return;
+    if (!responses || typeof responses !== "object" || Array.isArray(responses)) {
+        throw new Error("Neplatný formát odpovědí.");
+    }
+
+    const record = responses as Record<string, unknown>;
+    const allowed = new Map((customFields ?? []).map((field) => [field.label, field]));
+    if (Object.keys(record).length > 50 || JSON.stringify(record).length > 20_000) {
+        throw new Error("Odpověď je příliš velká.");
+    }
+
+    for (const [key, value] of Object.entries(record)) {
+        const field = allowed.get(key);
+        if (!field) throw new Error("Odpověď obsahuje neznámé pole.");
+        if (typeof value === "string" && value.length > 2_000) {
+            throw new Error("Text odpovědi je příliš dlouhý.");
+        }
+        if (field.options && typeof value === "string" && !field.options.includes(value)) {
+            throw new Error("Odpověď obsahuje neplatnou možnost.");
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 50 || value.some((item) => typeof item !== "string" || item.length > 500)) {
+                throw new Error("Odpověď obsahuje neplatný seznam.");
+            }
+            if (field.options && value.some((item) => !field.options?.includes(item))) {
+                throw new Error("Odpověď obsahuje neplatnou možnost.");
+            }
+        } else if (!["string", "boolean", "number"].includes(typeof value) && value !== null) {
+            throw new Error("Odpověď obsahuje nepodporovanou hodnotu.");
+        }
+    }
+}
+
+// Public query: no auth required, identified by a high-entropy capability.
 export const getByAccessKey = query({
     args: { accessKey: v.string() },
     handler: async (ctx, args) => {
         // 1. Find participation record by accessKey
-        const participation = await ctx.db
-            .query("participations")
-            .withIndex("by_access_key", (q) => q.eq("accessKey", args.accessKey))
-            .unique();
+        const participation = await findParticipationByCapability(ctx, args.accessKey);
 
         if (!participation) {
             return null; // Invalid link
@@ -49,15 +105,12 @@ export const getByAccessKey = query({
 export const submit = mutation({
     args: {
         accessKey: v.string(),
-        status: v.string(), // "attending" | "not_attending"
+        status: v.union(v.literal("attending"), v.literal("not_attending")),
         responses: v.optional(v.any()), // Form data matching customFields
     },
     handler: async (ctx, args) => {
         // 1. Verify availability
-        const participation = await ctx.db
-            .query("participations")
-            .withIndex("by_access_key", (q) => q.eq("accessKey", args.accessKey))
-            .unique();
+        const participation = await findParticipationByCapability(ctx, args.accessKey);
 
         if (!participation) {
             throw new Error("Invalid access key");
@@ -67,6 +120,7 @@ export const submit = mutation({
         if (!trip) {
             throw new Error("Trip not found");
         }
+        validateResponses(args.responses, trip.customFields);
 
         const isAfterDeadline = (lastCancellationDate: string | undefined) => {
             if (!lastCancellationDate) return false;

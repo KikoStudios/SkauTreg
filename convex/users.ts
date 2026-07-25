@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireCurrentUser } from "./lib/auth";
 
 export const store = mutation({
     args: {},
@@ -146,5 +147,60 @@ export const update = mutation({
             throw new Error("User not found");
         }
         await ctx.db.patch(user._id, args);
+    },
+});
+
+export const exportMyData = query({
+    args: {},
+    handler: async (ctx) => {
+        const user = await requireCurrentUser(ctx);
+        const [
+            troopRoles,
+            tripStaffAssignments,
+            errorReports,
+            featureRequests,
+            meetingPresence,
+            editorCursors,
+            requestHistory,
+        ] = await Promise.all([
+            ctx.db.query("troop_leaders").filter((row) => row.eq(row.field("userId"), user._id)).collect(),
+            ctx.db.query("trip_staff").filter((row) => row.eq(row.field("userId"), user._id)).collect(),
+            ctx.db.query("error_reports").withIndex("by_user", (index) => index.eq("userId", user._id)).collect(),
+            ctx.db.query("feature_requests").withIndex("by_user", (index) => index.eq("userId", user._id)).collect(),
+            ctx.db.query("meeting_participants").filter((row) => row.eq(row.field("userId"), user._id)).collect(),
+            ctx.db.query("editor_cursors").filter((row) => row.eq(row.field("userId"), user._id)).collect(),
+            ctx.db.query("data_requests").withIndex("by_user", (index) => index.eq("userId", user._id)).collect(),
+        ]);
+
+        return {
+            exportedAt: new Date().toISOString(),
+            profile: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                image: user.image,
+                dateOfBirth: user.dateOfBirth,
+                benefit: user.benefit,
+                birthDate: user.birthDate,
+                address: user.address,
+                personalEmail: user.personalEmail,
+                personalPhone: user.personalPhone,
+                contactProfileType: user.contactProfileType,
+                emergencyContactName: user.emergencyContactName,
+                emergencyContactPhone: user.emergencyContactPhone,
+                emergencyContactEmail: user.emergencyContactEmail,
+                parent1Name: user.parent1Name,
+                parent1Phone: user.parent1Phone,
+                parent1Email: user.parent1Email,
+                parent2Name: user.parent2Name,
+                parent2Phone: user.parent2Phone,
+                parent2Email: user.parent2Email,
+            },
+            troopRoles,
+            tripStaffAssignments,
+            authoredFeedback: { errorReports, featureRequests },
+            accountPresence: { meetingPresence, editorCursors },
+            requestHistory,
+        };
     },
 });

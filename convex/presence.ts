@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireCurrentUser, requireMeetingViewer } from "./lib/auth";
 
 // Heartbeat to mark user as active in a meeting
 export const heartbeat = mutation({
@@ -7,15 +8,8 @@ export const heartbeat = mutation({
         meetingId: v.id("meetings"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return null;
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) return null;
+        await requireMeetingViewer(ctx, args.meetingId);
+        const user = await requireCurrentUser(ctx);
 
         // Find existing presence record
         const existing = await ctx.db
@@ -50,6 +44,7 @@ export const heartbeat = mutation({
 export const getActiveParticipants = query({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
+        await requireMeetingViewer(ctx, args.meetingId);
         const participants = await ctx.db
             .query("meeting_participants")
             .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
@@ -70,15 +65,8 @@ export const getActiveParticipants = query({
 export const leave = mutation({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return;
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) return;
+        await requireMeetingViewer(ctx, args.meetingId);
+        const user = await requireCurrentUser(ctx);
 
         const existing = await ctx.db
             .query("meeting_participants")

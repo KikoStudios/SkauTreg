@@ -1,6 +1,38 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { normalizeLeaderRole } from "./lib/memberEmails";
+import { requireTroopManager, requireTroopOwner, requireTroopViewer } from "./lib/auth";
+import { decryptCredential, encryptCredential } from "./lib/credentials";
+
+function redactTroopSecrets<T extends {
+    emailProvider?: {
+        provider: string;
+        email: string;
+        connectedAt: string;
+        connectedBy: unknown;
+        groupEmail?: string;
+        memberMapping?: unknown;
+        matchedMemberIds?: unknown;
+        requiresReconnect?: boolean;
+    };
+    gmailOAuth?: unknown;
+}>(troop: T) {
+    const provider = troop.emailProvider;
+    return {
+        ...troop,
+        emailProvider: provider ? {
+            provider: provider.provider,
+            email: provider.email,
+            groupEmail: provider.groupEmail,
+            memberMapping: provider.memberMapping,
+            matchedMemberIds: provider.matchedMemberIds,
+            connectedAt: provider.connectedAt,
+            connectedBy: provider.connectedBy,
+            requiresReconnect: provider.requiresReconnect,
+        } : undefined,
+        gmailOAuth: undefined,
+    };
+}
 
 export const create = mutation({
     args: {
@@ -40,6 +72,7 @@ export const create = mutation({
             accentColor: args.accentColor,
             contactEmail: args.contactEmail,
             infoEmail: args.infoEmail,
+            publicDirectoryOptIn: false,
         });
 
         return troopId;
@@ -59,23 +92,7 @@ export const update = mutation({
         infoEmail: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("User not found");
-
-        const troop = await ctx.db.get(args.id);
-        if (!troop) throw new Error("Troop not found");
-
-        // Allow any authenticated user to update troop settings
-        // (owner and any troop leader can edit)
+        await requireTroopManager(ctx, args.id);
 
         const { id, ...updates } = args;
         await ctx.db.patch(id, updates);
@@ -130,7 +147,7 @@ export const getByUser = query({
                     // ignore invalid ID format
                 }
             }
-            return { ...t, logo: logoUrl };
+            return redactTroopSecrets({ ...t, logo: logoUrl });
         }));
 
         return troopsWithUrls;
@@ -140,6 +157,7 @@ export const getByUser = query({
 export const getById = query({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.id);
         const troop = await ctx.db.get(args.id);
         if (!troop) return null;
 
@@ -152,7 +170,7 @@ export const getById = query({
             }
         }
 
-        return { ...troop, logo: logoUrl };
+        return redactTroopSecrets({ ...troop, logo: logoUrl });
     }
 });
 
@@ -182,6 +200,7 @@ export const addLeader = mutation({
         role: v.string() // "main_leader", "leader", "rover"
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit. Přejít na přihlášení?");
 
@@ -230,6 +249,7 @@ export const updateRole = mutation({
         newRole: v.string()
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
@@ -260,6 +280,7 @@ export const removeLeader = mutation({
         userId: v.id("users")
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
@@ -287,6 +308,7 @@ export const removeLeader = mutation({
 export const getLeaders = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.troopId);
         const troop = await ctx.db.get(args.troopId);
         if (!troop) return [];
 
@@ -304,7 +326,10 @@ export const getLeaders = query({
                 const user = await ctx.db.get(record.userId);
                 if (!user) return null;
                 return {
-                    ...user,
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    image: user.image,
                     role: normalizeLeaderRole(record.role), // "main_leader", "leader", "rover"
                     isOwner: user._id === troop.ownerId
                 }
@@ -319,7 +344,14 @@ export const getLeaders = query({
         if (!ownerInList) {
             // Add owner with default role if not assigned a specific one
             return [
-                { ...owner, role: 'owner', isOwner: true },
+                {
+                    _id: owner?._id,
+                    name: owner?.name,
+                    email: owner?.email,
+                    image: owner?.image,
+                    role: "owner",
+                    isOwner: true,
+                },
                 ...validLeaders
             ];
         }
@@ -328,9 +360,46 @@ export const getLeaders = query({
     }
 });
 
+export const getMyRole = query({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        const { role } = await requireTroopViewer(ctx, args.troopId);
+        return role;
+    },
+});
+
+export const getEmailConfiguration = internalQuery({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop) return null;
+        return {
+            troopId: troop._id,
+            name: troop.name,
+            contactEmail: troop.contactEmail,
+            infoEmail: troop.infoEmail,
+            emailProvider: troop.emailProvider
+                ? {
+                    ...troop.emailProvider,
+                    refreshToken: await decryptCredential(troop.emailProvider.refreshToken),
+                    smtpPassword: await decryptCredential(troop.emailProvider.smtpPassword),
+                }
+                : undefined,
+            gmailOAuth: troop.gmailOAuth
+                ? {
+                    ...troop.gmailOAuth,
+                    refreshToken: await decryptCredential(troop.gmailOAuth.refreshToken),
+                }
+                : undefined,
+        };
+    },
+});
+
 export const deleteTroop = mutation({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.id);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -411,6 +480,7 @@ export const connectEmailProvider = mutation({
         }))),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -446,15 +516,16 @@ export const connectEmailProvider = mutation({
             emailProvider: {
                 provider: args.provider,
                 email: args.email,
-                refreshToken: args.refreshToken,
+                refreshToken: await encryptCredential(args.refreshToken),
                 smtpHost: args.smtpHost,
                 smtpPort: args.smtpPort,
-                smtpPassword: args.smtpPassword,
+                smtpPassword: await encryptCredential(args.smtpPassword),
                 groupEmail: args.groupEmail,
                 memberMapping: args.memberMapping,
                 matchedMemberIds: args.matchedMemberIds,
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
+                requiresReconnect: false,
             },
         });
     },
@@ -465,6 +536,7 @@ export const disconnectEmailProvider = mutation({
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -498,6 +570,7 @@ export const connectGmail = mutation({
         refreshToken: v.string(),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -523,9 +596,10 @@ export const connectGmail = mutation({
             emailProvider: {
                 provider: "gmail",
                 email: args.email,
-                refreshToken: args.refreshToken,
+                refreshToken: await encryptCredential(args.refreshToken),
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
+                requiresReconnect: false,
             },
         });
     },
@@ -536,6 +610,7 @@ export const disconnectGmail = mutation({
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -563,8 +638,8 @@ export const disconnectGmail = mutation({
 export const listPublic = query({
     args: {},
     handler: async (ctx) => {
-        // Get all troops with their logos resolved
-        const allTroops = await ctx.db.query("troops").collect();
+        const allTroops = (await ctx.db.query("troops").collect())
+            .filter((troop) => troop.publicDirectoryOptIn === true);
 
         // Resolve Logo URLs
         const troopsWithUrls = await Promise.all(
@@ -581,13 +656,21 @@ export const listPublic = query({
                     _id: t._id,
                     name: t.name,
                     logo: logoUrl,
-                    accentColor: t.accentColor,
-                    number: t.number,
-                    type: t.type,
                 };
             })
         );
 
         return troopsWithUrls;
+    },
+});
+
+export const setPublicDirectoryOptIn = mutation({
+    args: {
+        troopId: v.id("troops"),
+        enabled: v.boolean(),
+    },
+    handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.troopId);
+        await ctx.db.patch(args.troopId, { publicDirectoryOptIn: args.enabled });
     },
 });

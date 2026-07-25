@@ -206,7 +206,7 @@ async function importPdfJs(): Promise<any> {
   let lastErr: unknown = null;
   for (const spec of candidates) {
     try {
-      const mod: any = spec.endsWith(".mjs") ? await dynamicImport(spec) : require(spec);
+      const mod: any = await dynamicImport(spec);
       return mod?.default ?? mod;
     } catch (e) {
       lastErr = e;

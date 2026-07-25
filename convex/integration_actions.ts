@@ -1,10 +1,12 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireTroopManager } from "./lib/auth";
 
 // Get all actions for a troop
 export const getByTroop = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         return await ctx.db
             .query("integration_actions")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
@@ -16,6 +18,7 @@ export const getByTroop = query({
 export const getByTrigger = query({
     args: { troopId: v.id("troops"), trigger: v.string() },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         return await ctx.db
             .query("integration_actions")
             .withIndex("by_trigger", (q) => q.eq("troopId", args.troopId).eq("trigger", args.trigger))
@@ -27,7 +30,10 @@ export const getByTrigger = query({
 export const getById = query({
     args: { actionId: v.id("integration_actions") },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.actionId);
+        const action = await ctx.db.get(args.actionId);
+        if (!action) return null;
+        await requireTroopManager(ctx, action.troopId);
+        return action;
     },
 });
 
@@ -52,16 +58,7 @@ export const create = mutation({
         maxRetries: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        // Verify user is authorized
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        const { user } = await requireTroopManager(ctx, args.troopId);
 
         // Verify integration belongs to this troop
         const integration = await ctx.db.get(args.integrationId);
@@ -116,6 +113,14 @@ export const update = mutation({
     handler: async (ctx, args) => {
         const action = await ctx.db.get(args.actionId);
         if (!action) throw new Error("Action not found");
+        await requireTroopManager(ctx, action.troopId);
+
+        if (args.integrationId) {
+            const integration = await ctx.db.get(args.integrationId);
+            if (!integration || integration.troopId !== action.troopId) {
+                throw new Error("Integration not found for this troop");
+            }
+        }
 
         const updateData: any = {
             updatedAt: new Date().toISOString(),
@@ -145,6 +150,7 @@ export const toggleEnabled = mutation({
     handler: async (ctx, args) => {
         const action = await ctx.db.get(args.actionId);
         if (!action) throw new Error("Action not found");
+        await requireTroopManager(ctx, action.troopId);
 
         const newEnabled = !(action as any).isEnabled;
         await ctx.db.patch(args.actionId, { 
@@ -161,6 +167,7 @@ export const deleteAction = mutation({
     handler: async (ctx, args) => {
         const action = await ctx.db.get(args.actionId);
         if (!action) throw new Error("Action not found");
+        await requireTroopManager(ctx, action.troopId);
 
         await ctx.db.delete(args.actionId);
     },
@@ -181,6 +188,17 @@ export const logExecution = mutation({
         executionTime: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
+        const actionForTroop = await ctx.db.get(args.actionId);
+        const integrationForTroop = await ctx.db.get(args.integrationId);
+        if (
+            !actionForTroop ||
+            actionForTroop.troopId !== args.troopId ||
+            !integrationForTroop ||
+            integrationForTroop.troopId !== args.troopId
+        ) {
+            throw new Error("Integration action does not belong to this troop");
+        }
         // Increment trigger count
         const action = await ctx.db.get(args.actionId);
         if (action) {
@@ -214,6 +232,9 @@ export const getExecutionLogs = query({
         limit: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
+        const action = await ctx.db.get(args.actionId);
+        if (!action) throw new Error("Action not found");
+        await requireTroopManager(ctx, action.troopId);
         return await ctx.db
             .query("integration_logs")
             .withIndex("by_action", (q) => q.eq("actionId", args.actionId))

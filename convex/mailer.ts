@@ -2,9 +2,11 @@
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getMemberEmailTargets, normalizeLeaderRole, normalizeMemberContactFields } from "./lib/memberEmails";
+import nodemailer from "nodemailer";
+import { ImapFlow } from "imapflow";
 
 const getEnv = (key: string) => {
   const value = process.env[key];
@@ -134,6 +136,7 @@ export const sendTripEmail = action({
     baseUrl: v.string(),
   },
   handler: async (ctx, args): Promise<{ sentCount: number; skippedCount: number; failed: Array<{ email: string; error: string }>; total: number }> => {
+    await ctx.runMutation(api.rateLimits.consume, { operation: "email_send" });
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Unauthenticated");
 
@@ -143,7 +146,9 @@ export const sendTripEmail = action({
     const dashboard: any = await ctx.runQuery(api.trips.getDashboard, { tripId: args.tripId });
     if (!dashboard) throw new Error("Trip not found");
 
-    const troop = await ctx.runQuery(api.troops.getById, { id: dashboard.trip.troopId });
+    const troop = await ctx.runQuery(internal.troops.getEmailConfiguration, {
+      troopId: dashboard.trip.troopId,
+    });
     if (!troop) throw new Error("Troop not found");
 
     const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: dashboard.trip.troopId });
@@ -187,7 +192,7 @@ export const sendTripEmail = action({
       const memberName = member?.name || "";
       
       // Replace smart tags - no @userlink support
-      let html = args.body
+      const html = args.body
         .replace(/<user\.sign\.link>/g, userLink)
         .replace(/<user\.name>/g, memberName)
         .replace(/\n/g, "<br/>");
@@ -231,8 +236,6 @@ async function saveToImapSent(params: {
   text?: string;
 }) {
   try {
-    const { ImapFlow } = require("imapflow");
-    
     const client = new ImapFlow({
       host: params.imapHost,
       port: params.imapPort,
@@ -322,9 +325,6 @@ async function sendSmtpMessage(params: {
   imapPort?: number;
 }) {
   try {
-    // Using require for Node.js environment
-    const nodemailer = require("nodemailer");
-    
     const transporter = nodemailer.createTransport({
       host: params.smtpHost,
       port: params.smtpPort,
@@ -385,6 +385,7 @@ export const sendFromDraft = action({
     error?: string;
   }> => {
     try {
+      await ctx.runMutation(api.rateLimits.consume, { operation: "email_send" });
       const identity = await ctx.auth.getUserIdentity();
       if (!identity) throw new Error("Unauthenticated");
 
@@ -397,7 +398,9 @@ export const sendFromDraft = action({
       const trip: any = await ctx.runQuery(api.trips.getDashboard, { tripId: draft.tripId });
       if (!trip) throw new Error("Trip not found");
 
-      const troop = await ctx.runQuery(api.troops.getById, { id: trip.trip.troopId });
+      const troop = await ctx.runQuery(internal.troops.getEmailConfiguration, {
+        troopId: trip.trip.troopId,
+      });
       if (!troop) throw new Error("Troop not found");
 
       // Check permissions - vedoucí (normal leader) and main_leader can send
@@ -486,12 +489,12 @@ export const sendFromDraft = action({
         const memberName = member?.name || "";
         
         // Replace smart tags
-        let bodyText = draft.body
+        const bodyText = draft.body
           .replace(/<user\.sign\.link>/g, userLink)
           .replace(/<user\.name>/g, memberName);
         
         // Create simple, personal HTML (avoid promotional styling)
-        let html = `<!DOCTYPE html>
+        const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333; max-width: 600px; margin: 0; padding: 20px;">
@@ -559,10 +562,12 @@ ${bodyText.replace(/\n/g, "<br/>")}
 
 export const fetchGoogleGroupsMembers = action({
   args: {
+    troopId: v.id("troops"),
     groupEmail: v.string(), // e.g., "group-name@googlegroups.com"
     accessToken: v.string(), // Can be refreshToken - will exchange if needed
   },
   handler: async (ctx, args): Promise<Array<{ email: string; name?: string }>> => {
+    await ctx.runQuery(internal.troops.getEmailConfiguration, { troopId: args.troopId });
     try {
       let token = args.accessToken;
 
@@ -653,6 +658,7 @@ export const fetchGoogleGroupsMembers = action({
 // Test email connection (SMTP/IMAP) from UI
 export const testEmailConnection = action({
   args: {
+    troopId: v.id("troops"),
     provider: v.string(), // "seznam" | "centrum"
     email: v.string(),
     password: v.string(),
@@ -663,6 +669,8 @@ export const testEmailConnection = action({
     imap: { success: boolean; error?: string };
     testEmail?: { success: boolean; error?: string };
   }> => {
+    await ctx.runQuery(internal.troops.getEmailConfiguration, { troopId: args.troopId });
+    await ctx.runMutation(api.rateLimits.consume, { operation: "integration_test" });
     const results: any = {
       smtp: { success: false },
       imap: { success: false },
@@ -687,7 +695,6 @@ export const testEmailConnection = action({
 
     // Test SMTP
     try {
-      const nodemailer = require("nodemailer");
       const transporter = nodemailer.createTransport({
         host: config.smtp.host,
         port: config.smtp.port,
@@ -705,7 +712,6 @@ export const testEmailConnection = action({
 
     // Test IMAP
     try {
-      const { ImapFlow } = require("imapflow");
       const client = new ImapFlow({
         host: config.imap.host,
         port: config.imap.port,
@@ -726,7 +732,6 @@ export const testEmailConnection = action({
     // Send test email if recipient provided and SMTP works
     if (args.testRecipient && results.smtp.success) {
       try {
-        const nodemailer = require("nodemailer");
         const transporter = nodemailer.createTransport({
           host: config.smtp.host,
           port: config.smtp.port,
