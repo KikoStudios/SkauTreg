@@ -33,6 +33,12 @@ export const productionEnvSchema = z.object({
 
 export function validateProductionEnv(environment: NodeJS.ProcessEnv = process.env) {
   if (environment.NODE_ENV !== "production") return;
+  const isHostedPreview =
+    environment.VERCEL_ENV === "preview" ||
+    environment.CONTEXT === "deploy-preview" ||
+    environment.CONTEXT === "branch-deploy";
+  if (isHostedPreview) return;
+
   const result = productionEnvSchema.safeParse(environment);
   if (!result.success) {
     const details = result.error.issues
