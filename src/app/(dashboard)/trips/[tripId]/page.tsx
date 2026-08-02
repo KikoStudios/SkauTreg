@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
 import EmailDraftsTab from "../../../../components/EmailDraftsTab";
+import { resolveAttendanceSummary } from "../../../../lib/tripAttendance";
 import { useFeedback } from "../../../../context/FeedbackContext";
 import TransportTab from "../../../../components/trip/TransportTab";
 import FinanceTab from "../../../../components/trip/FinanceTab";
@@ -56,14 +57,13 @@ export default function TripDashboardPage() {
     const { showError, showSuccess } = useFeedback();
 
     const dashboard = useQuery(api.trips.getDashboard, tripId ? { tripId } : "skip");
-    const participantRows = useQuery(api.tripParticipants.list, dashboard && dashboard.role !== "rover" ? { tripId } : "skip") as TripParticipantDTO[] | undefined;
+    const participantRows = useQuery(api.tripParticipants.list, dashboard?.role && dashboard.role !== "rover" ? { tripId } : "skip") as TripParticipantDTO[] | undefined;
     const updateTrip = useMutation(api.trips.update);
     const deleteTrip = useMutation(api.trips.remove);
     const unassignBase = useMutation(api.trips.unassignBase);
     const ensureParticipations = useMutation(api.trips.ensureParticipations);
     const getParticipantCapability = useMutation(api.tripParticipants.getCapabilityUrl);
     const regenerateParticipantCapability = useMutation(api.tripParticipants.regenerateCapability);
-    const sendTripEmail = useAction(api.mailer.sendTripEmail);
     const addTripStaffUser = useMutation(api.tripStaff.addUser);
     const addTripStaffExternal = useMutation(api.tripStaff.addExternal);
     const addTripStaffFromPreset = useMutation(api.tripStaff.addFromPreset);
@@ -83,10 +83,6 @@ export default function TripDashboardPage() {
     const [viewResponse, setViewResponse] = useState<any | null>(null);
     const [showCreateDoc, setShowCreateDoc] = useState(false);
     const [newDocTitle, setNewDocTitle] = useState("");
-    const [emailSubject, setEmailSubject] = useState("");
-    const [emailBody, setEmailBody] = useState("");
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const [emailResult, setEmailResult] = useState<{ sentCount: number; skippedCount: number; total: number; failed: { email: string; error: string }[] } | null>(null);
     const [didEnsureParticipants, setDidEnsureParticipants] = useState(false);
     const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
     const [selectedLeaderId, setSelectedLeaderId] = useState<string>("");
@@ -364,89 +360,12 @@ export default function TripDashboardPage() {
     };
 
     useEffect(() => {
-        if (!dashboard) return;
-        if (!emailSubject) {
-            setEmailSubject(`Pozvánka: ${dashboard.trip.name}`);
-        }
-        if (!emailBody) {
-            const formatDate = (dStr: string) => {
-                if (!dStr) return "";
-                const [y, m, d] = dStr.split("-");
-                return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-            };
-            const dateLabel = `${formatDate(dashboard.trip.startDate)}${dashboard.trip.endDate ? ` - ${formatDate(dashboard.trip.endDate)}` : ""}`;
-            setEmailBody(`Ahoj!\n\nPosíláme pozvánku na výpravu ${dashboard.trip.name} (${dateLabel}).\n\nProsíme o potvrzení účasti přes tento odkaz: @userlink\n\nDěkujeme!`);
-        }
-    }, [dashboard, emailSubject, emailBody]);
-
-    useEffect(() => {
         if (!dashboard || dashboard.role === "rover" || didEnsureParticipants) return;
         setDidEnsureParticipants(true);
         ensureParticipations({ tripId }).catch((error) => {
             console.error("Failed to ensure participations", error);
         });
     }, [dashboard, didEnsureParticipants, ensureParticipations, tripId]);
-
-    const handleSendEmail = async () => {
-        if (!emailSubject.trim() || !emailBody.trim()) {
-            showError({
-                title: "⚠️ Vyplňte pole",
-                message: "Musíte vyplnit předmět i text e-mailu.",
-                icon: "warning",
-            });
-            return;
-        }
-        setIsSendingEmail(true);
-        setEmailResult(null);
-        try {
-            const result = await sendTripEmail({
-                tripId,
-                subject: emailSubject.trim(),
-                body: emailBody,
-                baseUrl: window.location.origin
-            });
-            setEmailResult(result);
-            
-            // Show result modal
-            const failedCount = result.failed?.length || 0;
-            const successCount = result.sentCount || 0;
-            const skippedCount = result.skippedCount || 0;
-
-            if (failedCount === 0) {
-                showSuccess({
-                    title: "✅ Hotovo!",
-                    message: `Odesláno ${successCount} e-mailů${skippedCount > 0 ? `, ${skippedCount} přeskočeno` : ""}`,
-                    duration: 3000,
-                });
-            } else {
-                showError({
-                    title: "⚠️ Částečné selhání",
-                    message: `✅ ${successCount} odesláno | ⊘ ${skippedCount} přeskočeno | ❌ ${failedCount} selhalo`,
-                    icon: "warning",
-                    details: result.failed?.map(f => `${f.email}: ${f.error}`).join("\n"),
-                });
-            }
-        } catch (error: any) {
-            console.error(error);
-            
-            let errorMsg = error?.message || "Odeslání e-mailu selhalo.";
-            if (errorMsg.includes("Gmail")) {
-                errorMsg = "📧 " + errorMsg;
-            } else {
-                errorMsg = "❌ " + errorMsg;
-            }
-
-            showError({
-                title: "❌ Chyba",
-                message: errorMsg,
-                icon: "error",
-                canReport: true,
-                details: error?.message,
-            });
-        } finally {
-            setIsSendingEmail(false);
-        }
-    };
 
     if (dashboard === undefined) {
         return <div>Načítám přehled...</div>;
@@ -457,14 +376,15 @@ export default function TripDashboardPage() {
     }
 
     const { trip, base } = dashboard;
-    const validParticipants: any[] = participantRows || [];
+    const canSeeSensitive = Boolean(dashboard.role && dashboard.role !== "rover");
+    const validParticipants: any[] = canSeeSensitive ? (participantRows || []) : [];
     const participantsWithEmail = validParticipants.filter((p) => p.primaryEmail);
     const tripStaff = (dashboard as any).tripStaff || [];
     const leaderPresets = (dashboard as any).leaderPresets || [];
-    const attendingCount = dashboard.attendanceSummary.attending;
-    const notAttendingCount = dashboard.attendanceSummary.notAttending;
-    const pendingCount = dashboard.attendanceSummary.pending;
-    const canSeeSensitive = dashboard.role !== "rover";
+    const attendanceSummary = resolveAttendanceSummary(dashboard);
+    const attendingCount = attendanceSummary.attending;
+    const notAttendingCount = attendanceSummary.notAttending;
+    const pendingCount = attendanceSummary.pending;
     const overviewParticipants = canSeeSensitive ? validParticipants : [
         ...Array.from({ length: attendingCount }, () => ({ status: "attending" })),
         ...Array.from({ length: notAttendingCount }, () => ({ status: "not_attending" })),
