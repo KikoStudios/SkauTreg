@@ -1,7 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { getMemberEmailTargets, normalizeMemberContactFields } from "./lib/memberEmails";
-import { requireTripLeader, requireTroopEditor, requireTroopManager } from "./lib/auth";
+import { authError, requireTripLeader, requireTroopEditor, requireTroopManager } from "./lib/auth";
+
+function validateMessage(subject?: string, body?: string) {
+    if (subject !== undefined && (subject.trim().length < 1 || subject.length > 180)) authError("VALIDATION_ERROR", "Předmět musí mít 1 až 180 znaků.");
+    if (body !== undefined && (body.trim().length < 1 || body.length > 20_000)) authError("VALIDATION_ERROR", "Text musí mít 1 až 20 000 znaků.");
+}
 
 // Create a new email draft for a trip
 export const create = mutation({
@@ -11,6 +16,7 @@ export const create = mutation({
         body: v.string(),
     },
     handler: async (ctx, args) => {
+        validateMessage(args.subject, args.body);
         const { user } = await requireTripLeader(ctx, args.tripId);
 
         const now = new Date().toISOString();
@@ -37,6 +43,7 @@ export const update = mutation({
         body: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        validateMessage(args.subject, args.body);
         const draft = await ctx.db.get(args.id);
         if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná byl smazán.");
         await requireTripLeader(ctx, draft.tripId);
@@ -158,7 +165,6 @@ export const getRecipients = query({
                     email: emails[0],
                     emails,
                     contacts,
-                    accessKey: p.secureAccessKey || p.accessKey,
                     hasEmail: emails.length > 0,
                     participationStatus: p.status,
                     responses: p.responses,
@@ -172,6 +178,21 @@ export const getRecipients = query({
             withoutEmail: recipients.filter((r) => !r.hasEmail).length,
             recipients: recipients.filter((r) => r.hasEmail),
         };
+    },
+});
+
+export const listRecipientsForSend = internalQuery({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
+        const trip = await ctx.db.get(args.tripId);
+        if (!trip) return [];
+        await requireTroopManager(ctx, trip.troopId);
+        const rows = await ctx.db.query("participations").withIndex("by_trip", (q) => q.eq("tripId", args.tripId)).collect();
+        return await Promise.all(rows.map(async (participation) => ({
+            participation,
+            member: normalizeMemberContactFields(await ctx.db.get(participation.memberId)),
+        })));
     },
 });
 

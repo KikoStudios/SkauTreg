@@ -166,7 +166,7 @@ export const remove = mutation({
 export const getDashboard = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
-        await requireTripLeader(ctx, args.tripId);
+        const authorization = await requireTripViewer(ctx, args.tripId);
         const trip = await ctx.db.get(args.tripId);
         if (!trip) return null;
 
@@ -175,16 +175,12 @@ export const getDashboard = query({
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
             .collect();
 
-        const participantsWithDetails = await Promise.all(
-            participations.map(async (p) => {
-                const member = await ctx.db.get(p.memberId);
-                return {
-                    ...p,
-                    accessKey: p.secureAccessKey || p.accessKey,
-                    member: normalizeMemberContactFields(member),
-                };
-            })
-        );
+        const attendanceSummary = {
+            total: participations.length,
+            attending: participations.filter((row) => row.status === "attending").length,
+            notAttending: participations.filter((row) => row.status === "not_attending").length,
+            pending: participations.filter((row) => row.status !== "attending" && row.status !== "not_attending").length,
+        };
 
         // Fetch assigned base if exists
         let base = null;
@@ -216,7 +212,9 @@ export const getDashboard = query({
                         const user = await ctx.db.get(record.userId);
                         if (!user) return null;
                         return {
-                            ...user,
+                            _id: user._id,
+                            name: user.name,
+                            image: user.image,
                             role: normalizeLeaderRole(record.role),
                             isOwner: user._id === troop.ownerId,
                         };
@@ -227,7 +225,7 @@ export const getDashboard = query({
                 const ownerInList = validLeaders.find((l) => l?._id === troop.ownerId);
 
                 if (!ownerInList && owner) {
-                    return [{ ...owner, role: "owner", isOwner: true }, ...validLeaders];
+                    return [{ _id: owner._id, name: owner.name, image: owner.image, role: "owner", isOwner: true }, ...validLeaders];
                 }
 
                 return validLeaders;
@@ -242,21 +240,23 @@ export const getDashboard = query({
         const tripStaffWithUsers = await Promise.all(
             tripStaff.map(async (row) => {
                 const user = row.userId ? await ctx.db.get(row.userId) : null;
-                return { ...row, user };
+                return { ...row, user: user ? { _id: user._id, name: user.name, image: user.image } : null };
             })
         );
 
-        const leaderPresets = await ctx.db
+        const leaderPresets = authorization.role === "rover" ? [] : await ctx.db
             .query("leader_presets")
             .withIndex("by_troop", (q) => q.eq("troopId", trip.troopId))
             .collect();
 
         return {
             trip,
-            participants: participantsWithDetails,
+            participants: [],
+            attendanceSummary,
             base,
             leaders,
-            currentUser,
+            currentUser: currentUser ? { _id: currentUser._id, name: currentUser.name, image: currentUser.image } : null,
+            role: authorization.role,
             tripStaff: tripStaffWithUsers,
             leaderPresets,
         };

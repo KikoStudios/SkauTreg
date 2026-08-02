@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
-import { getMemberEmailTargets, normalizeLeaderRole, normalizeMemberContactFields } from "./lib/memberEmails";
+import { getMemberEmailTargets, normalizeMemberContactFields } from "./lib/memberEmails";
 import nodemailer from "nodemailer";
 import { ImapFlow } from "imapflow";
 
@@ -20,6 +20,25 @@ const toBase64Url = (input: string) =>
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
     .replace(/=+$/g, "");
+
+const escapeHtml = (value: string) => value
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#039;");
+
+const appOrigin = () => {
+  const value = process.env.APP_ORIGIN?.replace(/\/$/, "");
+  if (!value || !/^https:\/\//.test(value)) throw new Error("APP_ORIGIN_NOT_CONFIGURED");
+  return value;
+};
+
+const activeCapabilityKey = (participation: { secureAccessKey?: string; accessKey: string; legacyAccessExpiresAt?: string }) => {
+  if (participation.secureAccessKey) return participation.secureAccessKey;
+  const expires = participation.legacyAccessExpiresAt ? Date.parse(participation.legacyAccessExpiresAt) : NaN;
+  return Number.isFinite(expires) && expires >= Date.now() ? participation.accessKey : null;
+};
 
 // Encode subject for RFC 2047 compliance
 const encodeSubject = (subject: string) => {
@@ -133,7 +152,7 @@ export const sendTripEmail = action({
     tripId: v.id("trips"),
     subject: v.string(),
     body: v.string(),
-    baseUrl: v.string(),
+    baseUrl: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ sentCount: number; skippedCount: number; failed: Array<{ email: string; error: string }>; total: number }> => {
     await ctx.runMutation(api.rateLimits.consume, { operation: "email_send" });
@@ -151,16 +170,10 @@ export const sendTripEmail = action({
     });
     if (!troop) throw new Error("Troop not found");
 
-    const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: dashboard.trip.troopId });
-    const canSend = leaders?.some((l: any) => {
-      const role = normalizeLeaderRole(l.role);
-      return l?._id === user._id && (role === "owner" || role === "main_leader" || role === "leader");
-    });
-    if (!canSend) throw new Error("Nemáte oprávnění rozesílat emaily.");
-
-    // Use troop's OAuth if available, otherwise fallback to global
-    const troopRefreshToken = (troop as any).gmailOAuth?.refreshToken;
-    const senderEmail = (troop as any).gmailOAuth?.email;
+    const recipients = await ctx.runQuery(internal.emailDrafts.listRecipientsForSend, { tripId: args.tripId });
+    const provider = (troop as any).emailProvider;
+    const troopRefreshToken = provider?.provider === "gmail" ? provider.refreshToken : (troop as any).gmailOAuth?.refreshToken;
+    const senderEmail = provider?.provider === "gmail" ? provider.email : (troop as any).gmailOAuth?.email;
     
     if (!troopRefreshToken) {
       throw new Error("Gmail není připojen. Připojte Gmail v Nastavení → Emaily.");
@@ -174,27 +187,30 @@ export const sendTripEmail = action({
     const replyTo = troop.infoEmail || troop.contactEmail || undefined;
 
     const accessToken = await getGmailAccessToken(troopRefreshToken);
-    const baseUrl = args.baseUrl.replace(/\/$/, "");
+    const baseUrl = appOrigin();
 
     let sentCount = 0;
     let skippedCount = 0;
     const failed: Array<{ email: string; error: string }> = [];
 
-    for (const p of dashboard.participants) {
-      const member = normalizeMemberContactFields(p.member);
+    for (const row of recipients) {
+      const member = normalizeMemberContactFields(row.member);
       const emails = getMemberEmailTargets(member);
       if (emails.length === 0) {
         skippedCount++;
         continue;
       }
 
-      const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
+      const capabilityKey = activeCapabilityKey(row.participation);
+      if (!capabilityKey) { skippedCount++; continue; }
+      const userLink = `${baseUrl}/rsvp/${capabilityKey}`;
       const memberName = member?.name || "";
       
       // Replace smart tags - no @userlink support
-      const html = args.body
-        .replace(/<user\.sign\.link>/g, userLink)
-        .replace(/<user\.name>/g, memberName)
+      const html = escapeHtml(args.body)
+        .replace(/&lt;user\.sign\.link&gt;/g, escapeHtml(userLink))
+        .replace(/@userlink/g, escapeHtml(userLink))
+        .replace(/&lt;user\.name&gt;/g, escapeHtml(memberName))
         .replace(/\n/g, "<br/>");
 
       for (const email of emails) {
@@ -218,7 +234,7 @@ export const sendTripEmail = action({
       sentCount,
       skippedCount,
       failed,
-      total: dashboard.participants.length,
+      total: recipients.length,
     };
   },
 });
@@ -374,8 +390,9 @@ async function sendSmtpMessage(params: {
 export const sendFromDraft = action({
   args: {
     draftId: v.id("email_drafts"),
-    baseUrl: v.string(),
+    baseUrl: v.optional(v.string()),
     memberIds: v.optional(v.array(v.id("members"))),
+    idempotencyKey: v.string(),
   },
   handler: async (ctx, args): Promise<{ 
     sentCount: number; 
@@ -403,69 +420,26 @@ export const sendFromDraft = action({
       });
       if (!troop) throw new Error("Troop not found");
 
-      // Check permissions - vedoucí (normal leader) and main_leader can send
-      const leaders = await ctx.runQuery(api.troops.getLeaders, { troopId: trip.trip.troopId });
-      const canSend = leaders?.some((l: any) => {
-        const role = normalizeLeaderRole(l.role);
-        return l?._id === user._id && (role === "owner" || role === "main_leader" || role === "leader");
-      });
-      
-      if (!canSend) {
-        return {
-          sentCount: 0,
-          skippedCount: 0,
-          failed: [],
-          total: 0,
-          error: "Pouze vedoucí mohou odesílat e-maily. Kontaktujte vedoucího jednotky.",
-        };
-      }
-
-      // Use troop's email provider (new format or legacy Gmail)
+      // getEmailConfiguration enforces owner/main-leader permission.
       const emailProvider = (troop as any).emailProvider;
       const troopGmail = (troop as any).gmailOAuth;
-      
-      // Determine which provider to use
       let accessToken: string | null = null;
-      let smtpConfig: any = null;
-      
       if (emailProvider?.provider === "gmail" || (!emailProvider && troopGmail)) {
-        // Gmail OAuth
         const troopRefreshToken = emailProvider?.refreshToken || troopGmail?.refreshToken;
         const senderEmail = emailProvider?.email || troopGmail?.email;
         if (!troopRefreshToken || !senderEmail) {
           throw new Error("Gmail není připojen. Připojte Gmail v nastavení jednotky.");
         }
         accessToken = await getGmailAccessToken(troopRefreshToken);
-      } else if (emailProvider?.provider === "seznam" || emailProvider?.provider === "centrum") {
-        // SMTP
-        if (!emailProvider?.smtpHost || !emailProvider?.smtpPort || !emailProvider?.smtpPassword) {
-          throw new Error("SMTP není správně nakonfigurován. Zkontrolujte nastavení e-mailu.");
-        }
-        smtpConfig = {
-          smtpHost: emailProvider.smtpHost,
-          smtpPort: emailProvider.smtpPort,
-          smtpUser: emailProvider.email,
-          smtpPassword: emailProvider.smtpPassword,
-          // Add IMAP params for saving to Sent folder
-          imapHost: emailProvider.provider === "seznam" ? "imap.seznam.cz" : "imap.centrum.cz",
-          imapPort: 993,
-        };
-      } else if (emailProvider?.provider === "google-groups") {
-        // Google Groups - use first member's email or fallback to Gmail
-        const troopRefreshToken = emailProvider?.refreshToken || troopGmail?.refreshToken;
-        const senderEmail = emailProvider?.email || troopGmail?.email;
-        if (!troopRefreshToken || !senderEmail) {
-          throw new Error("Google Groups není správně připojen.");
-        }
-        accessToken = await getGmailAccessToken(troopRefreshToken);
       } else {
-        throw new Error("Žádný e-mailový provider není připojen. Připojte e-mail v nastavení jednotky.");
+        throw new Error("GMAIL_RECONNECT_REQUIRED");
       }
       
       const fromName = troop.name || process.env.GMAIL_FROM_NAME || "SkautREG";
       const replyTo = troop.infoEmail || troop.contactEmail || undefined;
       const senderEmail = emailProvider?.email || troopGmail?.email;
-      const baseUrl = args.baseUrl.replace(/\/$/, "");
+      const baseUrl = appOrigin();
+      const recipients = await ctx.runQuery(internal.emailDrafts.listRecipientsForSend, { tripId: draft.tripId });
 
       let sentCount = 0;
       let skippedCount = 0;
@@ -473,25 +447,44 @@ export const sendFromDraft = action({
 
       // Filter participants by selected memberIds if provided
       const selectedMemberIds = args.memberIds ? new Set(args.memberIds) : null;
-      const participantsToSend = selectedMemberIds 
-        ? trip.participants.filter((p: any) => selectedMemberIds.has(p.member?._id))
-        : trip.participants;
+      const participantsToSend = selectedMemberIds
+        ? recipients.filter((row) => row.member && selectedMemberIds.has(row.member._id))
+        : recipients;
+      if (!/^[a-zA-Z0-9_-]{16,128}$/.test(args.idempotencyKey)) throw new Error("VALIDATION_ERROR");
+      const attemptResult = await ctx.runMutation(internal.emailDelivery.startAttempt, {
+        draftId: args.draftId,
+        tripId: draft.tripId,
+        requestedBy: user._id,
+        idempotencyKey: args.idempotencyKey,
+        recipientCount: participantsToSend.length,
+      });
+      if (!attemptResult.created) {
+        if (attemptResult.attempt.status === "sent" || attemptResult.attempt.status === "partial" || attemptResult.attempt.status === "failed") {
+          return { sentCount: attemptResult.attempt.sentCount, skippedCount: 0, failed: [], total: attemptResult.attempt.recipientCount };
+        }
+        throw new Error("EMAIL_SEND_IN_PROGRESS");
+      }
+      const attempt = attemptResult.attempt;
+      if (!attempt) throw new Error("EMAIL_ATTEMPT_FAILED");
 
-      for (const p of participantsToSend) {
-        const member = normalizeMemberContactFields(p.member);
+      for (const row of participantsToSend) {
+        const member = normalizeMemberContactFields(row.member);
         const emails = getMemberEmailTargets(member);
         if (emails.length === 0) {
           skippedCount++;
           continue;
         }
 
-        const userLink = `${baseUrl}/rsvp/${p.accessKey}`;
+        const capabilityKey = activeCapabilityKey(row.participation);
+        if (!capabilityKey) { skippedCount++; continue; }
+        const userLink = `${baseUrl}/rsvp/${capabilityKey}`;
         const memberName = member?.name || "";
         
         // Replace smart tags
-        const bodyText = draft.body
-          .replace(/<user\.sign\.link>/g, userLink)
-          .replace(/<user\.name>/g, memberName);
+        const bodyText = escapeHtml(draft.body)
+          .replace(/&lt;user\.sign\.link&gt;/g, escapeHtml(userLink))
+          .replace(/@userlink/g, escapeHtml(userLink))
+          .replace(/&lt;user\.name&gt;/g, escapeHtml(memberName));
         
         // Create simple, personal HTML (avoid promotional styling)
         const html = `<!DOCTYPE html>
@@ -513,15 +506,6 @@ ${bodyText.replace(/\n/g, "<br/>")}
                 html,
                 replyTo,
               });
-            } else if (smtpConfig) {
-              await sendSmtpMessage({
-                ...smtpConfig,
-                from: `${fromName} <${senderEmail}>`,
-                to: email,
-                subject: draft.subject,
-                html,
-                replyTo,
-              });
             }
             sentCount++;
           } catch (err: any) {
@@ -530,26 +514,28 @@ ${bodyText.replace(/\n/g, "<br/>")}
         }
       }
 
-      // Mark draft as sent
+      await ctx.runMutation(internal.emailDelivery.completeAttempt, {
+        attemptId: attempt._id,
+        sentCount,
+        failedCount: failed.length,
+      });
+
+      // Mark a draft sent only after every selected delivery succeeded.
+      if (failed.length === 0) {
       await ctx.runMutation(api.emailDrafts.markAsSent, {
         id: args.draftId,
         recipientCount: sentCount,
       });
+      }
 
       return {
         sentCount,
         skippedCount,
         failed,
-        total: trip.participants.length,
+        total: recipients.length,
       };
     } catch (err: any) {
-      console.error("mailer:sendFromDraft failed", {
-        draftId: args.draftId,
-        baseUrl: args.baseUrl,
-        hasClientId: Boolean(process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID),
-        hasClientSecret: Boolean(process.env.GMAIL_CLIENT_SECRET),
-        error: err?.message || err,
-      });
+      console.error("mailer.sendFromDraft failed", { operation: "email_send" });
       const message = err?.message || "Unknown error";
       throw new Error(`[mailer:sendFromDraft] ${message}`);
     }

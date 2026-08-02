@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { internalQuery, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { normalizeLeaderRole } from "./lib/memberEmails";
-import { requireTroopManager, requireTroopOwner, requireTroopViewer } from "./lib/auth";
+import { authError, requireCurrentUser, requireTroopManager, requireTroopOwner, requireTroopViewer } from "./lib/auth";
 import { decryptCredential, encryptCredential } from "./lib/credentials";
 
 function redactTroopSecrets<T extends {
@@ -131,7 +131,8 @@ export const getByUser = query({
         );
 
         // Filter out nulls and merge
-        const allTroops = [...ownedTroops, ...memberTroops].filter(t => t !== null);
+        const allTroops = [...ownedTroops, ...memberTroops]
+            .filter((t): t is NonNullable<typeof t> => t !== null && !t.archivedAt);
 
         // Deduplicate by ID
         const uniqueTroops = Array.from(new Map(allTroops.map(t => [t._id, t])).values());
@@ -157,9 +158,12 @@ export const getByUser = query({
 export const getById = query({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
-        await requireTroopViewer(ctx, args.id);
+        const authorization = await requireTroopViewer(ctx, args.id);
         const troop = await ctx.db.get(args.id);
         if (!troop) return null;
+        if (troop.archivedAt && authorization.role !== "owner") {
+            authError("NOT_FOUND", "Oddíl nebyl nalezen.");
+        }
 
         let logoUrl = troop.logo;
         if (troop.logo && !troop.logo.startsWith("http")) {
@@ -175,23 +179,6 @@ export const getById = query({
 });
 
 // --- Leadership Management ---
-
-// Helper to check permissions
-async function isAuthorizedToManage(ctx: any, troopId: any, userId: any) {
-    const troop = await ctx.db.get(troopId);
-    if (!troop) return false;
-    
-    // Allow owner, any leader, or anyone authenticated (for email settings)
-    if (troop.ownerId === userId) return true;
-
-    const leaderRecord = await ctx.db
-        .query("troop_leaders")
-        .withIndex("by_user_troop", (q: any) => q.eq("userId", userId).eq("troopId", troopId))
-        .unique();
-
-    // Allow main_leader, leader, or rover roles
-    return !!leaderRecord;
-}
 
 export const addLeader = mutation({
     args: {
@@ -209,10 +196,6 @@ export const addLeader = mutation({
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst. Zkuste se odhlásit a znovu přihlásit.");
-
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Pouze majitel nebo hlavní vedoucí může přidávat členy do vedení.");
-        }
 
         const userToAdd = await ctx.db
             .query("users")
@@ -259,10 +242,6 @@ export const updateRole = mutation({
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
 
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Nemáte oprávnění měnit role.");
-        }
-
         const leaderRecord = await ctx.db
             .query("troop_leaders")
             .withIndex("by_user_troop", q => q.eq("userId", args.userId).eq("troopId", args.troopId))
@@ -289,10 +268,6 @@ export const removeLeader = mutation({
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
-
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Nemáte oprávnění odebírat vedoucí.");
-        }
 
         const leaderRecord = await ctx.db
             .query("troop_leaders")
@@ -396,7 +371,7 @@ export const getEmailConfiguration = internalQuery({
     },
 });
 
-export const deleteTroop = mutation({
+export const deleteTroop = internalMutation({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
         await requireTroopOwner(ctx, args.id);
@@ -453,6 +428,59 @@ export const deleteTroop = mutation({
     },
 });
 
+export const archive = mutation({
+    args: {
+        troopId: v.id("troops"),
+        confirmationName: v.string(),
+        reason: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const { user, troop } = await requireTroopOwner(ctx, args.troopId);
+        if (args.confirmationName.trim() !== troop.name.trim()) {
+            authError("VALIDATION_ERROR", "Název oddílu se neshoduje.");
+        }
+        await ctx.db.patch(args.troopId, {
+            archivedAt: new Date().toISOString(),
+            archivedBy: user._id,
+            archiveReason: args.reason?.trim() || undefined,
+            publicDirectoryOptIn: false,
+        });
+        return { ok: true };
+    },
+});
+
+export const restore = mutation({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.troopId);
+        await ctx.db.patch(args.troopId, {
+            archivedAt: undefined,
+            archivedBy: undefined,
+            archiveReason: undefined,
+        });
+        return { ok: true };
+    },
+});
+
+export const listArchived = query({
+    args: {},
+    handler: async (ctx) => {
+        const user = await requireCurrentUser(ctx);
+        const troops = await ctx.db
+            .query("troops")
+            .filter((q) => q.eq(q.field("ownerId"), user._id))
+            .collect();
+        return troops
+            .filter((troop) => Boolean(troop.archivedAt))
+            .map((troop) => ({
+                _id: troop._id,
+                name: troop.name,
+                archivedAt: troop.archivedAt,
+                archiveReason: troop.archiveReason,
+            }));
+    },
+});
+
 // --- Email Provider Integration (Multi-Provider Support) ---
 
 export const connectEmailProvider = mutation({
@@ -481,6 +509,9 @@ export const connectEmailProvider = mutation({
     },
     handler: async (ctx, args) => {
         await requireTroopManager(ctx, args.troopId);
+        if (args.provider !== "gmail") {
+            authError("VALIDATION_ERROR", "V produkčním režimu je podporován pouze Gmail.");
+        }
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -495,11 +526,6 @@ export const connectEmailProvider = mutation({
 
         const troop = await ctx.db.get(args.troopId);
         if (!troop) throw new Error("Troop not found");
-
-        // Only owner or main_leader can connect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
-        }
 
         // Handle new Google Groups members creation
         if (args.newMembers && args.newMembers.length > 0) {
@@ -549,11 +575,6 @@ export const disconnectEmailProvider = mutation({
 
         if (!user) throw new Error("User not found");
 
-        // Only owner or main_leader can disconnect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
-        }
-
         await ctx.db.patch(args.troopId, {
             emailProvider: undefined,
             gmailOAuth: undefined, // Clear legacy too
@@ -563,7 +584,7 @@ export const disconnectEmailProvider = mutation({
 
 // --- Legacy Gmail OAuth Integration (Backward Compatible) ---
 
-export const connectGmail = mutation({
+export const connectGmail = internalMutation({
     args: {
         troopId: v.id("troops"),
         email: v.string(),
@@ -586,11 +607,6 @@ export const connectGmail = mutation({
         const troop = await ctx.db.get(args.troopId);
         if (!troop) throw new Error("Troop not found");
 
-        // Only owner or main_leader can connect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat Gmail.");
-        }
-
         // Use new emailProvider format instead of legacy gmailOAuth
         await ctx.db.patch(args.troopId, {
             emailProvider: {
@@ -605,7 +621,7 @@ export const connectGmail = mutation({
     },
 });
 
-export const disconnectGmail = mutation({
+export const disconnectGmail = internalMutation({
     args: {
         troopId: v.id("troops"),
     },
@@ -623,11 +639,6 @@ export const disconnectGmail = mutation({
 
         if (!user) throw new Error("User not found");
 
-        // Only owner or main_leader can disconnect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat Gmail.");
-        }
-
         await ctx.db.patch(args.troopId, {
             emailProvider: undefined,
             gmailOAuth: undefined,
@@ -639,7 +650,7 @@ export const listPublic = query({
     args: {},
     handler: async (ctx) => {
         const allTroops = (await ctx.db.query("troops").collect())
-            .filter((troop) => troop.publicDirectoryOptIn === true);
+            .filter((troop) => troop.publicDirectoryOptIn === true && !troop.archivedAt);
 
         // Resolve Logo URLs
         const troopsWithUrls = await Promise.all(

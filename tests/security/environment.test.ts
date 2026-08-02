@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateProductionEnv } from "../../src/lib/env";
+import { productionEnvSchema, validateProductionEnv } from "../../src/lib/env";
 
 describe("production environment validation", () => {
   it.each([
@@ -22,5 +22,11 @@ describe("production environment validation", () => {
         VERCEL_ENV: "production",
       }),
     ).toThrow("Invalid production environment");
+  });
+
+  it("rejects the former organization-name placeholder", () => {
+    const result = productionEnvSchema.safeParse({ NEXT_PUBLIC_STREDISKO_NAME: "LMAOOOOO" });
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues.some((issue) => issue.path.join(".") === "NEXT_PUBLIC_STREDISKO_NAME")).toBe(true);
   });
 });

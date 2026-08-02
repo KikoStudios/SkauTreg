@@ -24,7 +24,7 @@ async function seed() {
     const troopId = await ctx.db.insert("troops", { name: "A", ownerId, publicDirectoryOptIn: false });
     const otherTroopId = await ctx.db.insert("troops", { name: "B", ownerId: outsiderId, publicDirectoryOptIn: false });
     await ctx.db.insert("troop_leaders", { troopId, userId: roverId, role: "rover" });
-    await ctx.db.insert("members", { troopId, name: "Sensitive", guardianEmail: "guardian@example.cz" });
+    const memberId = await ctx.db.insert("members", { troopId, name: "Sensitive", guardianEmail: "guardian@example.cz" });
     const tripId = await ctx.db.insert("trips", {
       troopId,
       name: "Trip",
@@ -32,6 +32,7 @@ async function seed() {
       location: "Prague",
       startDate: "2026-08-01",
     });
+    await ctx.db.insert("participations", { tripId, memberId, status: "pending", accessKey: "legacy", secureAccessKey: "secure" });
     return { ownerId, outsiderId, roverId, troopId, otherTroopId, tripId };
   });
   return { t, fixture };
@@ -100,5 +101,40 @@ describe("Convex authorization", () => {
     const integrations = await owner.query(api.integrations.getByTroop, { troopId: fixture.troopId });
     expect(integrations[0]).not.toHaveProperty("configPayload");
     expect(integrations[0]).not.toHaveProperty("webhookUrl");
+  });
+
+  it("keeps participant PII out of the rover dashboard", async () => {
+    const { t, fixture } = await seed();
+    const rover = t.withIdentity({ tokenIdentifier: "test|rover" });
+    const dashboard = await rover.query(api.trips.getDashboard, { tripId: fixture.tripId });
+    expect(dashboard?.participants).toEqual([]);
+    expect(dashboard?.attendanceSummary.total).toBe(1);
+    await expect(rover.query(api.tripParticipants.list, { tripId: fixture.tripId })).rejects.toThrow();
+  });
+
+  it("archives a troop without deleting its data", async () => {
+    const { t, fixture } = await seed();
+    const owner = t.withIdentity({ tokenIdentifier: "test|owner" });
+    await owner.mutation(api.troops.archive, { troopId: fixture.troopId, confirmationName: "A" });
+    const archived = await owner.query(api.troops.listArchived, {});
+    expect(archived).toHaveLength(1);
+    const trip = await t.run((ctx) => ctx.db.get(fixture.tripId));
+    expect(trip).not.toBeNull();
+  });
+
+  it("creates one trip share from only explicitly selected same-trip tickets", async () => {
+    const { t, fixture } = await seed();
+    const { ticketId, foreignTicketId } = await t.run(async (ctx) => {
+      const now = new Date().toISOString();
+      const ticketId = await ctx.db.insert("transport_tickets", { tripId: fixture.tripId, storageId: "storage-a", name: "Tam", contentType: "application/pdf", createdAt: now, updatedAt: now });
+      const foreignTripId = await ctx.db.insert("trips", { troopId: fixture.otherTroopId, name: "Other", description: "Other", location: "Brno", startDate: "2027-09-01" });
+      const foreignTicketId = await ctx.db.insert("transport_tickets", { tripId: foreignTripId, storageId: "storage-b", name: "Foreign", contentType: "application/pdf", createdAt: now, updatedAt: now });
+      return { ticketId, foreignTicketId };
+    });
+    const owner = t.withIdentity({ tokenIdentifier: "test|owner" });
+    await owner.mutation(api.tripTicketShares.createOrUpdate, { tripId: fixture.tripId, selectedTicketIds: [ticketId], expiresAt: "2027-12-31" });
+    const share = await owner.query(api.tripTicketShares.getForManagement, { tripId: fixture.tripId });
+    expect(share?.selectedTicketIds).toEqual([ticketId]);
+    await expect(owner.mutation(api.tripTicketShares.createOrUpdate, { tripId: fixture.tripId, selectedTicketIds: [foreignTicketId], expiresAt: "2027-12-31" })).rejects.toThrow();
   });
 });

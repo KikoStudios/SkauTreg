@@ -39,6 +39,9 @@ export default defineSchema({
         contactEmail: v.optional(v.string()),
         infoEmail: v.optional(v.string()),
         publicDirectoryOptIn: v.optional(v.boolean()),
+        archivedAt: v.optional(v.string()),
+        archivedBy: v.optional(v.id("users")),
+        archiveReason: v.optional(v.string()),
         
         // Email provider integration (OAuth or SMTP)
         emailProvider: v.optional(v.object({
@@ -219,6 +222,21 @@ export default defineSchema({
         .index("by_route", ["routeId"])
         .index("by_share_slug", ["shareSlug"]),
 
+    trip_ticket_shares: defineTable({
+        tripId: v.id("trips"),
+        shareSlug: v.string(),
+        enabled: v.boolean(),
+        selectedTicketIds: v.array(v.id("transport_tickets")),
+        expiresAt: v.string(),
+        createdAt: v.string(),
+        createdBy: v.id("users"),
+        updatedAt: v.string(),
+        updatedBy: v.id("users"),
+        revokedAt: v.optional(v.string()),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_share_slug", ["shareSlug"]),
+
     participations: defineTable({
         tripId: v.id("trips"),
         memberId: v.id("members"),
@@ -233,6 +251,40 @@ export default defineSchema({
         .index("by_trip", ["tripId"])
         .index("by_access_key", ["accessKey"])
         .index("by_secure_access_key", ["secureAccessKey"]),
+
+    gmail_oauth_states: defineTable({
+        nonceHash: v.string(),
+        troopId: v.id("troops"),
+        userId: v.id("users"),
+        expiresAt: v.number(),
+        consumedAt: v.optional(v.string()),
+        createdAt: v.string(),
+    }).index("by_nonce_hash", ["nonceHash"]),
+
+    email_send_attempts: defineTable({
+        draftId: v.id("email_drafts"),
+        tripId: v.id("trips"),
+        requestedBy: v.id("users"),
+        idempotencyKey: v.string(),
+        status: v.string(),
+        recipientCount: v.number(),
+        sentCount: v.number(),
+        failedCount: v.number(),
+        createdAt: v.string(),
+        completedAt: v.optional(v.string()),
+    })
+        .index("by_draft", ["draftId"])
+        .index("by_idempotency_key", ["idempotencyKey"]),
+
+    email_deliveries: defineTable({
+        attemptId: v.id("email_send_attempts"),
+        memberId: v.id("members"),
+        contactKind: v.string(),
+        status: v.string(),
+        providerMessageId: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+        sentAt: v.optional(v.string()),
+    }).index("by_attempt", ["attemptId"]),
 
     trip_staff: defineTable({
         tripId: v.id("trips"),
