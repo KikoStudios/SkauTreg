@@ -9,7 +9,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import type { Point, Area } from "react-easy-crop";
-import EmailSettings from "../../../../components/EmailSettings";
+import GmailSettings from "../../../../components/GmailSettings";
 import styles from "./SettingsPage.module.css";
 
 // --- Helpers for Image Upload (Copied/Adapted) ---
@@ -87,10 +87,12 @@ export default function TroopSettingsPage() {
     const updateTroop = useMutation(api.troops.update);
     const setPublicDirectoryOptIn = useMutation(api.troops.setPublicDirectoryOptIn);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-    const deleteTroop = useMutation(api.troops.deleteTroop);
+    const archiveTroop = useMutation(api.troops.archive);
 
     const [activeTab, setActiveTab] = useState<"general" | "branding" | "gmail" | "danger">("general");
     const [isSaving, setIsSaving] = useState(false);
+    const [archiveConfirmation, setArchiveConfirmation] = useState("");
+    const [isArchiving, setIsArchiving] = useState(false);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -200,18 +202,14 @@ export default function TroopSettingsPage() {
         }
     };
 
-    const handleDelete = async () => {
-        const confirmText = prompt(`Pro potvrzení smazání napište "${troop?.name}"`);
-        if (confirmText === troop?.name) {
-            try {
-                await deleteTroop({ id: troopId });
-                router.push("/");
-            } catch (error) {
-                console.error(error);
-                alert("Chyba při mazání.");
-            }
-        } else {
-            alert("Názvy se neshodují.");
+    const handleArchive = async () => {
+        if (!troop || archiveConfirmation.trim() !== troop.name.trim()) return;
+        setIsArchiving(true);
+        try {
+            await archiveTroop({ troopId, confirmationName: archiveConfirmation });
+            router.push("/troop");
+        } finally {
+            setIsArchiving(false);
         }
     };
 
@@ -367,13 +365,18 @@ export default function TroopSettingsPage() {
                 {/* DANGER TAB */}
                 {activeTab === "danger" && (
                     <div className={`${styles.settingsPanel} ${styles.dangerPanel}`}>
-                        <h3 style={{ color: "#ef4444", fontWeight: "900", fontSize: "1.5rem", marginBottom: "1rem" }}>SMAZAT ODDÍL</h3>
+                        <h3 style={{ color: "#92400e", fontWeight: "900", fontSize: "1.5rem", marginBottom: "1rem" }}>ARCHIVOVAT ODDÍL</h3>
                         <p style={{ marginBottom: "2rem", fontWeight: "600" }}>
-                            Tato akce je nevratná. Smaže oddíl, všechny členy, výpravy a historii.
+                            Archivace skryje oddíl z běžné práce, ale nesmaže členy, výpravy ani historii. Obnovit jej může vlastník.
                         </p>
+                        <label style={{ display: "grid", gap: ".5rem", maxWidth: 420, marginBottom: "1rem", fontWeight: 800 }}>
+                            Pro potvrzení napište přesně „{troop.name}“
+                            <input value={archiveConfirmation} onChange={(event) => setArchiveConfirmation(event.target.value)} autoComplete="off" style={inputStyle} />
+                        </label>
                         <button
                             type="button"
-                            onClick={handleDelete}
+                            onClick={handleArchive}
+                            disabled={isArchiving || archiveConfirmation.trim() !== troop.name.trim()}
                             style={{
                                 padding: "1rem 2rem",
                                 backgroundColor: "#ef4444",
@@ -385,7 +388,7 @@ export default function TroopSettingsPage() {
                                 boxShadow: "4px 4px 0 0 #b91c1c"
                             }}
                         >
-                            SMAZAT ODDÍL &quot;{troop.name}&quot;
+                            {isArchiving ? "Archivuji…" : `Archivovat oddíl „${troop.name}“`}
                         </button>
                     </div>
                 )}
@@ -393,7 +396,7 @@ export default function TroopSettingsPage() {
                 {/* GMAIL TAB */}
                 {activeTab === "gmail" && (
                     <div className={styles.settingsPanel}>
-                        <EmailSettings 
+                        <GmailSettings
                             troopId={troopId}
                             isAuthorized={true}
                         />

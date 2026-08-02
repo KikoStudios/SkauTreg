@@ -18,8 +18,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     const troop = useQuery(api.troops.getById, { id: troopId });
     const members = useQuery(api.members.list, { troopId });
     const sentHistory = useQuery(api.emailDrafts.listSentByTroop, { troopId });
-    const connectGmail = useMutation(api.troops.connectGmail);
-    const disconnectGmail = useMutation(api.troops.disconnectGmail);
+    const disconnectGmail = useMutation(api.troops.disconnectEmailProvider);
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -77,30 +76,6 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     }, []); // Empty dependency array - run once on mount
 
 
-    const handleOAuthCallback = async (email: string, refreshToken: string) => {
-        setIsConnecting(true);
-        try {
-            await connectGmail({ troopId, email, refreshToken });
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            showSuccess({
-                title: "✅ Úspěch",
-                message: `Gmail účet ${email} připojen. Nyní můžete odesílat e-maily z tohoto účtu.`,
-                duration: 4000,
-            });
-        } catch (error: any) {
-            showError({
-                title: "❌ Chyba při uložení",
-                message: "Nepodařilo se uložit Gmail propojení. Zkuste znovu.",
-                icon: "error",
-                details: error?.message || "Unknown error",
-                canReport: true,
-            });
-        } finally {
-            setIsConnecting(false);
-        }
-    };
-
     const handleLoginClick = () => {
         router.push(`/settings/${troopId}/gmail-connect`);
     };
@@ -151,7 +126,8 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
         return <div>Načítání...</div>;
     }
 
-    const gmailOAuth = (troop as any).gmailOAuth;
+    const emailProvider = (troop as any).emailProvider;
+    const gmailOAuth = emailProvider?.provider === "gmail" ? emailProvider : (troop as any).gmailOAuth;
     const isConnected = !!gmailOAuth;
     const memberEmails = Array.from(
         new Set(
@@ -217,6 +193,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
                     Propojte oficiální e-mailovou adresu oddílu (např. info@vasoddil.cz) přes Google OAuth 2.0. Tento e-mail bude použit jako odesílatel pro všechny zprávy k výpravám.
                 </p>
+                {gmailOAuth?.requiresReconnect && <p role="alert" style={{ padding: ".75rem", background: "#fef3c7", border: "2px solid #92400e", borderRadius: 8, fontWeight: 800 }}>Připojení je potřeba bezpečně obnovit. Klikněte na „Připojit Gmail“ a znovu udělte oprávnění.</p>}
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                     <div style={{
                         padding: "0.5rem 0.75rem",

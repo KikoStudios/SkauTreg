@@ -10,7 +10,7 @@ const formatDate = (value?: string | null) => {
     return day && month && year ? `${day}. ${month}. ${year}` : value;
 };
 
-export function TripOverview({ trip, participants, staff, onManageStaff }: { trip: any; participants: any[]; staff: any[]; onManageStaff: () => void }) {
+export function TripOverview({ trip, participants, staff, onManageStaff, canManageStaff = true }: { trip: any; participants: any[]; staff: any[]; onManageStaff: () => void; canManageStaff?: boolean }) {
     const attending = participants.filter(item => item.status === "attending").length;
     const declined = participants.filter(item => item.status === "not_attending").length;
     const pending = participants.length - attending - declined;
@@ -49,7 +49,7 @@ export function TripOverview({ trip, participants, staff, onManageStaff }: { tri
                     </div>
                 </section>
                 <section className={styles.panel}>
-                    <div className={styles.panelHeading}><div><span className={styles.eyebrow}>Tým výpravy</span><h3>Vedoucí a roveři</h3></div><button className={styles.secondaryButton} onClick={onManageStaff}><Plus size={16} /> Spravovat</button></div>
+                    <div className={styles.panelHeading}><div><span className={styles.eyebrow}>Tým výpravy</span><h3>Vedoucí a roveři</h3></div>{canManageStaff && <button className={styles.secondaryButton} onClick={onManageStaff}><Plus size={16} /> Spravovat</button>}</div>
                     {staff.length === 0 ? <div className={styles.emptyInline}>Zatím není přiřazen žádný vedoucí.</div> : <div className={styles.peopleList}>{staff.slice(0, 5).map(person => <div key={person._id}><span className={styles.avatar}>{(person.user?.name || person.name || "?").slice(0, 1)}</span><div><strong>{person.user?.name || person.name}</strong><small>{person.role === "rover" ? "Rover" : "Vedoucí"}{person.benefit ? ` · ${person.benefit}` : ""}</small></div></div>)}</div>}
                 </section>
             </div>
@@ -89,36 +89,57 @@ export function TripBase({ base, onUnassign }: { base: any; onUnassign: () => vo
     );
 }
 
-export function TripParticipants({ participants, customFields, copiedKey, onCopy }: { participants: any[]; customFields: any[]; copiedKey: string | null; onCopy: (key: string) => void }) {
+export type TripParticipantDTO = {
+    participationId: string;
+    memberId: string;
+    name: string;
+    primaryEmail?: string;
+    guardianContacts: Array<{ label: string; email: string }>;
+    status: "pending" | "attending" | "not_attending";
+    answers: Array<{ fieldId: string; label: string; displayValue: string }>;
+    hasSecureLink: boolean;
+    legacyLinkActive: boolean;
+};
+
+export function TripParticipants({ participants, copiedKey, onCopy, onRegenerate }: {
+    participants: TripParticipantDTO[];
+    copiedKey: string | null;
+    onCopy: (participationId: string) => void;
+    onRegenerate: (participationId: string, name: string) => void;
+}) {
+    const [query, setQuery] = useState("");
+    const [status, setStatus] = useState<"all" | TripParticipantDTO["status"]>("all");
+    const [email, setEmail] = useState<"all" | "with" | "without">("all");
     const [answerDetail, setAnswerDetail] = useState<{ member: string; question: string; answer: string } | null>(null);
-    const parse = (value: unknown): Record<string, unknown> => {
-        let parsed = value;
-        for (let attempt = 0; attempt < 3 && typeof parsed === "string"; attempt += 1) {
-            try { parsed = JSON.parse(parsed); } catch { return {}; }
-        }
-        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-    };
-    const answerFor = (person: any, field: any) => {
-        const answers = parse(person.responses);
-        const direct = answers[field.label] ?? answers[field.id] ?? answers[field._id];
-        if (typeof direct === "boolean") return direct ? "Ano" : "Ne";
-        if (Array.isArray(direct)) return direct.join(", ");
-        return direct === undefined || direct === null || direct === "" ? "—" : String(direct);
-    };
+    const filtered = participants
+        .filter((person) => person.name.toLocaleLowerCase("cs").includes(query.trim().toLocaleLowerCase("cs")))
+        .filter((person) => status === "all" || person.status === status)
+        .filter((person) => email === "all" || (email === "with" ? Boolean(person.primaryEmail) : !person.primaryEmail))
+        .sort((a, b) => a.name.localeCompare(b.name, "cs"));
+    const label = (value: TripParticipantDTO["status"]) => value === "attending" ? "Jede" : value === "not_attending" ? "Nejede" : "Bez reakce";
 
     if (participants.length === 0) {
         return <section className={styles.participantEmpty}><img src="/illustrations/ill-participant-group.png" alt="" aria-hidden="true" /><div><h3>Zatím bez účastníků</h3><p>Jakmile rozešlete přihlášky, stav účasti a odpovědi se objeví přehledně na tomto místě.</p></div></section>;
     }
 
-    return (
-        <div className={styles.participantWorkspace}>
-            <section className={styles.tablePanel}>
-                <div className={styles.participantToolbar}><div><strong>{participants.length} účastníků</strong><span>Odpovědi jsou zobrazené přímo v seznamu.</span></div><div className={styles.statusLegend}><span data-status="attending">Jede</span><span data-status="pending">Bez reakce</span><span data-status="not_attending">Nejede</span></div></div>
-                <div className={styles.tableScroll}><table><thead><tr><th>Člen</th><th>Stav</th>{customFields.map((field, index) => <th key={field.id || field._id || `${field.label}-${index}`}>{field.label}</th>)}<th>Odkaz</th></tr></thead><tbody>{participants.map(person => <tr key={person._id}><td><strong>{person.member?.name}</strong><small>{person.member?.email || person.member?.guardianEmail || "Bez e-mailu"}</small></td><td><span className={styles.status} data-status={person.status}>{person.status === "attending" ? "Jede" : person.status === "not_attending" ? "Nejede" : "Bez reakce"}</span></td>{customFields.map((field, index) => { const answer = answerFor(person, field); const needsDetail = answer.length > 34; return <td key={field.id || field._id || `${field.label}-${index}`}><button className={styles.answerCell} data-empty={answer === "—"} title={needsDetail ? "Zobrazit celou odpověď" : answer} onClick={() => needsDetail && setAnswerDetail({ member: person.member?.name || "Účastník", question: field.label, answer })}>{answer}</button></td>; })}<td><button className={styles.iconCopyButton} aria-label="Kopírovat přihlašovací odkaz" onClick={() => onCopy(person.accessKey)}><ClipboardCopy size={15} />{copiedKey === person.accessKey && <span>Zkopírováno</span>}</button></td></tr>)}</tbody></table></div>
-            </section>
-            {answerDetail && <div className={styles.answerBackdrop} onClick={() => setAnswerDetail(null)}><section className={styles.answerDialog} onClick={event => event.stopPropagation()}><header><div><span>{answerDetail.member}</span><h3>{answerDetail.question}</h3></div><button onClick={() => setAnswerDetail(null)}>×</button></header><p>{answerDetail.answer}</p></section></div>}
-        </div>
-    );
+    return <div className={styles.participantWorkspace}>
+        <section className={styles.participantStats} aria-label="Souhrn účasti">
+            <span><b>{participants.filter((p) => p.status === "attending").length}</b> jede</span>
+            <span><b>{participants.filter((p) => p.status === "pending").length}</b> bez reakce</span>
+            <span><b>{participants.filter((p) => p.status === "not_attending").length}</b> nejede</span>
+            <span><b>{participants.filter((p) => !p.primaryEmail).length}</b> bez e-mailu</span>
+        </section>
+        <section className={styles.tablePanel}>
+            <div className={styles.participantFilters}>
+                <label>Hledat<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Jméno účastníka" /></label>
+                <label>Stav<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">Všechny stavy</option><option value="attending">Jede</option><option value="pending">Bez reakce</option><option value="not_attending">Nejede</option></select></label>
+                <label>E-mail<select value={email} onChange={(event) => setEmail(event.target.value as typeof email)}><option value="all">Všichni</option><option value="with">S e-mailem</option><option value="without">Bez e-mailu</option></select></label>
+            </div>
+            <div className={styles.tableScroll}><table><thead><tr><th>Člen</th><th>Stav</th><th>Odpovědi</th><th>Bezpečný odkaz</th></tr></thead><tbody>{filtered.map((person) => <tr key={person.participationId}><td><strong>{person.name}</strong><small>{person.primaryEmail || "Bez e-mailu"}</small></td><td><span className={styles.status} data-status={person.status}>{label(person.status)}</span></td><td><button className={styles.answerCell} onClick={() => person.answers[0] && setAnswerDetail({ member: person.name, question: "Odpovědi", answer: person.answers.map((item) => `${item.label}: ${item.displayValue}`).join("\n") })}>{person.answers.length ? `${person.answers.length} odpovědí` : "—"}</button></td><td><div className={styles.participantActions}><button onClick={() => onCopy(person.participationId)} disabled={!person.hasSecureLink}><ClipboardCopy size={15} />{copiedKey === person.participationId ? "Zkopírováno" : "Kopírovat"}</button><button onClick={() => onRegenerate(person.participationId, person.name)}>Obnovit</button>{person.legacyLinkActive && <small>Starý odkaz je ještě aktivní</small>}</div></td></tr>)}</tbody></table></div>
+            <div className={styles.participantCards}>{filtered.map((person) => <article key={person.participationId}><header><strong>{person.name}</strong><span className={styles.status} data-status={person.status}>{label(person.status)}</span></header><small>{person.primaryEmail || "Bez e-mailu"}</small><details><summary>Kontakty a odpovědi</summary>{person.guardianContacts.map((contact) => <p key={contact.email}><b>{contact.label}:</b> {contact.email}</p>)}{person.answers.map((answer) => <p key={answer.fieldId}><b>{answer.label}:</b> {answer.displayValue}</p>)}</details><button onClick={() => onCopy(person.participationId)} disabled={!person.hasSecureLink}>Kopírovat přihlašovací odkaz</button><button onClick={() => onRegenerate(person.participationId, person.name)}>Vytvořit nový odkaz</button></article>)}</div>
+        </section>
+        {answerDetail && <div className={styles.answerBackdrop} onClick={() => setAnswerDetail(null)}><section role="dialog" aria-modal="true" aria-labelledby="participant-answer-title" className={styles.answerDialog} onClick={(event) => event.stopPropagation()}><header><div><span>{answerDetail.member}</span><h3 id="participant-answer-title">{answerDetail.question}</h3></div><button aria-label="Zavřít" onClick={() => setAnswerDetail(null)}>×</button></header><p style={{ whiteSpace: "pre-wrap" }}>{answerDetail.answer}</p></section></div>}
+    </div>;
 }
 
 export function TripDocumentation({ documents, onOpenMain, onOpenDocument }: { documents: any[] | undefined; onOpenMain: () => void; onOpenDocument: (id: string) => void }) {

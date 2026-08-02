@@ -41,7 +41,7 @@ type ParsedTicket = {
 };
 
 type TicketSource = {
-  _id: unknown;
+  _id?: unknown;
   name: string;
   url?: string | null;
   parsed?: unknown;
@@ -175,10 +175,17 @@ function directionLabel(direction?: string) {
 
 export default function PublicTicketPage() {
   const params = useParams();
-  const code = (params.code as string | undefined)?.toUpperCase() || "";
-  const bundle = useQuery(api.publicTickets.getBundleByShareSlug, code ? { shareSlug: code } : "skip");
+  const code = (params.code as string | undefined) || "";
+  const tripShare = useQuery(api.tripTicketShares.getPublic, code ? { shareSlug: code } : "skip");
+  const legacyBundle = useQuery(api.publicTickets.getBundleByShareSlug, code ? { shareSlug: code } : "skip");
+  const bundle = tripShare?.status === "active"
+    ? { trip: tripShare.trip, route: null, tickets: tripShare.tickets }
+    : legacyBundle;
 
-  if (bundle === undefined) return <main className={styles.statePage}><strong>Načítám jízdenky…</strong></main>;
+  if (tripShare === undefined || legacyBundle === undefined) return <main className={styles.statePage}><strong>Načítám jízdenky…</strong></main>;
+  if (tripShare.status === "expired" || tripShare.status === "revoked") {
+    return <main className={styles.statePage}><section className={styles.stateCard}><span>Odkaz již není aktivní</span><h1>Platnost sdílení skončila</h1><p>Požádejte organizátora výpravy o nový odkaz.</p></section></main>;
+  }
   if (!bundle) {
     return <main className={styles.statePage}><section className={styles.stateCard}><span>Neplatný odkaz</span><h1>Jízdenky nejsou dostupné</h1><p>Požádejte organizátora výpravy o nový QR kód.</p></section></main>;
   }

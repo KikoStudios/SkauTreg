@@ -45,6 +45,7 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
     const [sendingDraftId, setSendingDraftId] = useState<Id<"email_drafts"> | null>(null);
     const [selectedMembers, setSelectedMembers] = useState<Set<Id<"members">>>(new Set());
     const [isSending, setIsSending] = useState(false);
+    const [sendConfirmed, setSendConfirmed] = useState(false);
 
     const allRecipients = Array.isArray(recipients?.recipients) ? recipients.recipients : [];
     const selectableRecipients = allRecipients.filter((recipient): recipient is typeof recipient & { memberId: Id<"members"> } => Boolean(recipient.memberId));
@@ -99,13 +100,14 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
     const openSend = (draft: any) => {
         setSendingDraftId(draft._id);
         setSelectedMembers(new Set(selectableRecipients.map(recipient => recipient.memberId)));
+        setSendConfirmed(false);
     };
 
     const sendDraft = async () => {
         if (!sendingDraftId || selectedMembers.size === 0) return;
         setIsSending(true);
         try {
-            const result = await sendFromDraft({ draftId: sendingDraftId, baseUrl: window.location.origin, memberIds: Array.from(selectedMembers) });
+            const result = await sendFromDraft({ draftId: sendingDraftId, memberIds: Array.from(selectedMembers), idempotencyKey: crypto.randomUUID() });
             setSendingDraftId(null);
             showSuccess({ title: "Zpráva odeslána", message: `Úspěšně doručeno ${result.sentCount} příjemcům.`, duration: 3000 });
         } catch (error: any) {
@@ -170,9 +172,9 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
                         <header><div><span>Odeslat zprávu</span><h3>{sendingDraft.subject}</h3></div><button onClick={() => setSendingDraftId(null)}><X size={19} /></button></header>
                         <div className={styles.sendBody}>
                             <div className={styles.sendPreview}><span>Náhled</span><strong>{previewText(sendingDraft.subject)}</strong><p>{previewText(sendingDraft.body)}</p></div>
-                            <div className={styles.recipientPicker}><div><strong>Příjemci</strong><button onClick={() => setSelectedMembers(new Set(selectedMembers.size === selectableRecipients.length ? [] : selectableRecipients.map(item => item.memberId)))}>{selectedMembers.size === selectableRecipients.length ? "Zrušit výběr" : "Vybrat všechny"}</button></div>{selectableRecipients.map(recipient => <label key={String(recipient.memberId)}><input type="checkbox" checked={selectedMembers.has(recipient.memberId)} onChange={() => setSelectedMembers(current => { const next = new Set(current); if (next.has(recipient.memberId)) next.delete(recipient.memberId); else next.add(recipient.memberId); return next; })} /><span><strong>{recipient.name}</strong><small>{recipient.contacts?.length || recipient.emails?.length || 1} e-mailových adres</small></span></label>)}</div>
+                            <div className={styles.recipientPicker}><div><strong>Příjemci</strong><button onClick={() => setSelectedMembers(new Set(selectedMembers.size === selectableRecipients.length ? [] : selectableRecipients.map(item => item.memberId)))}>{selectedMembers.size === selectableRecipients.length ? "Zrušit výběr" : "Vybrat všechny"}</button></div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: ".5rem" }}><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "pending").map((item) => item.memberId)))}>Jen bez reakce</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "attending").map((item) => item.memberId)))}>Jen účastníci</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.map((item) => item.memberId)))}>Všichni</button></div>{selectableRecipients.map(recipient => <label key={String(recipient.memberId)}><input type="checkbox" checked={selectedMembers.has(recipient.memberId)} onChange={() => setSelectedMembers(current => { const next = new Set(current); if (next.has(recipient.memberId)) next.delete(recipient.memberId); else next.add(recipient.memberId); return next; })} /><span><strong>{recipient.name}</strong><small>{recipient.contacts?.length || recipient.emails?.length || 1} e-mailových adres</small></span></label>)}</div>
                         </div>
-                        <footer><span>{selectedMembers.size} členů vybráno</span><button className={styles.primaryButton} disabled={!isLeader || isSending || selectedMembers.size === 0} onClick={sendDraft}><Send size={16} /> {isSending ? "Odesílám…" : "Odeslat"}</button></footer>
+                        <footer style={{ flexWrap: "wrap" }}><label style={{ flexBasis: "100%", display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendConfirmed} onChange={(event) => setSendConfirmed(event.target.checked)} /> Zkontroloval/a jsem odesílatele, obsah a {selectedMembers.size} vybraných členů.</label><span>{selectedMembers.size} členů vybráno</span><button className={styles.primaryButton} disabled={!isLeader || !sendConfirmed || isSending || selectedMembers.size === 0} onClick={sendDraft}><Send size={16} /> {isSending ? "Odesílám…" : "Odeslat"}</button></footer>
                     </section>
                 </div>
             )}
