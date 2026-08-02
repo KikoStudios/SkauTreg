@@ -508,47 +508,23 @@ export const connectEmailProvider = mutation({
         }))),
     },
     handler: async (ctx, args) => {
-        await requireTroopManager(ctx, args.troopId);
+        const { user } = await requireTroopManager(ctx, args.troopId);
         if (args.provider !== "gmail") {
             authError("VALIDATION_ERROR", "V produkčním režimu je podporován pouze Gmail.");
         }
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("User not found");
-
-        const troop = await ctx.db.get(args.troopId);
-        if (!troop) throw new Error("Troop not found");
-
-        // Handle new Google Groups members creation
-        if (args.newMembers && args.newMembers.length > 0) {
-            for (const newMember of args.newMembers) {
-                await ctx.db.insert("members", {
-                    troopId: args.troopId,
-                    name: newMember.name,
-                    guardianEmail: newMember.email,
-                });
-            }
+        const email = args.email.trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254 || !args.refreshToken || args.refreshToken.length > 4096) {
+            authError("VALIDATION_ERROR", "Google nevrátil platné údaje pro propojení Gmailu.");
+        }
+        if (args.smtpHost || args.smtpPort || args.smtpPassword || args.groupEmail || args.memberMapping || args.matchedMemberIds || args.newMembers) {
+            authError("VALIDATION_ERROR", "Gmail propojení nepřijímá nastavení jiných poskytovatelů.");
         }
 
         await ctx.db.patch(args.troopId, {
             emailProvider: {
-                provider: args.provider,
-                email: args.email,
+                provider: "gmail",
+                email,
                 refreshToken: await encryptCredential(args.refreshToken),
-                smtpHost: args.smtpHost,
-                smtpPort: args.smtpPort,
-                smtpPassword: await encryptCredential(args.smtpPassword),
-                groupEmail: args.groupEmail,
-                memberMapping: args.memberMapping,
-                matchedMemberIds: args.matchedMemberIds,
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
                 requiresReconnect: false,
@@ -672,6 +648,18 @@ export const listPublic = query({
         );
 
         return troopsWithUrls;
+    },
+});
+
+export const markGmailReconnectRequired = internalMutation({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop?.emailProvider || troop.emailProvider.provider !== "gmail") return;
+        await ctx.db.patch(args.troopId, {
+            emailProvider: { ...troop.emailProvider, requiresReconnect: true },
+        });
     },
 });
 

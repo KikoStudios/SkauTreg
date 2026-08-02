@@ -265,6 +265,7 @@ export default defineSchema({
         draftId: v.id("email_drafts"),
         tripId: v.id("trips"),
         requestedBy: v.id("users"),
+        retryOfAttemptId: v.optional(v.id("email_send_attempts")),
         idempotencyKey: v.string(),
         status: v.string(),
         recipientCount: v.number(),
@@ -284,7 +285,9 @@ export default defineSchema({
         providerMessageId: v.optional(v.string()),
         errorCode: v.optional(v.string()),
         sentAt: v.optional(v.string()),
-    }).index("by_attempt", ["attemptId"]),
+    })
+        .index("by_attempt", ["attemptId"])
+        .index("by_attempt_member_contact", ["attemptId", "memberId", "contactKind"]),
 
     trip_staff: defineTable({
         tripId: v.id("trips"),

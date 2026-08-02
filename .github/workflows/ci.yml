@@ -28,6 +28,7 @@ jobs:
       APP_ORIGIN: https://ci.example.com
       NEXT_PUBLIC_STREDISKO_NAME: CI SkauTreg
       NEXT_PUBLIC_GMAIL_CLIENT_ID: ci-gmail-client-id
+      NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS: testing
       GMAIL_CLIENT_SECRET: ci-gmail-client-secret
     steps:
       - uses: actions/checkout@v4

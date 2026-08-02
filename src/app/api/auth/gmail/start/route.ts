@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     scope: "openid email profile https://www.googleapis.com/auth/gmail.send",
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: "true",
     state,
   }).toString();
   const response = NextResponse.redirect(google);

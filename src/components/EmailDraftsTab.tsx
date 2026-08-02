@@ -32,6 +32,7 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
     const { showError, showSuccess } = useFeedback();
     const drafts = useQuery(api.emailDrafts.listByTrip, { tripId });
     const recipients = useQuery(api.emailDrafts.getRecipients, { tripId });
+    const sendConfiguration = useQuery(api.emailDrafts.getSendConfiguration, isLeader ? { tripId } : "skip");
     const createDraft = useMutation(api.emailDrafts.create);
     const updateDraft = useMutation(api.emailDrafts.update);
     const removeDraft = useMutation(api.emailDrafts.remove);
@@ -46,6 +47,7 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
     const [selectedMembers, setSelectedMembers] = useState<Set<Id<"members">>>(new Set());
     const [isSending, setIsSending] = useState(false);
     const [sendConfirmed, setSendConfirmed] = useState(false);
+    const [lastFailedAttemptId, setLastFailedAttemptId] = useState<Id<"email_send_attempts"> | null>(null);
 
     const allRecipients = Array.isArray(recipients?.recipients) ? recipients.recipients : [];
     const selectableRecipients = allRecipients.filter((recipient): recipient is typeof recipient & { memberId: Id<"members"> } => Boolean(recipient.memberId));
@@ -101,15 +103,26 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
         setSendingDraftId(draft._id);
         setSelectedMembers(new Set(selectableRecipients.map(recipient => recipient.memberId)));
         setSendConfirmed(false);
+        setLastFailedAttemptId(null);
     };
 
-    const sendDraft = async () => {
+    const sendDraft = async (retryAttemptId?: Id<"email_send_attempts">) => {
         if (!sendingDraftId || selectedMembers.size === 0) return;
         setIsSending(true);
         try {
-            const result = await sendFromDraft({ draftId: sendingDraftId, memberIds: Array.from(selectedMembers), idempotencyKey: crypto.randomUUID() });
-            setSendingDraftId(null);
-            showSuccess({ title: "Zpráva odeslána", message: `Úspěšně doručeno ${result.sentCount} příjemcům.`, duration: 3000 });
+            const result = await sendFromDraft({ draftId: sendingDraftId, memberIds: Array.from(selectedMembers), idempotencyKey: crypto.randomUUID(), retryAttemptId });
+            if (result.status === "sent") {
+                setSendingDraftId(null);
+                setLastFailedAttemptId(null);
+                showSuccess({ title: "Zpráva odeslána", message: `Úspěšně odesláno na ${result.sentCount} adres.`, duration: 3000 });
+            } else {
+                setLastFailedAttemptId(result.attemptId);
+                showError({
+                    title: result.status === "partial" ? "Část zpráv se neodeslala" : "Zprávy se nepodařilo odeslat",
+                    message: `Odesláno: ${result.sentCount}, neúspěšně: ${result.failed.length}. Další pokus odešle jen neúspěšné položky.`,
+                    icon: "warning",
+                });
+            }
         } catch (error: any) {
             showError({ title: "Odeslání se nepodařilo", message: error?.message || "Zkontrolujte připojení e-mailu.", icon: "error", canReport: true });
         } finally { setIsSending(false); }
@@ -174,7 +187,16 @@ export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: Em
                             <div className={styles.sendPreview}><span>Náhled</span><strong>{previewText(sendingDraft.subject)}</strong><p>{previewText(sendingDraft.body)}</p></div>
                             <div className={styles.recipientPicker}><div><strong>Příjemci</strong><button onClick={() => setSelectedMembers(new Set(selectedMembers.size === selectableRecipients.length ? [] : selectableRecipients.map(item => item.memberId)))}>{selectedMembers.size === selectableRecipients.length ? "Zrušit výběr" : "Vybrat všechny"}</button></div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: ".5rem" }}><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "pending").map((item) => item.memberId)))}>Jen bez reakce</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "attending").map((item) => item.memberId)))}>Jen účastníci</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.map((item) => item.memberId)))}>Všichni</button></div>{selectableRecipients.map(recipient => <label key={String(recipient.memberId)}><input type="checkbox" checked={selectedMembers.has(recipient.memberId)} onChange={() => setSelectedMembers(current => { const next = new Set(current); if (next.has(recipient.memberId)) next.delete(recipient.memberId); else next.add(recipient.memberId); return next; })} /><span><strong>{recipient.name}</strong><small>{recipient.contacts?.length || recipient.emails?.length || 1} e-mailových adres</small></span></label>)}</div>
                         </div>
-                        <footer style={{ flexWrap: "wrap" }}><label style={{ flexBasis: "100%", display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendConfirmed} onChange={(event) => setSendConfirmed(event.target.checked)} /> Zkontroloval/a jsem odesílatele, obsah a {selectedMembers.size} vybraných členů.</label><span>{selectedMembers.size} členů vybráno</span><button className={styles.primaryButton} disabled={!isLeader || !sendConfirmed || isSending || selectedMembers.size === 0} onClick={sendDraft}><Send size={16} /> {isSending ? "Odesílám…" : "Odeslat"}</button></footer>
+                        <footer style={{ flexWrap: "wrap" }}>
+                            <div style={{ flexBasis: "100%", fontSize: ".7rem", fontWeight: 750 }}>
+                                Odesílatel: {sendConfiguration?.senderEmail || "Gmail není připojen"} · {selectedMembers.size} členů · {selectableRecipients.filter(item => selectedMembers.has(item.memberId)).reduce((sum, item) => sum + (item.contacts?.length || item.emails?.length || 1), 0)} adres
+                                {sendConfiguration?.requiresReconnect && <span role="alert" style={{ display: "block", color: "#991b1b" }}>Gmail vyžaduje nové propojení v nastavení oddílu.</span>}
+                            </div>
+                            <label style={{ flexBasis: "100%", display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendConfirmed} onChange={(event) => setSendConfirmed(event.target.checked)} /> Zkontroloval/a jsem odesílatele, obsah a {selectedMembers.size} vybraných členů.</label>
+                            <span>{selectedMembers.size} členů vybráno</span>
+                            {lastFailedAttemptId && <button className={styles.secondaryButton} disabled={isSending} onClick={() => sendDraft(lastFailedAttemptId)}>Zkusit znovu jen neúspěšné</button>}
+                            <button className={styles.primaryButton} disabled={!isLeader || !sendConfirmed || isSending || selectedMembers.size === 0 || !sendConfiguration?.connected || sendConfiguration.requiresReconnect} onClick={() => sendDraft()}><Send size={16} /> {isSending ? "Odesílám…" : "Odeslat"}</button>
+                        </footer>
                     </section>
                 </div>
             )}

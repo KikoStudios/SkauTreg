@@ -28,7 +28,7 @@ const sections: LegalSection[] = [
   {
     id: "dodavatele",
     title: "4. Dodavatelé a přenosy",
-    content: <><p>Služba používá Clerk (přihlášení), Convex (databáze a soubory) a Vercel (hosting). Podle zapnutých funkcí může komunikovat s Google/Gmail, Mapy.com, Browserless/IDOS a Supernotes.</p><p>Pro provozní dohled mohou být použity Sentry v německém regionu, Axiom výhradně v EU Central, PostHog Cloud EU až po souhlasu a Better Stack. Pokud požadovaný evropský region není dostupný, daná integrace zůstane vypnutá.</p></>,
+    content: <><p>Služba používá Clerk (přihlášení), Convex (databáze a soubory) a Vercel (hosting). Podle zapnutých funkcí může komunikovat s Google/Gmail, Mapy.com, Browserless/IDOS a Supernotes.</p><p>Při dobrovolném propojení Gmailu získá SkauTreg oprávnění pouze k odesílání zpráv, které oprávněný vedoucí připraví, vybere jim příjemce a výslovně potvrdí odeslání. SkauTreg nečte obsah schránky. Obnovovací token je uložen šifrovaně a lze jej zneplatnit odpojením integrace.</p><p>Použití informací získaných z Google API dodržuje zásady Google API Services User Data Policy včetně požadavků Limited Use. Google data neprodáváme, nepoužíváme pro reklamu ani pro trénování obecných modelů umělé inteligence.</p><p>Pro provozní dohled mohou být použity Sentry v německém regionu, Axiom výhradně v EU Central, PostHog Cloud EU až po souhlasu a Better Stack. Pokud požadovaný evropský region není dostupný, daná integrace zůstane vypnutá.</p></>,
   },
   {
     id: "odkazy",

@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
 import schema from "../../convex/schema";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const modules = import.meta.glob("../../convex/**/*.ts");
@@ -13,6 +13,7 @@ type Fixture = {
   troopId: Id<"troops">;
   otherTroopId: Id<"troops">;
   tripId: Id<"trips">;
+  memberId: Id<"members">;
 };
 
 async function seed() {
@@ -33,7 +34,7 @@ async function seed() {
       startDate: "2026-08-01",
     });
     await ctx.db.insert("participations", { tripId, memberId, status: "pending", accessKey: "legacy", secureAccessKey: "secure" });
-    return { ownerId, outsiderId, roverId, troopId, otherTroopId, tripId };
+    return { ownerId, outsiderId, roverId, troopId, otherTroopId, tripId, memberId };
   });
   return { t, fixture };
 }
@@ -136,5 +137,35 @@ describe("Convex authorization", () => {
     const share = await owner.query(api.tripTicketShares.getForManagement, { tripId: fixture.tripId });
     expect(share?.selectedTicketIds).toEqual([ticketId]);
     await expect(owner.mutation(api.tripTicketShares.createOrUpdate, { tripId: fixture.tripId, selectedTicketIds: [foreignTicketId], expiresAt: "2027-12-31" })).rejects.toThrow();
+  });
+
+  it("tracks email deliveries without storing recipient addresses", async () => {
+    const { t, fixture } = await seed();
+    const owner = t.withIdentity({ tokenIdentifier: "test|owner" });
+    const draftId = await owner.mutation(api.emailDrafts.create, { tripId: fixture.tripId, subject: "Test", body: "Hello" });
+    const started = await owner.mutation(internal.emailDelivery.startAttempt, {
+      draftId,
+      tripId: fixture.tripId,
+      requestedBy: fixture.ownerId,
+      idempotencyKey: "email-attempt-123456789",
+      recipientCount: 1,
+    });
+    expect(started.created).toBe(true);
+    await owner.mutation(internal.emailDelivery.initializeDeliveries, {
+      attemptId: started.attempt!._id,
+      targets: [{ memberId: fixture.memberId, contactKind: "guardian" }],
+    });
+    await owner.mutation(internal.emailDelivery.recordDelivery, {
+      attemptId: started.attempt!._id,
+      memberId: fixture.memberId,
+      contactKind: "guardian",
+      status: "failed",
+      errorCode: "GMAIL_TEMPORARILY_UNAVAILABLE",
+    });
+    const rows = await t.run((ctx) => ctx.db.query("email_deliveries").collect());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).not.toHaveProperty("email");
+    expect(rows[0].errorCode).toBe("GMAIL_TEMPORARILY_UNAVAILABLE");
+    await expect(t.withIdentity({ tokenIdentifier: "test|rover" }).query(api.emailDelivery.listByDraft, { draftId })).rejects.toThrow();
   });
 });

@@ -5,6 +5,7 @@ import { authError, requireTripLeader, requireTroopEditor, requireTroopManager }
 
 function validateMessage(subject?: string, body?: string) {
     if (subject !== undefined && (subject.trim().length < 1 || subject.length > 180)) authError("VALIDATION_ERROR", "Předmět musí mít 1 až 180 znaků.");
+    if (subject !== undefined && /[\r\n]/.test(subject)) authError("VALIDATION_ERROR", "Předmět nesmí obsahovat zalomení řádku.");
     if (body !== undefined && (body.trim().length < 1 || body.length > 20_000)) authError("VALIDATION_ERROR", "Text musí mít 1 až 20 000 znaků.");
 }
 
@@ -177,6 +178,21 @@ export const getRecipients = query({
             withEmail: recipients.filter((r) => r.hasEmail).length,
             withoutEmail: recipients.filter((r) => !r.hasEmail).length,
             recipients: recipients.filter((r) => r.hasEmail),
+        };
+    },
+});
+
+export const getSendConfiguration = query({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        const { troop } = await requireTripLeader(ctx, args.tripId);
+        await requireTroopManager(ctx, troop._id);
+        const provider = troop.emailProvider?.provider === "gmail" ? troop.emailProvider : undefined;
+        return {
+            provider: provider ? "gmail" as const : null,
+            senderEmail: provider?.email ?? troop.gmailOAuth?.email ?? null,
+            connected: Boolean(provider?.refreshToken || troop.gmailOAuth?.refreshToken),
+            requiresReconnect: provider?.requiresReconnect === true,
         };
     },
 });
