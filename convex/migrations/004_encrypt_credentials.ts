@@ -1,6 +1,29 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, internalQuery } from "../_generated/server";
 import { encryptCredential, isEncryptedCredential } from "../lib/credentials";
+
+export const auditCredentialState = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const troops = await ctx.db.query("troops").collect();
+    const integrations = await ctx.db.query("integrations").collect();
+    const gmailTokens = troops.flatMap((troop) => {
+      const token = troop.emailProvider?.provider === "gmail"
+        ? troop.emailProvider.refreshToken
+        : troop.gmailOAuth?.refreshToken;
+      return token ? [token] : [];
+    });
+    const integrationSecrets = integrations.flatMap((integration) => [integration.configPayload, integration.webhookUrl].filter((value): value is string => Boolean(value)));
+    return {
+      gmailConnections: gmailTokens.length,
+      gmailEncrypted: gmailTokens.filter(isEncryptedCredential).length,
+      gmailPlaintext: gmailTokens.filter((token) => !isEncryptedCredential(token)).length,
+      integrationSecrets: integrationSecrets.length,
+      integrationEncrypted: integrationSecrets.filter(isEncryptedCredential).length,
+      integrationPlaintext: integrationSecrets.filter((secret) => !isEncryptedCredential(secret)).length,
+    };
+  },
+});
 
 export const encryptCredentialBatch = internalMutation({
   args: {
