@@ -1,6 +1,6 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
-import { fetchQuery } from "convex/nextjs";
+import { fetchMutation, fetchQuery } from "convex/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
@@ -19,11 +19,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/settings/${troopId}?gmail_error=Nemáte oprávnění`, request.url));
   }
 
+  const requestOrigin = request.nextUrl.origin;
+  const allowedOrigins = new Set([
+    process.env.APP_ORIGIN,
+    process.env.STAGING_ORIGIN,
+    process.env.NODE_ENV !== "production" ? requestOrigin : undefined,
+  ].filter((value): value is string => Boolean(value)).map((value) => value.replace(/\/$/, "")));
+  if (!allowedOrigins.has(requestOrigin)) {
+    return NextResponse.redirect(new URL(`/settings/${troopId}?gmail_error=Propojení Gmailu je dostupné na stagingu`, request.url));
+  }
+
   const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
   if (!clientId) return NextResponse.redirect(new URL(`/settings/${troopId}?gmail_error=Gmail není nakonfigurován`, request.url));
   const nonce = randomBytes(32).toString("base64url");
-  const state = signOAuthState({ nonce, troopId, userId, returnAction, expiresAt: Date.now() + 10 * 60_000 });
-  const redirectUri = `${request.nextUrl.origin}/api/auth/gmail/callback`;
+  const expiresAt = Date.now() + 10 * 60_000;
+  const state = signOAuthState({ nonce, troopId, userId, returnAction, expiresAt });
+  await fetchMutation(api.gmailOAuthStates.create, {
+    nonceHash: createHash("sha256").update(nonce).digest("hex"),
+    troopId: troopId as Id<"troops">,
+    expiresAt,
+  }, { token });
+  const redirectUri = `${requestOrigin}/api/auth/gmail/callback`;
   const google = new URL("https://accounts.google.com/o/oauth2/auth");
   google.search = new URLSearchParams({
     client_id: clientId,

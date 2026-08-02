@@ -32,7 +32,6 @@ export default function HomePage() {
   return (
     <>
       <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;700;800;900&display=swap');
         
         body {
           margin: 0;

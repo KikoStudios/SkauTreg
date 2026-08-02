@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const CONSENT_KEY = "skautreg.analytics-consent";
@@ -20,6 +20,9 @@ export default function AnalyticsConsent() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [consent, setConsent] = useState<Consent | null>(null);
+  const initialized = useRef(false);
+  const dialogRef = useRef<HTMLElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const stored = readConsent();
@@ -41,7 +44,7 @@ export default function AnalyticsConsent() {
     ]).then(([module, identity]) => {
       if (cancelled) return;
       const posthog = module.default;
-      posthog.init(key, {
+      if (!initialized.current) posthog.init(key, {
         api_host: host,
         autocapture: false,
         capture_pageview: false,
@@ -56,11 +59,34 @@ export default function AnalyticsConsent() {
           return properties;
         },
       });
+      initialized.current = true;
       if (identity?.id) posthog.identify(identity.id);
-      posthog.capture("page_view", { path: pathname });
+      posthog.capture("page_view", { path: window.location.pathname });
     });
     return () => { cancelled = true; };
+  }, [consent]);
+
+  useEffect(() => {
+    if (!consent?.analytics || !initialized.current) return;
+    void import("posthog-js").then(({ default: posthog }) => posthog.capture("page_view", { path: pathname }));
   }, [consent, pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelectorAll<HTMLElement>('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])');
+    focusable?.[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && consent) setOpen(false);
+      if (event.key !== "Tab" || !focusable?.length) return;
+      const first = focusable[0]; const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); (previous || openerRef.current)?.focus(); };
+  }, [open, consent]);
 
   const save = async (analytics: boolean) => {
     const value = { analytics, version: CONSENT_VERSION, updatedAt: new Date().toISOString() };
@@ -78,6 +104,7 @@ export default function AnalyticsConsent() {
   return (
     <>
       <button
+        ref={openerRef}
         type="button"
         onClick={() => setOpen(true)}
         style={{ position: "fixed", right: 12, bottom: 12, zIndex: 70, padding: ".45rem .65rem", border: "2px solid #111", borderRadius: 8, background: "#fff", fontWeight: 800 }}
@@ -86,7 +113,7 @@ export default function AnalyticsConsent() {
       </button>
       {open && (
         <div role="presentation" style={{ position: "fixed", inset: 0, zIndex: 100, display: "grid", placeItems: "center", padding: 16, background: "rgba(0,0,0,.55)" }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="analytics-title" style={{ width: "min(520px, 100%)", padding: 20, background: "#fff", border: "3px solid #111", borderRadius: 12, boxShadow: "6px 6px 0 #111" }}>
+          <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="analytics-title" style={{ width: "min(520px, 100%)", padding: 20, background: "#fff", border: "3px solid #111", borderRadius: 12, boxShadow: "6px 6px 0 #111" }}>
             <h2 id="analytics-title">Nastavení soukromí</h2>
             <p>Nezbytné zpracování zajišťuje přihlášení a chod aplikace a nelze je vypnout. Anonymizovaná produktová analytika PostHog EU je volitelná.</p>
             <p>Analytika neodesílá jméno, e-mail, ID oddílu, obsah formulářů ani úplné URL. Záznam relace je zatím vypnutý.</p>

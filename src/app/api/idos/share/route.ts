@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeShareLink } from "../../../../lib/idos/shareAnalysis";
+import { auth } from "@clerk/nextjs/server";
 
 function isAllowedIdosUrl(raw: string): boolean {
   try {
@@ -16,18 +17,17 @@ function isAllowedIdosUrl(raw: string): boolean {
 }
 
 export async function GET(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Přihlášení je vyžadováno." }, { status: 401 });
   const url = request.nextUrl.searchParams.get("url") || "";
-  if (!url || !isAllowedIdosUrl(url)) {
+  if (!url || url.length > 2_048 || !isAllowedIdosUrl(url)) {
     return NextResponse.json({ error: "Invalid or unsupported IDOS URL" }, { status: 400 });
   }
 
   try {
     const trip = await analyzeShareLink(url);
     return NextResponse.json({ trip });
-  } catch (e: unknown) {
-    return NextResponse.json(
-      { error: "Failed to parse shared link", details: e instanceof Error ? e.message : undefined },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Odkaz IDOS se nepodařilo načíst." }, { status: 422 });
   }
 }

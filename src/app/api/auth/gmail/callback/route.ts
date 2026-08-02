@@ -4,6 +4,7 @@ import { fetchMutation } from "convex/nextjs";
 import { api } from "../../../../../../convex/_generated/api";
 import { verifyOAuthState } from "../../../../../lib/oauthState";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
+import { createHash } from "node:crypto";
 
 /**
  * Gmail OAuth Callback Handler
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
   const authData = await auth();
   let troopId: string | null = null;
   let returnAction = "";
+  let nonceHash = "";
   try {
     if (!state) throw new Error("Missing state");
     const decoded = verifyOAuthState(state);
@@ -39,6 +41,7 @@ export async function GET(req: NextRequest) {
     }
     troopId = decoded.troopId;
     returnAction = decoded.returnAction;
+    nonceHash = createHash("sha256").update(decoded.nonce).digest("hex");
   } catch {
     return NextResponse.redirect(new URL("/settings?gmail_error=Neplatný nebo expirovaný OAuth požadavek", req.url));
   }
@@ -51,11 +54,10 @@ export async function GET(req: NextRequest) {
 
   // Handle errors from Google
   if (error) {
-    const errorDescription = searchParams.get('error_description') || error;
-    console.error('Gmail OAuth Error:', errorDescription);
+    console.error('Gmail OAuth was rejected', { operation: 'gmail_oauth' });
     return NextResponse.redirect(
       new URL(
-        getRedirectUrl(`gmail_error=${encodeURIComponent(errorDescription)}`),
+        getRedirectUrl(`gmail_error=${encodeURIComponent('Připojení ke Gmailu bylo zrušeno')}`),
         req.url
       )
     );
@@ -95,6 +97,7 @@ export async function GET(req: NextRequest) {
         grant_type: 'authorization_code',
         redirect_uri: redirectUri,
       }).toString(),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!tokenResponse.ok) {
@@ -130,6 +133,7 @@ export async function GET(req: NextRequest) {
       'https://www.googleapis.com/oauth2/v3/userinfo',
       {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(8_000),
       }
     );
 
@@ -179,6 +183,11 @@ export async function GET(req: NextRequest) {
         )
       );
     }
+
+    await fetchMutation(api.gmailOAuthStates.consume, {
+      nonceHash,
+      troopId: troopId as Id<"troops">,
+    }, { token });
 
     await fetchMutation(
       api.troops.connectEmailProvider,

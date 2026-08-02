@@ -24,6 +24,10 @@ jobs:
       NEXT_PUBLIC_FEATURE_TRANSPORT_TICKETS: beta
       NEXT_PUBLIC_FEATURE_COLLABORATIVE_MEETINGS: beta
       NEXT_PUBLIC_FEATURE_FEEDBACK_HUB: beta
+      APP_ORIGIN: https://ci.example.com
+      NEXT_PUBLIC_STREDISKO_NAME: CI SkauTreg
+      NEXT_PUBLIC_GMAIL_CLIENT_ID: ci-gmail-client-id
+      GMAIL_CLIENT_SECRET: ci-gmail-client-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,5 +38,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: npm run test:convex
+      - run: npm run test:security
       - run: npm run build
+      - run: npm run test:e2e
       - run: npm run audit:prod

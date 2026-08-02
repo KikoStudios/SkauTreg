@@ -6,7 +6,7 @@ SkauTreg je aplikace pro správu skautských oddílů postavená na Next.js, Con
 
 - Stabilní: autentizace, dashboard, členové, oddíly, výpravy, kalendář, RSVP a nastavení.
 - Beta: finance, sdílení dopravních dokladů, kolaborativní schůzky a centrum zpětné vazby.
-- Beta funkce se řídí proměnnými `FEATURE_*_STAGE` s hodnotou `off`, `beta` nebo `stable`.
+- Beta funkce se řídí proměnnými `NEXT_PUBLIC_FEATURE_*` s hodnotou `off`, `beta` nebo `stable`.
 
 ## Lokální spuštění
 
@@ -31,6 +31,8 @@ Produkční build vyžaduje úplné právní, bezpečnostní a feature-stage pro
 
 ## Bezpečné nasazení
 
+- Vercel je jediný kanonický produkční a preview hosting. Produkce, staging a preview musí používat oddělené Clerk a Convex prostředí.
+- `APP_ORIGIN` určuje kanonický původ RSVP odkazů v e-mailech; klient jej nesmí přepisovat.
 - Nejdříve exportujte produkční Convex data a ověřte počet tabulek a checksum.
 - Schéma a migrace nasazujte nejprve do stagingu.
 - Migrace `003_secure_capabilities` a `004_encrypt_credentials` nejsou automatické; spouští je operátor po záloze a ověření počtů.
