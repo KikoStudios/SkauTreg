@@ -100,14 +100,11 @@ function DashboardLayoutInner({
     if (isAppLoading) {
         return (
             <div className={styles.loadingScreen} role="status" aria-live="polite">
-                <div className={styles.loadingStripes} aria-hidden="true"><span /><span /><span /></div>
-                <section className={styles.loadingCard}>
+                <div className={styles.loadingContent}>
                     <img src="/Logo-light.svg" alt="SkauTreg" />
-                    <span className={styles.loadingEyebrow}>Bezpečný pracovní prostor</span>
-                    <strong>Připravuji SkauTreg</strong>
-                    <p>Ověřuji přihlášení a připojuji vaše data…</p>
                     <div className={styles.loadingTrack} aria-hidden="true"><span /></div>
-                </section>
+                    <span className={styles.loadingLabel}>Načítám…</span>
+                </div>
             </div>
         );
     }

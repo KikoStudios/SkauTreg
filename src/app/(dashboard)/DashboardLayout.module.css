@@ -53,19 +53,12 @@
   100% { transform: translate3d(115%, 0, 0) skewX(-8deg); }
 }
 
-.loadingScreen { position: relative; min-height: 100dvh; display: grid; place-items: center; overflow: hidden; padding: 1.25rem; color: #fff; background: #101112; }
-.loadingStripes { position: absolute; inset: 0; overflow: hidden; opacity: .58; }
-.loadingStripes span { position: absolute; left: -8%; width: 116%; height: 38%; transform: skewX(-8deg); border-block: 1px solid rgb(255 255 255 / 8%); }
-.loadingStripes span:nth-child(1) { top: -5%; background: #17191a; }
-.loadingStripes span:nth-child(2) { top: 31%; background: #213e2b; }
-.loadingStripes span:nth-child(3) { top: 67%; background: #6c6138; }
-.loadingCard { position: relative; z-index: 1; width: min(90vw, 430px); display: grid; justify-items: center; padding: clamp(1.5rem, 4vw, 2.35rem); background: rgb(16 17 18 / 88%); border: 1px solid #424746; border-radius: 16px; box-shadow: 0 20px 65px rgb(0 0 0 / 38%); text-align: center; backdrop-filter: blur(10px); }
-.loadingCard img { width: min(180px, 62%); height: auto; margin-bottom: 1.4rem; }
-.loadingEyebrow { margin-bottom: .45rem; color: #c9b45c; font-size: .65rem; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
-.loadingCard strong { font-size: clamp(1.25rem, 4vw, 1.65rem); }
-.loadingCard p { margin: .55rem 0 1.4rem; color: #b8bdb9; font-size: .82rem; line-height: 1.55; }
-.loadingTrack { width: min(260px, 82%); height: 5px; overflow: hidden; background: #303433; border-radius: 999px; }
-.loadingTrack span { display: block; width: 42%; height: 100%; background: #c9b45c; border-radius: inherit; animation: loadingTrackMove 1.05s ease-in-out infinite; }
+.loadingScreen { min-height: 100dvh; display: grid; place-items: center; padding: 1.25rem; color: #fff; background: #101112; }
+.loadingContent { width: min(72vw, 220px); display: grid; justify-items: center; gap: .9rem; text-align: center; }
+.loadingContent img { width: 100%; height: auto; }
+.loadingTrack { width: 100%; height: 4px; overflow: hidden; background: #292d2a; border-radius: 999px; }
+.loadingTrack span { display: block; width: 38%; height: 100%; background: #4a9400; border-radius: inherit; animation: loadingTrackMove 1.05s ease-in-out infinite; }
+.loadingLabel { color: #fff; font-size: .72rem; font-weight: 750; letter-spacing: .04em; }
 @keyframes loadingTrackMove { from { transform: translateX(-115%); } to { transform: translateX(340%); } }
 
 .statusScreen { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 1rem; padding: 1.25rem; background: var(--bg-app); text-align: center; }
