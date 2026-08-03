@@ -394,7 +394,7 @@ export default function TripDashboardPage() {
     return (
         <div className={workspaceStyles.workspace}>
             <aside className={workspaceStyles.rail}>
-                <div className={workspaceStyles.railBrand}><img src="/logo_skautreg.svg" alt="SkautREG" /><strong>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</strong></div>
+                <div className={workspaceStyles.railBrand}><img src="/Logo-light.svg" alt="SkautREG" /><strong>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</strong></div>
                 <button className={workspaceStyles.backLink} onClick={() => router.push("/trips")}><ArrowLeft size={17} /> Zpět na všechny výpravy</button>
                 <div className={workspaceStyles.tripIdentity}>
                     <div className={workspaceStyles.identityTop}><span>Pracovní prostor</span><b>Výprava</b></div>

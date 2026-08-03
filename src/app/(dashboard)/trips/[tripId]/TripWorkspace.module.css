@@ -1,24 +1,24 @@
 .workspace { min-height: 100dvh; display: grid; grid-template-columns: var(--sidebar-width, 265px) minmax(0, 1fr); background: #f5f4ef; }
-.rail { position: sticky; top: 0; z-index: 70; height: 100dvh; display: flex; flex-direction: column; padding: 0 .65rem .7rem; overflow: visible; color: #2b281e; background: #e8d99a; border-right: 2px solid #2b281e; animation: railEnter .22s ease both; }
-.railBrand { min-height: 86px; display: grid; align-content: center; gap: .3rem; padding: .8rem .45rem; border-bottom: 1px solid #b9a75f; }
+.rail { position: sticky; top: 0; z-index: 70; height: 100dvh; display: flex; flex-direction: column; padding: 0 .65rem .7rem; overflow: visible; color: #f4f5f4; background: #101112; border-right: 2px solid #000; animation: railEnter .22s ease both; }
+.railBrand { min-height: 86px; display: grid; align-content: center; gap: .3rem; padding: .8rem .45rem; border-bottom: 1px solid #34383a; }
 .railBrand img { width: 148px; height: auto; }
-.railBrand strong { font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; }
-.backLink { display: flex; align-items: center; gap: .45rem; margin-top: .65rem; padding: .5rem .55rem; color: #4e4835; background: transparent; border: 0; border-radius: 8px; font-size: .7rem; font-weight: 800; cursor: pointer; transition: color .15s ease, background .15s ease; }
-.backLink:hover { color: #111; background: #f7f0d2; }
-.tripIdentity { margin: .35rem 3px .55rem 0; padding: .75rem; background: #f7f0d2; border: 2px solid #2b281e; border-radius: 9px; box-shadow: 3px 3px 0 #2b281e; }
+.railBrand strong { color: #d7dad7; font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; }
+.backLink { display: flex; align-items: center; gap: .45rem; margin-top: .65rem; padding: .5rem .55rem; color: #c5c9c6; background: transparent; border: 0; border-radius: 8px; font-size: .7rem; font-weight: 800; cursor: pointer; transition: color .15s ease, background .15s ease; }
+.backLink:hover { color: #fff; background: #202326; }
+.tripIdentity { margin: .35rem 3px .55rem 0; padding: .75rem; background: #1b1e20; border: 1px solid #3a3e3b; border-radius: 9px; }
 .identityTop { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.identityTop span { color: #716745; font-size: .58rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-.identityTop b { padding: .22rem .4rem; color: #2b281e; background: #e8d99a; border: 1px solid #9e8d4d; border-radius: 999px; font-size: .54rem; letter-spacing: .04em; text-transform: uppercase; }
-.tripIdentity h1 { margin: .5rem 0 .8rem; color: #2b281e; font-size: 1.18rem; line-height: 1.2; }
-.tripMeta { display: flex; align-items: flex-start; gap: .4rem; margin-top: .35rem; color: #5f573e; font-size: .68rem; line-height: 1.35; }
+.identityTop span { color: #9da39e; font-size: .58rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.identityTop b { padding: .22rem .4rem; color: #2b281e; background: #e8d99a; border: 1px solid #c9b45c; border-radius: 999px; font-size: .54rem; letter-spacing: .04em; text-transform: uppercase; }
+.tripIdentity h1 { margin: .5rem 0 .8rem; color: #fff; font-size: 1.18rem; line-height: 1.2; }
+.tripMeta { display: flex; align-items: flex-start; gap: .4rem; margin-top: .35rem; color: #b7bcb8; font-size: .68rem; line-height: 1.35; }
 .workspaceNav { display: grid; gap: .18rem; }
 .navWithSubmenu { position: relative; }
 .navWithSubmenu > button { width: 100%; }
 .hoverSubmenu { position: absolute; top: 0; left: 100%; z-index: 80; display: none; width: max-content; min-width: 170px; padding: .3rem; color: #222; background: #fff9e8; border: 2px solid #111; border-radius: 8px; box-shadow: 3px 3px 0 #111; }
 .navWithSubmenu:hover .hoverSubmenu, .navWithSubmenu:focus-within .hoverSubmenu { display: grid; gap: .2rem; animation: submenuIn .14s ease both; }
 .navLabel { margin: .8rem .55rem .3rem; color: #7f858b; font-size: .59rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
-.workspaceNav button { position: relative; width: 100%; min-height: 46px; display: flex; align-items: center; gap: .7rem; padding: .54rem .7rem; color: #4e4835; background: transparent; border: 1px solid transparent; border-radius: 8px; text-align: left; cursor: pointer; transition: color .15s ease, background .15s ease, transform .15s ease; }
-.workspaceNav button:hover { color: #111; background: #f7f0d2; }
+.workspaceNav button { position: relative; width: 100%; min-height: 46px; display: flex; align-items: center; gap: .7rem; padding: .54rem .7rem; color: #c5c9c6; background: transparent; border: 1px solid transparent; border-radius: 8px; text-align: left; cursor: pointer; transition: color .15s ease, background .15s ease, transform .15s ease; }
+.workspaceNav button:hover { color: #fff; background: #202326; }
 .workspaceNav button[data-active="true"] { color: #2b281e; background: #c9b45c; border: 2px solid #2b281e; box-shadow: 2px 2px 0 #2b281e; }
 .workspaceNav button[data-active="true"]::after { content: ""; position: absolute; right: .55rem; width: 4px; height: 18px; background: #2b281e; border-radius: 99px; }
 .workspaceNav button > span { display: grid; gap: .1rem; }
@@ -28,7 +28,7 @@
 .workspaceNav .hoverSubmenu button:hover { color: #111; background: #fff; }
 .workspaceNav .hoverSubmenu button[data-selected="true"] { color: #fff; background: #315f3f; }
 .workspaceNav .hoverSubmenu button[data-selected="true"]::after { display: none; }
-.railActions { display: grid; gap: .4rem; margin-top: auto; padding: .8rem .2rem .1rem; border-top: 1px solid #2d322e; }
+.railActions { display: grid; gap: .4rem; margin-top: auto; padding: .8rem .2rem .1rem; border-top: 1px solid #34383a; }
 .railActions > span { margin: 0 .25rem .2rem; color: #737b75; font-size: .56rem; font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
 .railActions button { display: flex; align-items: center; justify-content: flex-start; gap: .5rem; min-height: 37px; padding: .5rem .65rem; color: #c6cbc7; background: transparent; border: 1px solid transparent; border-radius: 8px; font-size: .69rem; font-weight: 750; cursor: pointer; }
 .railActions .deleteAction { color: #d49c9c; background: transparent; border-color: transparent; }
@@ -37,7 +37,8 @@
 .workspaceContent > * { max-width: 1500px; margin-inline: auto; }
 .workspaceContent > div[style*="460px"] { max-width: 1500px; }
 .mobileContext { display: none; }
-.rail :where(button,a):focus-visible, .mobileContext :where(button,a):focus-visible { outline: 3px solid #2b281e; outline-offset: 2px; }
+.rail :where(button,a):focus-visible { outline: 3px solid #e8d99a; outline-offset: 2px; }
+.mobileContext :where(button,a):focus-visible { outline: 3px solid #2b281e; outline-offset: 2px; }
 .sectionIntro { margin-bottom: 1.5rem; padding: 1.1rem 1.25rem; background: #fff9e8; border: 2px solid #111; border-radius: 12px; box-shadow: 3px 3px 0 #111; }
 .sectionIntro span { color: #74777c; font-size: .64rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
 .sectionIntro h2 { margin: .25rem 0 .3rem; font-size: clamp(1.45rem,2.6vw,2rem); }

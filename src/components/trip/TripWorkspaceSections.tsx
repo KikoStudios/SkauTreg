@@ -123,12 +123,6 @@ export function TripParticipants({ participants, copiedKey, onCopy, onRegenerate
     }
 
     return <div className={styles.participantWorkspace}>
-        <section className={styles.participantStats} aria-label="Souhrn účasti">
-            <span><b>{participants.filter((p) => p.status === "attending").length}</b> jede</span>
-            <span><b>{participants.filter((p) => p.status === "pending").length}</b> bez reakce</span>
-            <span><b>{participants.filter((p) => p.status === "not_attending").length}</b> nejede</span>
-            <span><b>{participants.filter((p) => !p.primaryEmail).length}</b> bez e-mailu</span>
-        </section>
         <section className={styles.tablePanel}>
             <div className={styles.participantFilters}>
                 <label>Hledat<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Jméno účastníka" /></label>
