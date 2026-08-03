@@ -56,9 +56,9 @@
 .contactList a > span { display: grid; gap: .08rem; }
 .contactList small { color: #818682; font-size: .61rem; }
 .contactList strong { font-size: .73rem; }
-.tablePanel { padding: 0; overflow: hidden; }
+.tablePanel { padding: 0; overflow: hidden; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .participantWorkspace { width: 100%; animation: sectionIn .2s ease both; }
-.participantFilters { display: grid; grid-template-columns: minmax(220px,1fr) minmax(130px,160px) minmax(120px,150px); gap: .65rem; align-items: end; padding: .75rem .85rem; background: #fff; border-bottom: 1px solid #dfe3e0; }
+.participantFilters { display: grid; grid-template-columns: minmax(220px,1fr) minmax(130px,160px) minmax(120px,150px); gap: .65rem; align-items: end; padding: 0 0 .8rem; background: transparent; border-bottom: 1px solid #dfe3e0; }
 .participantFilters label { display: grid; gap: .25rem; font-size: .65rem; font-weight: 850; }
 .participantFilters input, .participantFilters select { width: 100%; min-height: 38px; padding: .45rem .6rem; border: 1.5px solid #868d88; border-radius: 7px; background: #fff; }
 .participantFilters input:focus-visible, .participantFilters select:focus-visible { outline: 3px solid #c9b45c; outline-offset: 1px; border-color: #2b281e; }
@@ -84,16 +84,17 @@
 .statusLegend span[data-status="not_attending"] { background: #f7e9e9; }
 .tableHeading { align-items: center; margin: 0; padding: 1rem 1.2rem; border-bottom: 1px solid #e2e4e2; }
 .tableHeading > span { color: #747a76; font-size: .68rem; }
-.tableScroll { width: 100%; overflow-x: auto; }
-.tableScroll table { width: 100%; min-width: 680px; table-layout: fixed; border-collapse: collapse; }
-.tableScroll th:nth-child(1) { width: 34%; }
-.tableScroll th:nth-child(2) { width: 17%; }
-.tableScroll th:nth-child(3) { width: 16%; }
-.tableScroll th:nth-child(4) { width: 33%; }
+.tableScroll { width: 100%; min-width: 0; overflow-x: auto; }
+.tableScroll table { width: 100%; min-width: 640px; table-layout: fixed; border-collapse: collapse; background: transparent; }
+.tableScroll th:nth-child(1) { width: 32%; }
+.tableScroll th:nth-child(2) { width: 15%; }
+.tableScroll th:nth-child(3) { width: 15%; }
+.tableScroll th:nth-child(4) { width: 38%; }
 .tableScroll th { padding: .65rem .85rem; color: #313632; background: #edf3ef; border-bottom: 1px solid #cbd2cd; font-size: .62rem; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
 .tableScroll td { min-width: 0; padding: .7rem .85rem; vertical-align: middle; border-bottom: 1px solid #e7eae8; font-size: .75rem; }
 .tableScroll tbody tr:last-child td { border-bottom: 0; }
-.tableScroll tbody tr:hover { background: #fafbf9; }
+.tableScroll tbody tr { background: transparent; }
+.tableScroll tbody tr:hover { background: rgb(255 255 255 / 55%); }
 .tableScroll td:first-child { display: grid; gap: .12rem; }
 .tableScroll td:first-child strong, .tableScroll td:first-child small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tableScroll td:first-child small { color: #7b807c; font-size: .64rem; }
@@ -135,7 +136,7 @@
 @media (max-width: 980px) {
   .participantFilters { grid-template-columns: 1fr; }
   .tableScroll { display: none; }
-  .participantCards { display: grid; gap: .7rem; padding: .75rem; }
+  .participantCards { display: grid; gap: .7rem; padding: .75rem 0; }
   .participantCards article { display: grid; gap: .55rem; padding: .85rem; border: 2px solid #111; border-radius: 10px; background: #fff; }
   .participantCards header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
   .participantCards details p { margin: .45rem 0; font-size: .76rem; }
