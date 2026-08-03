@@ -23,7 +23,7 @@ export const productionEnvSchema = z.object({
   NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS: z.enum(["testing", "submitted", "verified"]),
   GMAIL_CLIENT_SECRET: z.string().min(16),
   NEXT_PUBLIC_LEGAL_OPERATOR_NAME: realText,
-  NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS: realText,
+  NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS: realText.optional(),
   NEXT_PUBLIC_PRIVACY_EMAIL: z.string().email(),
   NEXT_PUBLIC_SECURITY_EMAIL: z.string().email(),
   NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE: z.string().date(),

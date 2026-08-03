@@ -10,7 +10,7 @@ const formatDate = (value?: string | null) => {
     return day && month && year ? `${day}. ${month}. ${year}` : value;
 };
 
-export function TripOverview({ trip, participants, staff, onManageStaff, canManageStaff = true }: { trip: any; participants: any[]; staff: any[]; onManageStaff: () => void; canManageStaff?: boolean }) {
+export function TripOverview({ trip, participants, staff, onManageStaff, onManageRegistration, canManageStaff = true }: { trip: any; participants: any[]; staff: any[]; onManageStaff: () => void; onManageRegistration: () => void; canManageStaff?: boolean }) {
     const attending = participants.filter(item => item.status === "attending").length;
     const declined = participants.filter(item => item.status === "not_attending").length;
     const pending = participants.length - attending - declined;
@@ -41,12 +41,13 @@ export function TripOverview({ trip, participants, staff, onManageStaff, canMana
 
             <div className={styles.overviewGrid}>
                 <section className={styles.panel}>
-                    <div className={styles.panelHeading}><div><span className={styles.eyebrow}>Přihlašování</span><h3>Aktuální odezva</h3></div><strong className={styles.count}>{participants.length}</strong></div>
+                    <div className={styles.panelHeading}><div><span className={styles.eyebrow}>Přihlašování</span><h3>{trip.formType === "apology" ? "Pouze omluvenky" : "Přihláška a omluvenky"}</h3></div>{canManageStaff && <button className={styles.secondaryButton} onClick={onManageRegistration}>Nastavit formulář</button>}</div>
                     <div className={styles.statusRows}>
                         <div><span><CheckCircle2 size={17} /> Jede</span><strong>{attending}</strong></div>
                         <div><span><XCircle size={17} /> Nejede</span><strong>{declined}</strong></div>
                         <div><span><span className={styles.pendingDot} /> Bez reakce</span><strong>{pending}</strong></div>
                     </div>
+                    <p className={styles.panelHint}>{trip.formType === "apology" ? "Účastníci se teď mohou pouze omluvit. V nastavení můžete kdykoli zapnout celý přihlašovací formulář." : `${trip.customFields?.length || 0} vlastních otázek ve formuláři.`}</p>
                 </section>
                 <section className={styles.panel}>
                     <div className={styles.panelHeading}><div><span className={styles.eyebrow}>Tým výpravy</span><h3>Vedoucí a roveři</h3></div>{canManageStaff && <button className={styles.secondaryButton} onClick={onManageStaff}><Plus size={16} /> Spravovat</button>}</div>

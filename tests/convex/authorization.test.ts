@@ -40,6 +40,33 @@ async function seed() {
 }
 
 describe("Convex authorization", () => {
+  it("accepts current RSVP objects and legacy JSON payloads after validation", async () => {
+    const { t, fixture } = await seed();
+    await t.run(async (ctx) => {
+      await ctx.db.patch(fixture.tripId, {
+        formType: "registration",
+        customFields: [{ label: "Alergie", type: "text", required: false }],
+      });
+    });
+
+    await t.mutation(api.public_rsvp.submit, {
+      accessKey: "secure",
+      status: "attending",
+      responses: { Alergie: "žádné" },
+    });
+    await t.mutation(api.public_rsvp.submit, {
+      accessKey: "secure",
+      status: "not_attending",
+      responses: JSON.stringify({ Alergie: "bez odpovědi" }),
+    });
+
+    const participation = await t.run((ctx) => ctx.db
+      .query("participations")
+      .withIndex("by_secure_access_key", (q) => q.eq("secureAccessKey", "secure"))
+      .unique());
+    expect(participation?.responses).toEqual({ Alergie: "bez odpovědi" });
+  });
+
   it("denies signed-out and cross-troop member reads", async () => {
     const { t, fixture } = await seed();
     await expect(t.query(api.members.list, { troopId: fixture.troopId })).rejects.toThrow();

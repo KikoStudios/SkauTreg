@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import Link from "next/link";
 import TripForm, { TripFormData } from "../../../components/TripForm";
 import { useFeedback } from "@/context/FeedbackContext";
-import { Plus } from "lucide-react";
+import { CalendarPlus, Plus, X } from "lucide-react";
+import styles from "./TripsPage.module.css";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
@@ -36,7 +37,7 @@ const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 export default function TripsPage() {
-    const { showSuccess } = useFeedback();
+    const { showError, showSuccess } = useFeedback();
     const troops = useQuery(api.troops.getByUser);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -71,6 +72,7 @@ export default function TripsPage() {
 
     const [isCreating, setIsCreating] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const createCloseRef = useRef<HTMLButtonElement>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [activeTab, setActiveTab] = useState<"upcoming" | "old">("upcoming");
 
@@ -83,6 +85,20 @@ export default function TripsPage() {
             setShowAddModal(true);
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        if (!showAddModal) return;
+        const previous = document.activeElement as HTMLElement | null;
+        createCloseRef.current?.focus();
+        const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && !isCreating && setShowAddModal(false);
+        document.addEventListener("keydown", onKeyDown);
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.removeEventListener("keydown", onKeyDown);
+            document.body.style.overflow = "";
+            previous?.focus();
+        };
+    }, [showAddModal, isCreating]);
 
     const handleCreate = async (data: TripFormData) => {
         if (!selectedTroopId) return;
@@ -100,8 +116,11 @@ export default function TripsPage() {
                 duration: 2500,
             });
         } catch (error) {
-            console.error(error);
-            alert("Chyba při vytváření výpravy");
+            showError({
+                title: "Výpravu se nepodařilo vytvořit",
+                message: error instanceof Error ? error.message : "Zkontrolujte údaje a zkuste to znovu.",
+                icon: "error",
+            });
         } finally {
             setIsCreating(false);
         }
@@ -453,68 +472,25 @@ export default function TripsPage() {
 
             {/* Create Modal */}
             {showAddModal && (
-                <div style={{
-                    position: "fixed",
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    backgroundColor: "rgba(0,0,0,0.55)",
-                    backdropFilter: "blur(3px)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 2000,
-                    padding: "1rem"
-                }} onClick={() => setShowAddModal(false)}>
-                    <div style={{
-                        backgroundColor: "white",
-                        border: "3px solid #000",
-                        borderRadius: "24px",
-                        boxShadow: "10px 10px 0 0 #000",
-                        width: "100%",
-                        maxWidth: "900px",
-                        maxHeight: "90vh",
-                        overflow: "hidden",
-                        display: "flex",
-                        flexDirection: "column"
-                    }} onClick={e => e.stopPropagation()}>
-                        
-                        {/* Header with Gradient */}
-                        <div style={{
-                            background: "linear-gradient(135deg, #86efac 0%, #4ade80 100%)",
-                            padding: "1rem 2rem",
-                            borderBottom: "3px solid #000",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center"
-                        }}>
-                            <h2 style={{ fontSize: "1.2rem", fontWeight: "900", margin: 0 }}>Naplánovat Výpravu</h2>
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                style={{
-                                    backgroundColor: "white",
-                                    border: "2px solid #000",
-                                    borderRadius: "50%",
-                                    width: "32px",
-                                    height: "32px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    cursor: "pointer",
-                                    fontWeight: "900",
-                                    boxShadow: "2px 2px 0 0 #000"
-                                }}
-                            >
-                                ✕
-                            </button>
-                        </div>
+                <div className={styles.createOverlay} onMouseDown={(event) => event.target === event.currentTarget && setShowAddModal(false)}>
+                    <section className={styles.createDialog} role="dialog" aria-modal="true" aria-labelledby="create-trip-title">
+                        <header className={styles.createHeader}>
+                            <div className={styles.createHeading}>
+                                <span className={styles.createIcon}><CalendarPlus size={21} /></span>
+                                <div><span>Nová výprava</span><h2 id="create-trip-title">Naplánovat výpravu</h2></div>
+                            </div>
+                            <button ref={createCloseRef} type="button" className={styles.closeButton} onClick={() => setShowAddModal(false)} aria-label="Zavřít"><X size={20} /></button>
+                        </header>
 
-                        <div style={{ flex: "1 1 auto", overflowY: "auto", padding: "1.5rem 2rem" }}>
+                        <div className={styles.createBody}>
+                            <p className={styles.createIntro}>Nejdřív vyplňte základní údaje. Způsob přihlašování a vlastní otázky nastavíte ve druhé části.</p>
                             <TripForm
                                 onSubmit={handleCreate}
                                 isLoading={isCreating}
-                                buttonText="Vytvořit Výpravu"
+                                buttonText="Vytvořit výpravu"
                             />
                         </div>
-                    </div>
+                    </section>
                 </div>
             )}
         </div>

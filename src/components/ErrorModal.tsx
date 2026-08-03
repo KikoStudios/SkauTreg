@@ -113,12 +113,14 @@ export default function ErrorModal() {
                             </button>
                         )}
 
-                        <button
-                            className={`${styles.button} ${styles.secondary}`}
-                            onClick={closeError}
-                        >
-                            Zavřít
-                        </button>
+                        {!errorConfig.buttons?.length && (
+                            <button
+                                className={`${styles.button} ${styles.secondary}`}
+                                onClick={closeError}
+                            >
+                                Zavřít
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

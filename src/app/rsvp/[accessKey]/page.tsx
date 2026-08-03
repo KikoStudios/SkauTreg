@@ -168,7 +168,17 @@ export default function PublicRSVPPage() {
             if (data.currentStatus === "attending" || data.currentStatus === "not_attending") {
                 setStatus(data.currentStatus);
             }
-            if (data.currentResponses) setResponses(data.currentResponses);
+            if (data.currentResponses) {
+                if (typeof data.currentResponses === "string") {
+                    try {
+                        setResponses(JSON.parse(data.currentResponses));
+                    } catch {
+                        setResponses({});
+                    }
+                } else {
+                    setResponses(data.currentResponses);
+                }
+            }
         }
     }, [data]);
 
@@ -215,7 +225,7 @@ export default function PublicRSVPPage() {
             await submitRSVP({
                 accessKey,
                 status: chosenStatus,
-                responses: JSON.stringify(responses)
+                responses,
             });
             setStatus(chosenStatus);
             setIsSuccess(true);
@@ -225,8 +235,11 @@ export default function PublicRSVPPage() {
                 duration: 2500,
             });
         } catch (error) {
-            console.error("Failed to submit RSVP", error);
-            alert("Něco se pokazilo. Zkuste to prosím znovu.");
+            showError({
+                title: "Odpověď se nepodařilo uložit",
+                message: getErrorDetails(error) || "Zkuste to prosím znovu.",
+                icon: "error",
+            });
         } finally {
             setIsSubmitting(false);
         }

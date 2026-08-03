@@ -14,6 +14,7 @@ import { useFeedback } from "../../../../context/FeedbackContext";
 import TransportTab from "../../../../components/trip/TransportTab";
 import FinanceTab from "../../../../components/trip/FinanceTab";
 import { TripBase, TripDocumentation, TripOverview, TripParticipants, type TripParticipantDTO } from "../../../../components/trip/TripWorkspaceSections";
+import TripStaffModal from "../../../../components/trip/TripStaffModal";
 import { normalizeMemberContactFields } from "../../../../lib/memberEmails";
 import { ArrowLeft, Bus, CalendarDays, ClipboardList, FileText, Mail, MapPin, Settings2, Trash2, Users, WalletCards } from "lucide-react";
 import workspaceStyles from "./TripWorkspace.module.css";
@@ -229,7 +230,7 @@ export default function TripDashboardPage() {
                     variant: "danger",
                 },
                 {
-                    label: "Zrušit",
+                    label: "Ne, ponechat",
                     onClick: () => {},
                     variant: "secondary",
                 },
@@ -441,7 +442,7 @@ export default function TripDashboardPage() {
                 <div className={workspaceStyles.mobileContext}><span>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</span><strong>{trip.name}</strong><Link href="/trips"><ArrowLeft size={15} /> Zpět</Link></div>
 
                 <div key={activeTab} className={workspaceStyles.sectionTransition}>
-                    {activeTab === 'info' && <TripOverview trip={trip} participants={overviewParticipants} staff={tripStaff} onManageStaff={() => setIsStaffModalOpen(true)} canManageStaff={canSeeSensitive} />}
+                    {activeTab === 'info' && <TripOverview trip={trip} participants={overviewParticipants} staff={tripStaff} onManageStaff={() => setIsStaffModalOpen(true)} onManageRegistration={() => { setSettingsSection("registration"); selectTab("nastaveni"); }} canManageStaff={canSeeSensitive} />}
                     {activeTab === 'zakladna' && <TripBase base={base} onUnassign={confirmUnassignBase} />}
                     {activeTab === 'doprava' && <TransportTab tripId={tripId} trip={trip} />}
                     {activeTab === 'finance' && <FinanceTab tripId={tripId} />}
@@ -450,6 +451,32 @@ export default function TripDashboardPage() {
                     {activeTab === 'emaily' && <EmailDraftsTab tripId={tripId} view={emailView} isLeader={dashboard && troop ? (() => { const leaders = dashboard.leaders || []; const user = dashboard.currentUser; return leaders.some((leader: any) => leader?._id === user?._id && (leader.role === "owner" || leader.role === "main_leader")); })() : false} />}
                     {activeTab === 'nastaveni' && <TripForm initialData={{ name: trip.name, description: trip.description, location: trip.location, startDate: trip.startDate, endDate: trip.endDate || "", lastCancellationDate: trip.lastCancellationDate || "", lateCancellationMessage: trip.lateCancellationMessage || "", formType: trip.formType || "registration", customFields: trip.customFields || [] }} onSubmit={handleUpdate} isLoading={isSaving} buttonText="Uložit změny" layout="workspace" section={settingsSection} showNavigation={false} />}
                 </div>
+
+                <TripStaffModal
+                    open={isStaffModalOpen}
+                    onClose={() => setIsStaffModalOpen(false)}
+                    leaders={dashboard.leaders || []}
+                    staff={tripStaff}
+                    presets={leaderPresets}
+                    selectedLeaderId={selectedLeaderId}
+                    setSelectedLeaderId={setSelectedLeaderId}
+                    onAddLeader={handleAddLeaderFromTeam}
+                    externalName={externalName}
+                    setExternalName={setExternalName}
+                    externalRole={externalRole}
+                    setExternalRole={setExternalRole}
+                    externalAge={externalAge}
+                    setExternalAge={setExternalAge}
+                    externalBenefit={externalBenefit}
+                    setExternalBenefit={setExternalBenefit}
+                    benefitOptions={BENEFIT_OPTIONS}
+                    saveAsPreset={saveExternalAsPreset}
+                    setSaveAsPreset={setSaveExternalAsPreset}
+                    onAddExternal={handleAddExternal}
+                    onAddPreset={async (presetId) => handleAddFromPreset(presetId as Id<"leader_presets">)}
+                    onRemovePreset={async (presetId) => { await removeLeaderPreset({ presetId: presetId as Id<"leader_presets"> }); }}
+                    onRemoveStaff={async (staffId) => { await removeTripStaff({ tripStaffId: staffId as Id<"trip_staff"> }); }}
+                />
 
             {/* Tab Content - INFO */}
             {activeTab === ('legacy-info' as TabType) && (

@@ -4,7 +4,7 @@ import LegalPage, { type LegalSection } from "@/components/LegalPage";
 export const metadata: Metadata = { title: "Ochrana osobních údajů | SkauTreg" };
 
 const operator = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME || "Provozovatel bude doplněn";
-const address = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS || "Adresa bude doplněna";
+const address = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS?.trim();
 const privacyEmail = process.env.NEXT_PUBLIC_PRIVACY_EMAIL || "privacy@example.invalid";
 const securityEmail = process.env.NEXT_PUBLIC_SECURITY_EMAIL || "security@example.invalid";
 const effectiveDate = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "návrh";
@@ -13,7 +13,7 @@ const sections: LegalSection[] = [
   {
     id: "spravce",
     title: "1. Správce a kontakt",
-    content: <><p>Správcem služby je <strong>{operator}</strong>, {address}.</p><p>Ochrana osobních údajů: <a href={`mailto:${privacyEmail}`}>{privacyEmail}</a>. Bezpečnostní incidenty: <a href={`mailto:${securityEmail}`}>{securityEmail}</a>.</p></>,
+    content: <><p>Správcem interní služby je <strong>{operator}</strong>{address ? `, ${address}` : ""}.</p><p>Ochrana osobních údajů: <a href={`mailto:${privacyEmail}`}>{privacyEmail}</a>. Bezpečnostní incidenty: <a href={`mailto:${securityEmail}`}>{securityEmail}</a>.</p></>,
   },
   {
     id: "udaje",

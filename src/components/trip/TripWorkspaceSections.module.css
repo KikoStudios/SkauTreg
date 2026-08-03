@@ -32,6 +32,7 @@
 .statusRows > div { display: flex; align-items: center; justify-content: space-between; min-height: 43px; border-top: 1px solid #eceeec; }
 .statusRows span { display: flex; align-items: center; gap: .5rem; color: #5e645f; font-size: .76rem; font-weight: 700; }
 .statusRows strong { font-size: .8rem; }
+.panelHint { margin: .65rem 0 0; padding-top: .65rem; color: #686e69; border-top: 1px solid #eceeec; font-size: .68rem; line-height: 1.45; }
 .pendingDot { width: 7px; height: 7px; background: #b88a2f; border-radius: 50%; }
 .peopleList { display: grid; gap: .4rem; }
 .peopleList > div { display: flex; align-items: center; gap: .6rem; padding: .45rem; border-top: 1px solid #eceeec; }

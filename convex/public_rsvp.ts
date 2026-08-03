@@ -26,13 +26,25 @@ async function findParticipationByCapability(
 function validateResponses(
     responses: unknown,
     customFields: Array<{ label: string; type: string; options?: string[] }> | undefined,
-) {
-    if (responses === undefined) return;
-    if (!responses || typeof responses !== "object" || Array.isArray(responses)) {
+) : Record<string, unknown> | undefined {
+    if (responses === undefined) return undefined;
+
+    // Older RSVP clients sent the form object as JSON. Keep accepting those
+    // links during the additive rollout, but always validate and store an object.
+    let normalized = responses;
+    if (typeof normalized === "string") {
+        try {
+            normalized = JSON.parse(normalized);
+        } catch {
+            throw new Error("Neplatný formát odpovědí.");
+        }
+    }
+
+    if (!normalized || typeof normalized !== "object" || Array.isArray(normalized)) {
         throw new Error("Neplatný formát odpovědí.");
     }
 
-    const record = responses as Record<string, unknown>;
+    const record = normalized as Record<string, unknown>;
     const allowed = new Map((customFields ?? []).map((field) => [field.label, field]));
     if (Object.keys(record).length > 50 || JSON.stringify(record).length > 20_000) {
         throw new Error("Odpověď je příliš velká.");
@@ -58,6 +70,8 @@ function validateResponses(
             throw new Error("Odpověď obsahuje nepodporovanou hodnotu.");
         }
     }
+
+    return record;
 }
 
 // Public query: no auth required, identified by a high-entropy capability.
@@ -92,6 +106,7 @@ export const getByAccessKey = query({
             tripEndDate: trip.endDate,
             tripLastCancellationDate: trip.lastCancellationDate,
             tripLateCancellationMessage: trip.lateCancellationMessage,
+            formType: trip.formType || "registration",
             customFields: trip.customFields,
             memberName: member.name, // Personalization
             memberNickname: member.nickname,
@@ -120,7 +135,7 @@ export const submit = mutation({
         if (!trip) {
             throw new Error("Trip not found");
         }
-        validateResponses(args.responses, trip.customFields);
+        const responses = validateResponses(args.responses, trip.customFields);
 
         const isAfterDeadline = (lastCancellationDate: string | undefined) => {
             if (!lastCancellationDate) return false;
@@ -137,7 +152,7 @@ export const submit = mutation({
         // 2. Update status and responses
         await ctx.db.patch(participation._id, {
             status: args.status,
-            responses: args.responses,
+            responses,
             lateCancellation,
             lateCancellationAt,
         });

@@ -4,7 +4,7 @@ import LegalPage, { type LegalSection } from "@/components/LegalPage";
 export const metadata: Metadata = { title: "Podmínky používání | SkauTreg" };
 
 const operator = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_NAME || "Provozovatel bude doplněn";
-const address = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS || "Adresa bude doplněna";
+const address = process.env.NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS?.trim();
 const effectiveDate = process.env.NEXT_PUBLIC_LEGAL_EFFECTIVE_DATE || "návrh";
 const securityEmail = process.env.NEXT_PUBLIC_SECURITY_EMAIL || "security@example.invalid";
 
@@ -12,7 +12,7 @@ const sections: LegalSection[] = [
   {
     id: "provozovatel",
     title: "1. Provozovatel a přijetí podmínek",
-    content: <p>Službu SkauTreg provozuje <strong>{operator}</strong>, {address}. Používáním služby potvrzujete, že jste oprávněni jednat za svůj účet nebo oddíl a budete dodržovat tyto podmínky.</p>,
+    content: <p>Interní službu SkauTreg provozuje <strong>{operator}</strong>{address ? `, ${address}` : ""}. Používáním služby potvrzujete, že jste oprávněni jednat za svůj účet nebo oddíl a budete dodržovat tyto podmínky.</p>,
   },
   {
     id: "ucet",

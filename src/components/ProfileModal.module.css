@@ -10,8 +10,8 @@
 }
 
 .profileCard {
-    width: min(760px, 100%);
-    height: min(620px, calc(100dvh - 2rem));
+    width: min(980px, 100%);
+    height: min(720px, calc(100dvh - 2rem));
     overflow: hidden;
     color: var(--text-main);
     background: var(--bg-card);
@@ -27,13 +27,13 @@
 }
 
 .profileHeader {
-    min-height: 82px;
+    min-height: 88px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    padding: .75rem 1rem;
-    background: #fff;
+    padding: .85rem 1.15rem;
+    background: linear-gradient(90deg, #edf4ef 0 7px, #fff 7px);
     border-bottom: var(--border-ui);
 }
 
@@ -77,26 +77,28 @@
 .closeButton:hover { background: var(--color-danger-bg); }
 
 .profileLayout {
-    height: calc(100% - 82px);
+    height: calc(100% - 88px);
     display: grid;
-    grid-template-rows: 58px minmax(0, 1fr) 64px;
+    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 64px;
 }
 
 .sectionNav {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: .45rem;
-    padding: .55rem 1rem;
+    padding: 1rem .8rem;
     background: var(--bg-app);
-    border-bottom: var(--surface-border);
+    border-right: var(--surface-border);
 }
 .sectionNav button {
     min-width: 0;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: .42rem;
-    padding: .45rem .55rem;
+    min-height: 42px;
+    padding: .6rem .7rem;
     color: #5f6166;
     background: transparent;
     border: 1px solid transparent;
@@ -109,7 +111,7 @@
 .sectionNav button.sectionNavActive { color: var(--color-primary-text); background: var(--color-primary); border: var(--border-ui); box-shadow: var(--shadow-sm); }
 .sectionNav em { min-width: 18px; height: 18px; display: grid; place-items: center; color: #fff; background: #111; border-radius: 50%; font-size: .58rem; font-style: normal; }
 
-.content { min-width: 0; overflow-y: auto; padding: 1.2rem 1.35rem 1.6rem; background: #fff; scrollbar-width: thin; scrollbar-color: #aaa transparent; }
+.content { min-width: 0; overflow-y: auto; padding: 1.5rem 1.75rem 2rem; background: #fff; scrollbar-width: thin; scrollbar-color: #aaa transparent; }
 .section { width: 100%; animation: sectionIn .13s ease; }
 @keyframes sectionIn { from { opacity: .45; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 .sectionHeading { margin-bottom: 1rem; }
@@ -161,6 +163,7 @@
 .loadingState { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: .5rem; color: var(--text-muted); font-size: .72rem; }
 
 .footer {
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -186,11 +189,11 @@
     .modalOverlay { padding: .4rem; align-items: end; }
     .profileCard { height: min(680px, calc(100dvh - .4rem)); border-radius: 14px 14px 0 0; }
     .profileHeader { min-height: 72px; padding: .6rem .75rem; }
-    .profileLayout { height: calc(100% - 72px); grid-template-rows: 55px minmax(0, 1fr) 62px; }
+    .profileLayout { height: calc(100% - 72px); grid-template-columns: 1fr; grid-template-rows: 55px minmax(0, 1fr) 62px; }
     .avatarWrap, .userAvatar { width: 46px; height: 46px; }
     .completion { display: none; }
-    .sectionNav { padding: .45rem .55rem; gap: .25rem; }
-    .sectionNav button { padding: .4rem .2rem; }
+    .sectionNav { display: grid; grid-template-columns: repeat(4, 1fr); padding: .45rem .55rem; gap: .25rem; border-right: 0; border-bottom: var(--surface-border); }
+    .sectionNav button { justify-content: center; min-height: 38px; padding: .4rem .2rem; }
     .sectionNav button span { display: none; }
     .content { padding: 1rem .8rem 1.4rem; }
     .fieldGrid { grid-template-columns: 1fr; gap: .7rem; }
