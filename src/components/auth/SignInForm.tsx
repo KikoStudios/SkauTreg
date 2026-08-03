@@ -45,7 +45,6 @@ export default function SignInForm() {
                 await setActive({ session: result.createdSessionId });
                 router.push("/home");
             } else {
-                console.log("Sign in result:", result);
                 setError("Authentication incomplete. Please try again.");
             }
         } catch (err: any) {
@@ -105,9 +104,9 @@ export default function SignInForm() {
             </form>
 
             <div className={styles.footer}>
-                Don't have an account?{" "}
+                Nemáte účet?{" "}
                 <Link href="/sign-up" className={styles.link}>
-                    Sign up
+                    Zaregistrovat se
                 </Link>
             </div>
         </div>

@@ -1,9 +1,10 @@
 "use client";
 
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
+import { csCZ } from "@clerk/localizations";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import UserSync from "../components/UserSync";
 
 const convex = new ConvexReactClient(
@@ -11,23 +12,13 @@ const convex = new ConvexReactClient(
 );
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
-
-    // Prevent hydration mismatch by not rendering Clerk until client-side is ready
-    if (!mounted) {
-        return null;
-    }
-
     return (
         <ClerkProvider
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
-            afterSignInUrl="/home"
-            afterSignUpUrl="/home"
+            signInFallbackRedirectUrl="/home"
+            signUpFallbackRedirectUrl="/home"
+            localization={csCZ}
             publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         >
             <ConvexProviderWithClerk client={convex} useAuth={useAuth}>

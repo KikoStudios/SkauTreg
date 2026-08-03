@@ -193,6 +193,18 @@
   object-fit: cover;
 }
 
+.badgeInitials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #111;
+  font-size: clamp(18px, 4vw, 30px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .badgePlus {
   width: clamp(56px, 12vw, 90px);
   height: clamp(56px, 12vw, 90px);

@@ -2,737 +2,212 @@
 
 import { useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { CheckCircle2, ChevronRight, Clock3, MessageSquareText, Pencil, Plus, Send, Trash2, UserRound, X } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { useFeedback } from "../context/FeedbackContext";
+import styles from "./EmailDraftsTab.module.css";
+
+type EmailView = "drafts" | "sent" | "responses";
 
 interface EmailDraftsTabProps {
     tripId: Id<"trips">;
     isLeader: boolean;
+    view?: EmailView;
 }
 
-export default function EmailDraftsTab({ tripId, isLeader }: EmailDraftsTabProps) {
+const parseResponses = (value: unknown): Record<string, unknown> => {
+    let parsed = value;
+    for (let attempt = 0; attempt < 3 && typeof parsed === "string"; attempt += 1) {
+        try { parsed = JSON.parse(parsed); } catch { return {}; }
+    }
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+};
+
+const previewText = (value: string) => value
+    .replaceAll("<user.name>", "Jana Nováková")
+    .replaceAll("<user.sign.link>", "odkaz na přihlášku");
+
+export default function EmailDraftsTab({ tripId, isLeader, view = "drafts" }: EmailDraftsTabProps) {
     const { showError, showSuccess } = useFeedback();
     const drafts = useQuery(api.emailDrafts.listByTrip, { tripId });
     const recipients = useQuery(api.emailDrafts.getRecipients, { tripId });
+    const sendConfiguration = useQuery(api.emailDrafts.getSendConfiguration, isLeader ? { tripId } : "skip");
     const createDraft = useMutation(api.emailDrafts.create);
     const updateDraft = useMutation(api.emailDrafts.update);
     const removeDraft = useMutation(api.emailDrafts.remove);
     const sendFromDraft = useAction(api.mailer.sendFromDraft);
 
-    const [showNewDraft, setShowNewDraft] = useState(false);
+    const [composerOpen, setComposerOpen] = useState(false);
     const [editingDraft, setEditingDraft] = useState<any | null>(null);
-    const [sendingDraftId, setSendingDraftId] = useState<Id<"email_drafts"> | null>(null);
-    const [sendingSelectedMembers, setSendingSelectedMembers] = useState<Set<Id<"members">>>(new Set());
-    
     const [subject, setSubject] = useState("");
     const [body, setBody] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [sendingDraftId, setSendingDraftId] = useState<Id<"email_drafts"> | null>(null);
+    const [selectedMembers, setSelectedMembers] = useState<Set<Id<"members">>>(new Set());
     const [isSending, setIsSending] = useState(false);
-    const [sendResult, setSendResult] = useState<any | null>(null);
+    const [sendConfirmed, setSendConfirmed] = useState(false);
+    const [lastFailedAttemptId, setLastFailedAttemptId] = useState<Id<"email_send_attempts"> | null>(null);
 
-    const allMembers = Array.isArray(recipients?.recipients) ? recipients.recipients : [];
-    const memberIds = allMembers
-        .map((m) => m.memberId)
-        .filter((id): id is Id<"members"> => Boolean(id));
-    const selectableMembers = allMembers.filter(
-        (member): member is typeof member & { memberId: Id<"members"> } => Boolean(member.memberId)
-    );
+    const allRecipients = Array.isArray(recipients?.recipients) ? recipients.recipients : [];
+    const selectableRecipients = allRecipients.filter((recipient): recipient is typeof recipient & { memberId: Id<"members"> } => Boolean(recipient.memberId));
+    const draftItems = (drafts || []).filter(item => item.status !== "sent");
+    const sentItems = (drafts || []).filter(item => item.status === "sent").sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+    const sendingDraft = drafts?.find(item => item._id === sendingDraftId);
 
-    const highlightTags = (text: string) => {
-        const parts = text.split(/(<[^>]+>)/g);
-        return parts.map((part, idx) => {
-            if (part.startsWith("<") && part.endsWith(">")) {
-                return (
-                    <span key={idx} style={{ 
-                        backgroundColor: "#fbbf24", 
-                        fontWeight: "900", 
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        border: "1px solid #f59e0b",
-                        display: "inline-block",
-                        fontSize: "0.95em"
-                    }}>
-                        {part}
-                    </span>
-                );
-            }
-            return <span key={idx}>{part}</span>;
-        });
+    const closeComposer = () => {
+        setComposerOpen(false);
+        setEditingDraft(null);
+        setSubject("");
+        setBody("");
     };
 
-    const handleCreateDraft = async () => {
+    const openEditor = (draft?: any) => {
+        setEditingDraft(draft || null);
+        setSubject(draft?.subject || "");
+        setBody(draft?.body || "");
+        setComposerOpen(true);
+    };
+
+    const insertPersonalization = (token: "<user.name>" | "<user.sign.link>") => {
+        setBody(current => `${current}${current && !current.endsWith("\n") ? " " : ""}${token}`);
+    };
+
+    const saveDraft = async () => {
         if (!subject.trim() || !body.trim()) {
-            showError({
-                title: "⚠️ Chyby ve formuláři",
-                message: "Předmět i tělo e-mailu jsou povinné.",
-                icon: "warning",
-            });
+            showError({ title: "Doplňte zprávu", message: "Předmět i text e-mailu jsou povinné.", icon: "warning" });
             return;
         }
-
         setIsSaving(true);
         try {
-            await createDraft({ tripId, subject, body });
-            setSubject("");
-            setBody("");
-            setShowNewDraft(false);
-            showSuccess({
-                title: "✅ Koncept vytvořen",
-                message: "Nový koncept e-mailu byl uložen.",
-                duration: 2500,
-            });
+            if (editingDraft) await updateDraft({ id: editingDraft._id, subject: subject.trim(), body: body.trim() });
+            else await createDraft({ tripId, subject: subject.trim(), body: body.trim() });
+            closeComposer();
+            showSuccess({ title: "Koncept uložen", message: "Zpráva je připravená k pozdějšímu odeslání.", duration: 2200 });
         } catch (error: any) {
-            showError({
-                title: "❌ Chyba",
-                message: "Nepodařilo se vytvořit koncept.",
-                icon: "error",
-                details: error?.message,
-                canReport: true,
-            });
-        } finally {
-            setIsSaving(false);
-        }
+            showError({ title: "Koncept se nepodařilo uložit", message: error?.message || "Zkuste to prosím znovu.", icon: "error", canReport: true });
+        } finally { setIsSaving(false); }
     };
 
-    const handleUpdateDraft = async () => {
-        if (!editingDraft) return;
-        if (!subject.trim() || !body.trim()) {
-            showError({
-                title: "⚠️ Chyby ve formuláři",
-                message: "Předmět i tělo e-mailu jsou povinné.",
-                icon: "warning",
-            });
-            return;
-        }
+    const deleteDraft = (draftId: Id<"email_drafts">) => showError({
+        title: "Smazat koncept?",
+        message: "Tuto zprávu už nebude možné obnovit.",
+        icon: "warning",
+        buttons: [
+            { label: "Smazat", variant: "danger", onClick: async () => { await removeDraft({ id: draftId }); } },
+            { label: "Ponechat", variant: "secondary", onClick: () => {} },
+        ],
+    });
 
-        setIsSaving(true);
-        try {
-            await updateDraft({
-                id: editingDraft._id,
-                subject,
-                body,
-            });
-            setEditingDraft(null);
-            setSubject("");
-            setBody("");
-            showSuccess({
-                title: "✅ Koncept aktualizován",
-                message: "Koncept e-mailu byl uložen.",
-                duration: 2500,
-            });
-        } catch (error: any) {
-            showError({
-                title: "❌ Chyba",
-                message: "Nepodařilo se aktualizovat koncept.",
-                icon: "error",
-                details: error?.message,
-                canReport: true,
-            });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleDeleteDraft = async (draftId: Id<"email_drafts">) => {
-        showError({
-            title: "⚠️ Potvrzení",
-            message: "Opravdu smazat tento koncept?",
-            icon: "warning",
-            buttons: [
-                {
-                    label: "Smazat",
-                    onClick: async () => {
-                        try {
-                            await removeDraft({ id: draftId });
-                            showSuccess({
-                                title: "✅ Smazáno",
-                                message: "Koncept byl smazán.",
-                                duration: 2500,
-                            });
-                        } catch (error: any) {
-                            showError({
-                                title: "❌ Chyba",
-                                message: "Nepodařilo se smazat koncept.",
-                                icon: "error",
-                                details: error?.message,
-                                canReport: true,
-                            });
-                        }
-                    },
-                    variant: "danger",
-                },
-                {
-                    label: "Zrušit",
-                    onClick: () => {},
-                    variant: "secondary",
-                },
-            ],
-        });
-    };
-
-    const handleOpenSendPopup = (draft: any) => {
+    const openSend = (draft: any) => {
         setSendingDraftId(draft._id);
-        setSendingSelectedMembers(new Set(memberIds));
+        setSelectedMembers(new Set(selectableRecipients.map(recipient => recipient.memberId)));
+        setSendConfirmed(false);
+        setLastFailedAttemptId(null);
     };
 
-    const handleCloseSendPopup = () => {
-        setSendingDraftId(null);
-        setSendingSelectedMembers(new Set());
-        setSendResult(null);
-    };
-
-    const toggleMember = (memberId: Id<"members">) => {
-        const newSet = new Set(sendingSelectedMembers);
-        if (newSet.has(memberId)) {
-            newSet.delete(memberId);
-        } else {
-            newSet.add(memberId);
-        }
-        setSendingSelectedMembers(newSet);
-    };
-
-    const handleSendDraft = async () => {
-        if (!sendingDraftId) return;
-        if (sendingSelectedMembers.size === 0) {
-            showError({
-                title: "⚠️ Chyby ve formuláři",
-                message: "Vyberte alespoň jednoho příjemce.",
-                icon: "warning",
-            });
-            return;
-        }
-
+    const sendDraft = async (retryAttemptId?: Id<"email_send_attempts">) => {
+        if (!sendingDraftId || selectedMembers.size === 0) return;
         setIsSending(true);
-        setSendResult(null);
         try {
-            const result = await sendFromDraft({
-                draftId: sendingDraftId,
-                baseUrl: window.location.origin,
-                memberIds: Array.from(sendingSelectedMembers),
-            });
-            setSendResult(result);
-            
-            // Show summary
-            const successCount = result.sentCount;
-            const failedCount = result.failed?.length || 0;
-            const skippedCount = result.skippedCount;
-            
-            if (failedCount > 0) {
-                showError({
-                    title: "📧 Částečné selhání",
-                    message: `Odesláno: ${successCount} ✅ | Selhalo: ${failedCount} ❌ | Přeskočeno: ${skippedCount} ⊘`,
-                    icon: "error",
-                    details: failedCount > 0 ? `Nepodařilo se odeslat: ${result.failed.map((f: any) => f.email).join(", ")}` : undefined,
-                    canReport: failedCount > 0,
-                });
+            const result = await sendFromDraft({ draftId: sendingDraftId, memberIds: Array.from(selectedMembers), idempotencyKey: crypto.randomUUID(), retryAttemptId });
+            if (result.status === "sent") {
+                setSendingDraftId(null);
+                setLastFailedAttemptId(null);
+                showSuccess({ title: "Zpráva odeslána", message: `Úspěšně odesláno na ${result.sentCount} adres.`, duration: 3000 });
             } else {
-                showSuccess({
-                    title: "✅ Odesláno",
-                    message: `E-maily úspěšně odeslány (${successCount} členů).`,
-                    duration: 4000,
+                setLastFailedAttemptId(result.attemptId);
+                showError({
+                    title: result.status === "partial" ? "Část zpráv se neodeslala" : "Zprávy se nepodařilo odeslat",
+                    message: `Odesláno: ${result.sentCount}, neúspěšně: ${result.failed.length}. Další pokus odešle jen neúspěšné položky.`,
+                    icon: "warning",
                 });
             }
         } catch (error: any) {
-            showError({
-                title: "❌ Chyba",
-                message: error?.message || "Nepodařilo se odeslat e-mail.",
-                icon: "error",
-                details: error?.message,
-                canReport: true,
-            });
-        } finally {
-            setIsSending(false);
-        }
+            showError({ title: "Odeslání se nepodařilo", message: error?.message || "Zkontrolujte připojení e-mailu.", icon: "error", canReport: true });
+        } finally { setIsSending(false); }
     };
-
-    const sendingDraft = drafts?.find(d => d._id === sendingDraftId);
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-            {/* New Draft Button */}
-            {!editingDraft && !showNewDraft && (
-                <button
-                    onClick={() => setShowNewDraft(true)}
-                    style={{
-                        padding: "1rem 1.5rem",
-                        backgroundColor: "#86efac",
-                        border: "3px solid #000",
-                        borderRadius: "10px",
-                        fontWeight: "900",
-                        cursor: "pointer",
-                        fontSize: "1rem",
-                        textTransform: "uppercase",
-                        boxShadow: "4px 4px 0 0 #000",
-                        alignSelf: "flex-start"
-                    }}
-                >
-                    + Nový koncept
-                </button>
-            )}
-
-            {/* Create/Edit Draft Form */}
-            {(showNewDraft || editingDraft) && (
-                <div style={{
-                    backgroundColor: "#f0fdf4",
-                    border: "3px solid #000",
-                    borderRadius: "14px",
-                    padding: "1.75rem",
-                    boxShadow: "6px 6px 0 0 #000"
-                }}>
-                    <h3 style={{ fontSize: "1.2rem", fontWeight: "900", marginBottom: "1.5rem", textTransform: "uppercase" }}>
-                        {editingDraft ? "Upravit koncept" : "Nový koncept"}
-                    </h3>
-
-                    <div style={{ display: "grid", gap: "1rem", marginBottom: "1rem" }}>
-                        <div>
-                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.5rem" }}>Předmět</label>
-                            <input
-                                type="text"
-                                value={subject}
-                                onChange={(e) => setSubject(e.target.value)}
-                                placeholder="Pozvánka na výpravu..."
-                                style={{
-                                    width: "100%",
-                                    padding: "0.85rem",
-                                    border: "3px solid #000",
-                                    borderRadius: "10px",
-                                    fontWeight: "700",
-                                    backgroundColor: "#fff",
-                                    boxShadow: "3px 3px 0 0 #000"
-                                }}
-                            />
-                        </div>
-
-                        <div>
-                            <label style={{ display: "block", fontWeight: "800", marginBottom: "0.5rem" }}>Text e-mailu</label>
-                            <textarea
-                                value={body}
-                                onChange={(e) => setBody(e.target.value)}
-                                placeholder="Ahoj &lt;user.name&gt;!\n\nPozvánku najdeš zde: &lt;user.sign.link&gt;\n\nDěkujeme!"
-                                style={{
-                                    width: "100%",
-                                    minHeight: "200px",
-                                    padding: "0.85rem",
-                                    border: "3px solid #000",
-                                    borderRadius: "10px",
-                                    fontWeight: "600",
-                                    fontFamily: "inherit",
-                                    fontSize: "0.95rem",
-                                    resize: "vertical",
-                                    backgroundColor: "#fff",
-                                    boxShadow: "3px 3px 0 0 #000",
-                                    lineHeight: "1.6"
-                                }}
-                            />
-                        </div>
-
-                        {/* Smart Tags Info */}
-                        <div style={{
-                            padding: "0.75rem 1rem",
-                            backgroundColor: "#dbeafe",
-                            border: "2px solid #0284c7",
-                            borderRadius: "8px",
-                            fontSize: "0.9rem",
-                            fontWeight: "600",
-                            color: "#0c4a6e"
-                        }}>
-                            <strong>Dostupné tokeny:</strong> &lt;user.name&gt; = jméno člena, &lt;user.sign.link&gt; = odkaz na přihlášku
-                        </div>
+        <div className={styles.workspace}>
+            {view === "drafts" && (
+                <>
+                    <div className={styles.compactToolbar}>
+                        <div><strong>Rozepsané zprávy</strong><span>{draftItems.length} konceptů · {recipients?.withEmail || 0} dostupných příjemců</span></div>
+                        <img className={styles.mailArtwork} src="/illustrations/ill-trip-email.png" alt="" aria-hidden="true" />
+                        {!composerOpen && <button className={styles.primaryButton} onClick={() => openEditor()}><Plus size={16} /> Nová zpráva</button>}
                     </div>
 
-                    {/* Preview */}
-                    {(subject || body) && (
-                        <div style={{
-                            padding: "1rem",
-                            backgroundColor: "#fff",
-                            border: "2px solid #000",
-                            borderRadius: "8px",
-                            marginBottom: "1rem",
-                            boxShadow: "2px 2px 0 0 #000"
-                        }}>
-                            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", marginBottom: "0.5rem" }}>NÁHLED:</div>
-                            <div style={{ fontSize: "0.95rem", fontWeight: "700", marginBottom: "0.75rem" }}>
-                                Předmět: {highlightTags(subject)}
+                    {composerOpen && (
+                        <section className={styles.composer}>
+                            <div className={styles.composerEditor}>
+                                <div className={styles.sectionTitle}><div><span>{editingDraft ? "Upravit koncept" : "Nová zpráva"}</span><strong>Zpráva pro účastníky a rodiče</strong></div><button aria-label="Zavřít editor" onClick={closeComposer}><X size={18} /></button></div>
+                                <label><span>Předmět</span><input value={subject} onChange={event => setSubject(event.target.value)} placeholder="Např. Informace před odjezdem" /></label>
+                                <label><span>Text zprávy</span><textarea value={body} onChange={event => setBody(event.target.value)} placeholder="Napište stručně vše, co mají rodiny vědět…" /></label>
+                                <div className={styles.personalization}>
+                                    <span>Vložit automaticky:</span>
+                                    <button onClick={() => insertPersonalization("<user.name>")}><UserRound size={14} /> Jméno příjemce</button>
+                                    <button onClick={() => insertPersonalization("<user.sign.link>")}><ChevronRight size={14} /> Odkaz na přihlášku</button>
+                                </div>
+                                <div className={styles.composerActions}><button className={styles.secondaryButton} onClick={closeComposer}>Zrušit</button><button className={styles.primaryButton} disabled={isSaving} onClick={saveDraft}>{isSaving ? "Ukládám…" : "Uložit koncept"}</button></div>
                             </div>
-                            <div style={{ fontSize: "0.9rem", lineHeight: "1.5", color: "#333", whiteSpace: "pre-wrap" }}>
-                                {highlightTags(body)}
-                            </div>
-                        </div>
+                            <aside className={styles.preview}><span>Náhled pro příjemce</span><strong>{previewText(subject) || "Předmět zprávy"}</strong><div>{previewText(body) || "Zde se zobrazí náhled zprávy. Automatické údaje uvidíte tak, jak je obdrží rodič nebo účastník."}</div></aside>
+                        </section>
                     )}
 
-                    {/* Buttons */}
-                    <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                        <button
-                            onClick={editingDraft ? handleUpdateDraft : handleCreateDraft}
-                            disabled={isSaving}
-                            style={{
-                                padding: "0.75rem 1.5rem",
-                                backgroundColor: "#86efac",
-                                border: "3px solid #000",
-                                borderRadius: "8px",
-                                fontWeight: "900",
-                                cursor: isSaving ? "not-allowed" : "pointer",
-                                boxShadow: "4px 4px 0 0 #000"
-                            }}
-                        >
-                            {isSaving ? "Ukládám..." : (editingDraft ? "Uložit změny" : "Vytvořit koncept")}
-                        </button>
-                        <button
-                            onClick={() => {
-                                setEditingDraft(null);
-                                setShowNewDraft(false);
-                                setSubject("");
-                                setBody("");
-                            }}
-                            style={{
-                                padding: "0.75rem 1.5rem",
-                                backgroundColor: "#fca5a5",
-                                border: "3px solid #000",
-                                borderRadius: "8px",
-                                fontWeight: "900",
-                                cursor: "pointer",
-                                boxShadow: "4px 4px 0 0 #000"
-                            }}
-                        >
-                            Zrušit
-                        </button>
+                    <div className={styles.messageList}>
+                        {draftItems.length === 0 && !composerOpen ? <Empty illustration="/illustrations/ill-no-email-drafts.png" title="Žádné rozepsané zprávy" text="Připravte první informační e-mail pro rodiče a účastníky." /> : draftItems.map(draft => <MessageRow key={draft._id} draft={draft} onEdit={() => openEditor(draft)} onSend={() => openSend(draft)} onDelete={() => deleteDraft(draft._id)} />)}
                     </div>
+                </>
+            )}
+
+            {view === "sent" && (
+                <div className={styles.messageList}>
+                    <div className={styles.compactToolbar}><div><strong>Odeslané zprávy</strong><span>Historie komunikace k této výpravě</span></div><span className={styles.counter}>{sentItems.length}</span></div>
+                    {sentItems.length === 0 ? <Empty illustration="/illustrations/ill-no-email-drafts.png" title="Zatím nic neodešlo" text="Po odeslání konceptu zde najdete čas, odesílatele a počet příjemců." /> : sentItems.map(draft => <article className={styles.sentRow} key={draft._id}><span className={styles.sentIcon}><CheckCircle2 size={17} /></span><div><strong>{draft.subject}</strong><small>{draft.sender?.name || "Vedoucí"} · {draft.sentAt ? new Date(draft.sentAt).toLocaleString("cs-CZ") : "Odesláno"}</small></div><span>{draft.recipientCount || 0} příjemců</span><button onClick={() => openSend(draft)}>Odeslat znovu</button></article>)}
                 </div>
             )}
 
-            {/* Drafts List */}
-            {drafts && drafts.length > 0 ? (
-                <div style={{ display: "grid", gap: "1rem" }}>
-                    <h3 style={{ fontSize: "1.1rem", fontWeight: "900", margin: "1rem 0 0 0", textTransform: "uppercase" }}>
-                        Koncepty ({drafts.length})
-                    </h3>
-                    {drafts.map((draft) => (
-                        <div
-                            key={draft._id}
-                            style={{
-                                backgroundColor: draft.status === "sent" ? "#f3f4f6" : "#fef3c7",
-                                border: "3px solid #000",
-                                borderRadius: "12px",
-                                padding: "1.5rem",
-                                boxShadow: "4px 4px 0 0 #000"
-                            }}
-                        >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-                                <div style={{ flex: "1 1 auto", minWidth: "250px" }}>
-                                    <div style={{ fontSize: "1.1rem", fontWeight: "900" }}>{draft.subject}</div>
-                                    <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600", marginTop: "0.25rem" }}>
-                                        Status: {draft.status === "sent" ? `✅ Odesláno (${draft.recipientCount || 0})` : "📝 Koncept"}
-                                    </div>
-                                </div>
+            {view === "responses" && (
+                <section className={styles.responses}>
+                    <div className={styles.compactToolbar}><div><strong>Odezva rodin</strong><span>Reakce na přihlášku a kontakty, kterým zprávy chodí</span></div><span className={styles.counter}>{allRecipients.length}</span></div>
+                    {allRecipients.length === 0 ? <Empty illustration="/illustrations/ill-no-responses.png" title="Zatím bez odpovědí" text="Jakmile rodiny odpoví na přihlášku, jejich reakce a kontakty se zobrazí zde." /> : <div className={styles.responseGrid}>{allRecipients.map(recipient => {
+                        const answers = parseResponses(recipient.responses);
+                        const answerEntries = Object.entries(answers);
+                        return <article key={String(recipient.memberId)}><div className={styles.responseHead}><span className={styles.avatar}>{recipient.name?.slice(0, 1) || "?"}</span><div><strong>{recipient.name}</strong><small>{recipient.participationStatus === "attending" ? "Účast potvrzena" : recipient.participationStatus === "not_attending" ? "Omluven/a" : "Čeká na reakci"}</small></div></div><div className={styles.contactChips}>{(recipient.contacts || []).map((contact: any) => <span key={contact.email}><b>{contact.role === "guardian" ? "Rodič" : "Člen"}</b>{contact.name} · {contact.email}</span>)}</div>{answerEntries.length > 0 && <div className={styles.replyPreview}><MessageSquareText size={15} /><span><strong>Odpovědi v přihlášce</strong>{answerEntries.slice(0, 2).map(([question, answer]) => <small key={question}>{question}: {String(answer)}</small>)}</span></div>}</article>;
+                    })}</div>}
+                </section>
+            )}
 
-                                {/* Action Buttons */}
-                                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                                    {
-                                        <>
-                                            <button
-                                                onClick={() => {
-                                                    setEditingDraft(draft);
-                                                    setSubject(draft.subject);
-                                                    setBody(draft.body);
-                                                }}
-                                                style={{
-                                                    padding: "0.6rem 1rem",
-                                                    backgroundColor: "#dbeafe",
-                                                    border: "2px solid #000",
-                                                    borderRadius: "8px",
-                                                    fontWeight: "800",
-                                                    cursor: "pointer",
-                                                    fontSize: "0.85rem",
-                                                    boxShadow: "2px 2px 0 0 #000"
-                                                }}
-                                            >
-                                                ✏️ Upravit
-                                            </button>
-                                            <button
-                                                onClick={() => handleOpenSendPopup(draft)}
-                                                style={{
-                                                    padding: "0.6rem 1rem",
-                                                    backgroundColor: "#86efac",
-                                                    border: "2px solid #000",
-                                                    borderRadius: "8px",
-                                                    fontWeight: "800",
-                                                    cursor: "pointer",
-                                                    fontSize: "0.85rem",
-                                                    boxShadow: "2px 2px 0 0 #000"
-                                                }}
-                                            >
-                                                📤 {draft.status === "sent" ? "Odeslat znovu" : "Odeslat"}
-                                            </button>
-                                        </>
-                                    }
-                                    <button
-                                        onClick={() => handleDeleteDraft(draft._id)}
-                                        style={{
-                                            padding: "0.6rem 1rem",
-                                            backgroundColor: "#fca5a5",
-                                            border: "2px solid #000",
-                                            borderRadius: "8px",
-                                            fontWeight: "800",
-                                            cursor: "pointer",
-                                            fontSize: "0.85rem",
-                                            boxShadow: "2px 2px 0 0 #000"
-                                        }}
-                                    >
-                                        🗑️ Smazat
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Draft Preview */}
-                            <div style={{
-                                padding: "0.75rem",
-                                backgroundColor: "#fef9e7",
-                                border: "2px solid #f59e0b",
-                                borderRadius: "8px",
-                                fontSize: "0.9rem",
-                                color: "#333",
-                                lineHeight: "1.5",
-                                whiteSpace: "pre-wrap",
-                                fontWeight: "500"
-                            }}>
-                                {highlightTags(draft.body)}
-                            </div>
+            {sendingDraft && (
+                <div className={styles.modalBackdrop} onClick={() => setSendingDraftId(null)}>
+                    <section className={styles.sendDialog} onClick={event => event.stopPropagation()}>
+                        <header><div><span>Odeslat zprávu</span><h3>{sendingDraft.subject}</h3></div><button onClick={() => setSendingDraftId(null)}><X size={19} /></button></header>
+                        <div className={styles.sendBody}>
+                            <div className={styles.sendPreview}><span>Náhled</span><strong>{previewText(sendingDraft.subject)}</strong><p>{previewText(sendingDraft.body)}</p></div>
+                            <div className={styles.recipientPicker}><div><strong>Příjemci</strong><button onClick={() => setSelectedMembers(new Set(selectedMembers.size === selectableRecipients.length ? [] : selectableRecipients.map(item => item.memberId)))}>{selectedMembers.size === selectableRecipients.length ? "Zrušit výběr" : "Vybrat všechny"}</button></div><div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: ".5rem" }}><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "pending").map((item) => item.memberId)))}>Jen bez reakce</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.filter((item) => item.participationStatus === "attending").map((item) => item.memberId)))}>Jen účastníci</button><button onClick={() => setSelectedMembers(new Set(selectableRecipients.map((item) => item.memberId)))}>Všichni</button></div>{selectableRecipients.map(recipient => <label key={String(recipient.memberId)}><input type="checkbox" checked={selectedMembers.has(recipient.memberId)} onChange={() => setSelectedMembers(current => { const next = new Set(current); if (next.has(recipient.memberId)) next.delete(recipient.memberId); else next.add(recipient.memberId); return next; })} /><span><strong>{recipient.name}</strong><small>{recipient.contacts?.length || recipient.emails?.length || 1} e-mailových adres</small></span></label>)}</div>
                         </div>
-                    ))}
-                </div>
-            ) : !showNewDraft && !editingDraft ? (
-                <div style={{
-                    padding: "2rem",
-                    textAlign: "center",
-                    border: "2px dashed #ccc",
-                    borderRadius: "12px",
-                    color: "#999",
-                    fontStyle: "italic"
-                }}>
-                    Žádné koncepty. Vytvořte si svůj první e-mail!
-                </div>
-            ) : null}
-
-            {/* Send Modal - 2 Column Popup */}
-            {sendingDraftId && sendingDraft && (
-                <div style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: "rgba(0, 0, 0, 0.6)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    zIndex: 4000,
-                    padding: "1rem"
-                }} onClick={handleCloseSendPopup}>
-                    <div
-                        style={{
-                            backgroundColor: "#fff",
-                            border: "4px solid #000",
-                            borderRadius: "16px",
-                            boxShadow: "8px 8px 0 0 #000",
-                            width: "100%",
-                            maxWidth: "1000px",
-                            maxHeight: "85vh",
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            overflow: "hidden"
-                        }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Left Column - Email Preview */}
-                        <div style={{
-                            padding: "2rem",
-                            borderRight: "3px solid #000",
-                            overflowY: "auto",
-                            backgroundColor: "#f9fafb"
-                        }}>
-                            <h3 style={{ fontSize: "1.1rem", fontWeight: "900", marginTop: 0 }}>Email náhled</h3>
-                            <div style={{
-                                padding: "1rem",
-                                backgroundColor: "#fff",
-                                border: "2px solid #000",
-                                borderRadius: "8px",
-                                boxShadow: "2px 2px 0 0 #000"
-                            }}>
-                                <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", marginBottom: "0.5rem" }}>PŘEDMĚT:</div>
-                                <div style={{ fontSize: "0.95rem", fontWeight: "800", marginBottom: "1.5rem" }}>
-                                    {highlightTags(sendingDraft.subject)}
-                                </div>
-
-                                <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#666", marginBottom: "0.5rem" }}>TEXT:</div>
-                                <div style={{
-                                    fontSize: "0.95rem",
-                                    lineHeight: "1.7",
-                                    color: "#2d3748",
-                                    whiteSpace: "pre-wrap",
-                                    padding: "1rem",
-                                    backgroundColor: "#fef9e7",
-                                    borderRadius: "8px",
-                                    border: "1px solid #f59e0b",
-                                    fontWeight: "500"
-                                }}>
-                                    {highlightTags(sendingDraft.body)}
-                                </div>
+                        <footer style={{ flexWrap: "wrap" }}>
+                            <div style={{ flexBasis: "100%", fontSize: ".7rem", fontWeight: 750 }}>
+                                Odesílatel: {sendConfiguration?.senderEmail || "Gmail není připojen"} · {selectedMembers.size} členů · {selectableRecipients.filter(item => selectedMembers.has(item.memberId)).reduce((sum, item) => sum + (item.contacts?.length || item.emails?.length || 1), 0)} adres
+                                {sendConfiguration?.requiresReconnect && <span role="alert" style={{ display: "block", color: "#991b1b" }}>Gmail vyžaduje nové propojení v nastavení oddílu.</span>}
                             </div>
-                        </div>
-
-                        {/* Right Column - Member Selection */}
-                        <div style={{
-                            padding: "2rem",
-                            overflowY: "auto",
-                            display: "flex",
-                            flexDirection: "column"
-                        }}>
-                            <h3 style={{ fontSize: "1.1rem", fontWeight: "900", marginTop: 0 }}>Příjemci</h3>
-                            
-                            <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                                <button
-                                    onClick={() => setSendingSelectedMembers(new Set(memberIds))}
-                                    style={{
-                                        padding: "0.5rem 0.75rem",
-                                        backgroundColor: "#dbeafe",
-                                        border: "2px solid #000",
-                                        borderRadius: "6px",
-                                        fontWeight: "700",
-                                        fontSize: "0.8rem",
-                                        cursor: "pointer",
-                                        boxShadow: "2px 2px 0 0 #000"
-                                    }}
-                                >
-                                    Vybrat všechny
-                                </button>
-                                <button
-                                    onClick={() => setSendingSelectedMembers(new Set())}
-                                    style={{
-                                        padding: "0.5rem 0.75rem",
-                                        backgroundColor: "#fecaca",
-                                        border: "2px solid #000",
-                                        borderRadius: "6px",
-                                        fontWeight: "700",
-                                        fontSize: "0.8rem",
-                                        cursor: "pointer",
-                                        boxShadow: "2px 2px 0 0 #000"
-                                    }}
-                                >
-                                    Zrušit všechny
-                                </button>
-                            </div>
-
-                            <div style={{ flex: "1 1 auto", overflowY: "auto", marginBottom: "1rem" }}>
-                                {selectableMembers.length > 0 ? selectableMembers.map((member) => (
-                                    <div
-                                        key={member.memberId}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.75rem",
-                                            padding: "0.75rem",
-                                            marginBottom: "0.5rem",
-                                            backgroundColor: sendingSelectedMembers.has(member.memberId) ? "#dcfce7" : "#f3f4f6",
-                                            border: "2px solid " + (sendingSelectedMembers.has(member.memberId) ? "#22c55e" : "#ccc"),
-                                            borderRadius: "8px",
-                                            cursor: "pointer",
-                                            transition: "all 0.1s"
-                                        }}
-                                        onClick={() => toggleMember(member.memberId)}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={sendingSelectedMembers.has(member.memberId)}
-                                            onChange={() => toggleMember(member.memberId)}
-                                            style={{
-                                                width: "18px",
-                                                height: "18px",
-                                                cursor: "pointer"
-                                            }}
-                                        />
-                                        <div>
-                                            <div style={{ fontWeight: "700", fontSize: "0.95rem" }}>{member.name}</div>
-                                            <div style={{ fontSize: "0.8rem", color: "#666", fontWeight: "600" }}>{member.email}</div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div style={{
-                                        padding: "1rem",
-                                        textAlign: "center",
-                                        color: "#999",
-                                        fontSize: "0.85rem",
-                                        fontWeight: "600"
-                                    }}>
-                                        Žádní účastníci s emailem
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{
-                                padding: "0.75rem",
-                                backgroundColor: "#fef3c7",
-                                border: "2px solid #f59e0b",
-                                borderRadius: "8px",
-                                fontSize: "0.85rem",
-                                fontWeight: "600",
-                                marginBottom: "1rem",
-                                textAlign: "center"
-                            }}>
-                                Vybrání: {sendingSelectedMembers.size} / {selectableMembers.length}
-                            </div>
-
-                            {sendResult && (
-                                <div style={{
-                                    padding: "0.75rem",
-                                    backgroundColor: "#dcfce7",
-                                    border: "2px solid #22c55e",
-                                    borderRadius: "8px",
-                                    fontSize: "0.85rem",
-                                    fontWeight: "600",
-                                    marginBottom: "1rem",
-                                    color: "#166534"
-                                }}>
-                                    ✅ Odesláno: {sendResult.sentCount} • Bez emailu: {sendResult.skippedCount}
-                                </div>
-                            )}
-
-                            <div style={{ display: "flex", gap: "0.75rem" }}>
-                                <button
-                                    onClick={handleSendDraft}
-                                    disabled={isSending || sendingSelectedMembers.size === 0}
-                                    style={{
-                                        flex: 1,
-                                        padding: "0.85rem",
-                                        backgroundColor: sendingSelectedMembers.size === 0 ? "#e5e7eb" : "#86efac",
-                                        border: "3px solid #000",
-                                        borderRadius: "8px",
-                                        fontWeight: "900",
-                                        cursor: sendingSelectedMembers.size === 0 ? "not-allowed" : "pointer",
-                                        boxShadow: "3px 3px 0 0 #000"
-                                    }}
-                                >
-                                    {isSending ? "Odesílám..." : "📤 Odeslat"}
-                                </button>
-                                <button
-                                    onClick={handleCloseSendPopup}
-                                    style={{
-                                        padding: "0.85rem 1.25rem",
-                                        backgroundColor: "#fca5a5",
-                                        border: "3px solid #000",
-                                        borderRadius: "8px",
-                                        fontWeight: "900",
-                                        cursor: "pointer",
-                                        boxShadow: "3px 3px 0 0 #000"
-                                    }}
-                                >
-                                    Zavřít
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                            <label style={{ flexBasis: "100%", display: "flex", gap: 8, alignItems: "center" }}><input type="checkbox" checked={sendConfirmed} onChange={(event) => setSendConfirmed(event.target.checked)} /> Zkontroloval/a jsem odesílatele, obsah a {selectedMembers.size} vybraných členů.</label>
+                            <span>{selectedMembers.size} členů vybráno</span>
+                            {lastFailedAttemptId && <button className={styles.secondaryButton} disabled={isSending} onClick={() => sendDraft(lastFailedAttemptId)}>Zkusit znovu jen neúspěšné</button>}
+                            <button className={styles.primaryButton} disabled={!isLeader || !sendConfirmed || isSending || selectedMembers.size === 0 || !sendConfiguration?.connected || sendConfiguration.requiresReconnect} onClick={() => sendDraft()}><Send size={16} /> {isSending ? "Odesílám…" : "Odeslat"}</button>
+                        </footer>
+                    </section>
                 </div>
             )}
         </div>
     );
+}
+
+function MessageRow({ draft, onEdit, onSend, onDelete }: { draft: any; onEdit: () => void; onSend: () => void; onDelete: () => void }) {
+    return <article className={styles.messageRow}><div><span className={styles.draftIcon}><Clock3 size={16} /></span><div><strong>{draft.subject}</strong><small>Upraveno {draft.updatedAt ? new Date(draft.updatedAt).toLocaleString("cs-CZ") : "nedávno"}</small></div></div><p>{previewText(draft.body)}</p><div className={styles.rowActions}><button onClick={onEdit}><Pencil size={15} /> Upravit</button><button className={styles.sendButton} onClick={onSend}><Send size={15} /> Odeslat</button><button aria-label="Smazat koncept" onClick={onDelete}><Trash2 size={15} /></button></div></article>;
+}
+
+function Empty({ illustration, title, text }: { illustration: string; title: string; text: string }) {
+    return <div className={styles.empty}><img src={illustration} alt="" aria-hidden="true" /><div><strong>{title}</strong><span>{text}</span></div></div>;
 }

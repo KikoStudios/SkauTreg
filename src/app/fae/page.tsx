@@ -3,16 +3,26 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useFeedback } from "@/context/FeedbackContext";
 import styles from "./page.module.css";
 import { SupernotesCard } from "@/lib/supernotes";
+import { useSearchParams } from "next/navigation";
+import FeatureGate from "@/components/FeatureGate";
 type Tab = "errors" | "features" | "submit" | "notes";
 type Status = "all" | "open" | "planned" | "completed" | "rejected";
 
-export default function FeedbackPage() {
+function FeedbackPageContent() {
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<Tab>("features");
     const [selectedStatus, setSelectedStatus] = useState<Status>("open");
+
+    useEffect(() => {
+        const requestedTab = searchParams.get("tab");
+        if (requestedTab === "errors" || requestedTab === "features" || requestedTab === "submit" || requestedTab === "notes") {
+            setActiveTab(requestedTab);
+        }
+    }, [searchParams]);
 
     // Supernotes state
     const [supernotesCards, setSupernotesCards] = useState<SupernotesCard[]>([]);
@@ -21,7 +31,10 @@ export default function FeedbackPage() {
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
     // Queries
-    const errorReports = useQuery(api.feedback.getErrorReports, {});
+    const errorReports = useQuery(
+        api.feedback.getErrorReports,
+        activeTab === "errors" ? {} : "skip",
+    );
     const featureRequests = useQuery(api.feedback.getFeatureRequests, {
         status: selectedStatus === "all" ? undefined : selectedStatus,
     });
@@ -137,6 +150,7 @@ export default function FeedbackPage() {
     };
 
     return (
+      <FeatureGate feature="feedbackHub">
         <div className={styles.container}>
             {/* Header */}
             <div className={styles.header}>
@@ -506,5 +520,14 @@ export default function FeedbackPage() {
                 )}
             </div>
         </div>
+      </FeatureGate>
+    );
+}
+
+export default function FeedbackPage() {
+    return (
+        <Suspense fallback={<div role="status">Načítání centra zpětné vazby…</div>}>
+            <FeedbackPageContent />
+        </Suspense>
     );
 }

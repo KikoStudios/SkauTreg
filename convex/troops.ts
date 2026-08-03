@@ -1,5 +1,38 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import { normalizeLeaderRole } from "./lib/memberEmails";
+import { authError, requireCurrentUser, requireTroopManager, requireTroopOwner, requireTroopViewer } from "./lib/auth";
+import { decryptCredential, encryptCredential } from "./lib/credentials";
+
+function redactTroopSecrets<T extends {
+    emailProvider?: {
+        provider: string;
+        email: string;
+        connectedAt: string;
+        connectedBy: unknown;
+        groupEmail?: string;
+        memberMapping?: unknown;
+        matchedMemberIds?: unknown;
+        requiresReconnect?: boolean;
+    };
+    gmailOAuth?: unknown;
+}>(troop: T) {
+    const provider = troop.emailProvider;
+    return {
+        ...troop,
+        emailProvider: provider ? {
+            provider: provider.provider,
+            email: provider.email,
+            groupEmail: provider.groupEmail,
+            memberMapping: provider.memberMapping,
+            matchedMemberIds: provider.matchedMemberIds,
+            connectedAt: provider.connectedAt,
+            connectedBy: provider.connectedBy,
+            requiresReconnect: provider.requiresReconnect,
+        } : undefined,
+        gmailOAuth: undefined,
+    };
+}
 
 export const create = mutation({
     args: {
@@ -39,6 +72,7 @@ export const create = mutation({
             accentColor: args.accentColor,
             contactEmail: args.contactEmail,
             infoEmail: args.infoEmail,
+            publicDirectoryOptIn: false,
         });
 
         return troopId;
@@ -58,23 +92,7 @@ export const update = mutation({
         infoEmail: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("User not found");
-
-        const troop = await ctx.db.get(args.id);
-        if (!troop) throw new Error("Troop not found");
-
-        // Allow any authenticated user to update troop settings
-        // (owner and any troop leader can edit)
+        await requireTroopManager(ctx, args.id);
 
         const { id, ...updates } = args;
         await ctx.db.patch(id, updates);
@@ -113,7 +131,8 @@ export const getByUser = query({
         );
 
         // Filter out nulls and merge
-        const allTroops = [...ownedTroops, ...memberTroops].filter(t => t !== null);
+        const allTroops = [...ownedTroops, ...memberTroops]
+            .filter((t): t is NonNullable<typeof t> => t !== null && !t.archivedAt);
 
         // Deduplicate by ID
         const uniqueTroops = Array.from(new Map(allTroops.map(t => [t._id, t])).values());
@@ -129,7 +148,7 @@ export const getByUser = query({
                     // ignore invalid ID format
                 }
             }
-            return { ...t, logo: logoUrl };
+            return redactTroopSecrets({ ...t, logo: logoUrl });
         }));
 
         return troopsWithUrls;
@@ -139,8 +158,12 @@ export const getByUser = query({
 export const getById = query({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
+        const authorization = await requireTroopViewer(ctx, args.id);
         const troop = await ctx.db.get(args.id);
         if (!troop) return null;
+        if (troop.archivedAt && authorization.role !== "owner") {
+            authError("NOT_FOUND", "Oddíl nebyl nalezen.");
+        }
 
         let logoUrl = troop.logo;
         if (troop.logo && !troop.logo.startsWith("http")) {
@@ -151,28 +174,11 @@ export const getById = query({
             }
         }
 
-        return { ...troop, logo: logoUrl };
+        return redactTroopSecrets({ ...troop, logo: logoUrl });
     }
 });
 
 // --- Leadership Management ---
-
-// Helper to check permissions
-async function isAuthorizedToManage(ctx: any, troopId: any, userId: any) {
-    const troop = await ctx.db.get(troopId);
-    if (!troop) return false;
-    
-    // Allow owner, any leader, or anyone authenticated (for email settings)
-    if (troop.ownerId === userId) return true;
-
-    const leaderRecord = await ctx.db
-        .query("troop_leaders")
-        .withIndex("by_user_troop", (q: any) => q.eq("userId", userId).eq("troopId", troopId))
-        .unique();
-
-    // Allow main_leader, leader, or rover roles
-    return !!leaderRecord;
-}
 
 export const addLeader = mutation({
     args: {
@@ -181,6 +187,7 @@ export const addLeader = mutation({
         role: v.string() // "main_leader", "leader", "rover"
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit. Přejít na přihlášení?");
 
@@ -189,10 +196,6 @@ export const addLeader = mutation({
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst. Zkuste se odhlásit a znovu přihlásit.");
-
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Pouze majitel nebo hlavní vedoucí může přidávat členy do vedení.");
-        }
 
         const userToAdd = await ctx.db
             .query("users")
@@ -217,7 +220,7 @@ export const addLeader = mutation({
         await ctx.db.insert("troop_leaders", {
             troopId: args.troopId,
             userId: userToAdd._id,
-            role: args.role
+            role: normalizeLeaderRole(args.role) ?? "leader"
         });
     }
 });
@@ -229,6 +232,7 @@ export const updateRole = mutation({
         newRole: v.string()
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
@@ -238,10 +242,6 @@ export const updateRole = mutation({
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
 
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Nemáte oprávnění měnit role.");
-        }
-
         const leaderRecord = await ctx.db
             .query("troop_leaders")
             .withIndex("by_user_troop", q => q.eq("userId", args.userId).eq("troopId", args.troopId))
@@ -249,7 +249,7 @@ export const updateRole = mutation({
 
         if (!leaderRecord) throw new Error("👤 Vedoucí nebyl nalezen.");
 
-        await ctx.db.patch(leaderRecord._id, { role: args.newRole });
+        await ctx.db.patch(leaderRecord._id, { role: normalizeLeaderRole(args.newRole) ?? leaderRecord.role });
     }
 });
 
@@ -259,6 +259,7 @@ export const removeLeader = mutation({
         userId: v.id("users")
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("🔐 Musíte se přihlásit.");
 
@@ -267,10 +268,6 @@ export const removeLeader = mutation({
             .withIndex("by_token", q => q.eq("tokenIdentifier", identity.tokenIdentifier))
             .unique();
         if (!currentUser) throw new Error("⚠️ Váš profil se nepodařilo načíst.");
-
-        if (!(await isAuthorizedToManage(ctx, args.troopId, currentUser._id))) {
-            throw new Error("🔐 Nemáte oprávnění odebírat vedoucí.");
-        }
 
         const leaderRecord = await ctx.db
             .query("troop_leaders")
@@ -286,6 +283,7 @@ export const removeLeader = mutation({
 export const getLeaders = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.troopId);
         const troop = await ctx.db.get(args.troopId);
         if (!troop) return [];
 
@@ -303,8 +301,11 @@ export const getLeaders = query({
                 const user = await ctx.db.get(record.userId);
                 if (!user) return null;
                 return {
-                    ...user,
-                    role: record.role, // "main_leader", "leader", "rover"
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    image: user.image,
+                    role: normalizeLeaderRole(record.role), // "main_leader", "leader", "rover"
                     isOwner: user._id === troop.ownerId
                 }
             })
@@ -318,7 +319,14 @@ export const getLeaders = query({
         if (!ownerInList) {
             // Add owner with default role if not assigned a specific one
             return [
-                { ...owner, role: 'owner', isOwner: true },
+                {
+                    _id: owner?._id,
+                    name: owner?.name,
+                    email: owner?.email,
+                    image: owner?.image,
+                    role: "owner",
+                    isOwner: true,
+                },
                 ...validLeaders
             ];
         }
@@ -327,9 +335,46 @@ export const getLeaders = query({
     }
 });
 
-export const deleteTroop = mutation({
+export const getMyRole = query({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        const { role } = await requireTroopViewer(ctx, args.troopId);
+        return role;
+    },
+});
+
+export const getEmailConfiguration = internalQuery({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop) return null;
+        return {
+            troopId: troop._id,
+            name: troop.name,
+            contactEmail: troop.contactEmail,
+            infoEmail: troop.infoEmail,
+            emailProvider: troop.emailProvider
+                ? {
+                    ...troop.emailProvider,
+                    refreshToken: await decryptCredential(troop.emailProvider.refreshToken),
+                    smtpPassword: await decryptCredential(troop.emailProvider.smtpPassword),
+                }
+                : undefined,
+            gmailOAuth: troop.gmailOAuth
+                ? {
+                    ...troop.gmailOAuth,
+                    refreshToken: await decryptCredential(troop.gmailOAuth.refreshToken),
+                }
+                : undefined,
+        };
+    },
+});
+
+export const deleteTroop = internalMutation({
     args: { id: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.id);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -383,6 +428,59 @@ export const deleteTroop = mutation({
     },
 });
 
+export const archive = mutation({
+    args: {
+        troopId: v.id("troops"),
+        confirmationName: v.string(),
+        reason: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const { user, troop } = await requireTroopOwner(ctx, args.troopId);
+        if (args.confirmationName.trim() !== troop.name.trim()) {
+            authError("VALIDATION_ERROR", "Název oddílu se neshoduje.");
+        }
+        await ctx.db.patch(args.troopId, {
+            archivedAt: new Date().toISOString(),
+            archivedBy: user._id,
+            archiveReason: args.reason?.trim() || undefined,
+            publicDirectoryOptIn: false,
+        });
+        return { ok: true };
+    },
+});
+
+export const restore = mutation({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.troopId);
+        await ctx.db.patch(args.troopId, {
+            archivedAt: undefined,
+            archivedBy: undefined,
+            archiveReason: undefined,
+        });
+        return { ok: true };
+    },
+});
+
+export const listArchived = query({
+    args: {},
+    handler: async (ctx) => {
+        const user = await requireCurrentUser(ctx);
+        const troops = await ctx.db
+            .query("troops")
+            .filter((q) => q.eq(q.field("ownerId"), user._id))
+            .collect();
+        return troops
+            .filter((troop) => Boolean(troop.archivedAt))
+            .map((troop) => ({
+                _id: troop._id,
+                name: troop.name,
+                archivedAt: troop.archivedAt,
+                archiveReason: troop.archiveReason,
+            }));
+    },
+});
+
 // --- Email Provider Integration (Multi-Provider Support) ---
 
 export const connectEmailProvider = mutation({
@@ -410,50 +508,26 @@ export const connectEmailProvider = mutation({
         }))),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Unauthenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("User not found");
-
-        const troop = await ctx.db.get(args.troopId);
-        if (!troop) throw new Error("Troop not found");
-
-        // Only owner or main_leader can connect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
+        const { user } = await requireTroopManager(ctx, args.troopId);
+        if (args.provider !== "gmail") {
+            authError("VALIDATION_ERROR", "V produkčním režimu je podporován pouze Gmail.");
         }
-
-        // Handle new Google Groups members creation
-        if (args.newMembers && args.newMembers.length > 0) {
-            for (const newMember of args.newMembers) {
-                await ctx.db.insert("members", {
-                    troopId: args.troopId,
-                    name: newMember.name,
-                    guardianEmail: newMember.email,
-                });
-            }
+        const email = args.email.trim().toLowerCase();
+        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254 || !args.refreshToken || args.refreshToken.length > 4096) {
+            authError("VALIDATION_ERROR", "Google nevrátil platné údaje pro propojení Gmailu.");
+        }
+        if (args.smtpHost || args.smtpPort || args.smtpPassword || args.groupEmail || args.memberMapping || args.matchedMemberIds || args.newMembers) {
+            authError("VALIDATION_ERROR", "Gmail propojení nepřijímá nastavení jiných poskytovatelů.");
         }
 
         await ctx.db.patch(args.troopId, {
             emailProvider: {
-                provider: args.provider,
-                email: args.email,
-                refreshToken: args.refreshToken,
-                smtpHost: args.smtpHost,
-                smtpPort: args.smtpPort,
-                smtpPassword: args.smtpPassword,
-                groupEmail: args.groupEmail,
-                memberMapping: args.memberMapping,
-                matchedMemberIds: args.matchedMemberIds,
+                provider: "gmail",
+                email,
+                refreshToken: await encryptCredential(args.refreshToken),
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
+                requiresReconnect: false,
             },
         });
     },
@@ -464,6 +538,7 @@ export const disconnectEmailProvider = mutation({
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -476,11 +551,6 @@ export const disconnectEmailProvider = mutation({
 
         if (!user) throw new Error("User not found");
 
-        // Only owner or main_leader can disconnect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat e-mailové připojení.");
-        }
-
         await ctx.db.patch(args.troopId, {
             emailProvider: undefined,
             gmailOAuth: undefined, // Clear legacy too
@@ -490,13 +560,14 @@ export const disconnectEmailProvider = mutation({
 
 // --- Legacy Gmail OAuth Integration (Backward Compatible) ---
 
-export const connectGmail = mutation({
+export const connectGmail = internalMutation({
     args: {
         troopId: v.id("troops"),
         email: v.string(),
         refreshToken: v.string(),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -512,29 +583,26 @@ export const connectGmail = mutation({
         const troop = await ctx.db.get(args.troopId);
         if (!troop) throw new Error("Troop not found");
 
-        // Only owner or main_leader can connect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat Gmail.");
-        }
-
         // Use new emailProvider format instead of legacy gmailOAuth
         await ctx.db.patch(args.troopId, {
             emailProvider: {
                 provider: "gmail",
                 email: args.email,
-                refreshToken: args.refreshToken,
+                refreshToken: await encryptCredential(args.refreshToken),
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
+                requiresReconnect: false,
             },
         });
     },
 });
 
-export const disconnectGmail = mutation({
+export const disconnectGmail = internalMutation({
     args: {
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) throw new Error("Unauthenticated");
 
@@ -546,11 +614,6 @@ export const disconnectGmail = mutation({
             .unique();
 
         if (!user) throw new Error("User not found");
-
-        // Only owner or main_leader can disconnect
-        if (!(await isAuthorizedToManage(ctx, args.troopId, user._id))) {
-            throw new Error("Nemáte oprávnění nastavovat Gmail.");
-        }
 
         await ctx.db.patch(args.troopId, {
             emailProvider: undefined,
@@ -562,8 +625,8 @@ export const disconnectGmail = mutation({
 export const listPublic = query({
     args: {},
     handler: async (ctx) => {
-        // Get all troops with their logos resolved
-        const allTroops = await ctx.db.query("troops").collect();
+        const allTroops = (await ctx.db.query("troops").collect())
+            .filter((troop) => troop.publicDirectoryOptIn === true && !troop.archivedAt);
 
         // Resolve Logo URLs
         const troopsWithUrls = await Promise.all(
@@ -580,13 +643,33 @@ export const listPublic = query({
                     _id: t._id,
                     name: t.name,
                     logo: logoUrl,
-                    accentColor: t.accentColor,
-                    number: t.number,
-                    type: t.type,
                 };
             })
         );
 
         return troopsWithUrls;
+    },
+});
+
+export const markGmailReconnectRequired = internalMutation({
+    args: { troopId: v.id("troops") },
+    handler: async (ctx, args) => {
+        await requireTroopManager(ctx, args.troopId);
+        const troop = await ctx.db.get(args.troopId);
+        if (!troop?.emailProvider || troop.emailProvider.provider !== "gmail") return;
+        await ctx.db.patch(args.troopId, {
+            emailProvider: { ...troop.emailProvider, requiresReconnect: true },
+        });
+    },
+});
+
+export const setPublicDirectoryOptIn = mutation({
+    args: {
+        troopId: v.id("troops"),
+        enabled: v.boolean(),
+    },
+    handler: async (ctx, args) => {
+        await requireTroopOwner(ctx, args.troopId);
+        await ctx.db.patch(args.troopId, { publicDirectoryOptIn: args.enabled });
     },
 });

@@ -1,6 +1,6 @@
-import { mutation } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 
-export const removeIntegrationFields = mutation({
+export const removeIntegrationFields = internalMutation({
     args: {},
     handler: async (ctx) => {
         // Get all troops from the database

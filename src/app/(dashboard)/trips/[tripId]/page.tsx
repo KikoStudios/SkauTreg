@@ -3,15 +3,36 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
 import EmailDraftsTab from "../../../../components/EmailDraftsTab";
+import { resolveAttendanceSummary } from "../../../../lib/tripAttendance";
 import { useFeedback } from "../../../../context/FeedbackContext";
 import TransportTab from "../../../../components/trip/TransportTab";
+import FinanceTab from "../../../../components/trip/FinanceTab";
+import { TripBase, TripDocumentation, TripOverview, TripParticipants, type TripParticipantDTO } from "../../../../components/trip/TripWorkspaceSections";
+import TripStaffModal from "../../../../components/trip/TripStaffModal";
+import { normalizeMemberContactFields } from "../../../../lib/memberEmails";
+import { ArrowLeft, Bus, CalendarDays, ClipboardList, FileText, Mail, MapPin, Settings2, Trash2, Users, WalletCards } from "lucide-react";
+import workspaceStyles from "./TripWorkspace.module.css";
 
-type TabType = 'info' | 'zakladna' | 'doprava' | 'ucastnici' | 'dokumentace' | 'emaily';
+type TabType = 'info' | 'zakladna' | 'doprava' | 'finance' | 'ucastnici' | 'dokumentace' | 'emaily' | 'nastaveni';
+const URL_TO_TAB: Record<string, TabType> = { overview: "info", base: "zakladna", transport: "doprava", finance: "finance", participants: "ucastnici", documents: "dokumentace", email: "emaily", settings: "nastaveni" };
+const TAB_TO_URL: Record<TabType, string> = Object.fromEntries(Object.entries(URL_TO_TAB).map(([url, tab]) => [tab, url])) as Record<TabType, string>;
+
+const TAB_META: Record<TabType, { title: string; description: string }> = {
+    info: { title: "Přehled a plán", description: "Základní informace, termíny, přihlašování a organizační odpovědnosti." },
+    zakladna: { title: "Základna a místo", description: "Vyberte ubytování a držte informace o místě pohromadě s plánem výpravy." },
+    doprava: { title: "Doprava", description: "Plánujte trasy, spoje, jízdenky a náklady na cestu." },
+    finance: { title: "Finance", description: "Pracovní rozpočet, výdaje a přehled plateb účastníků." },
+    ucastnici: { title: "Účastníci", description: "Přihlášky, odpovědi, kontakty a stav účasti na jednom místě." },
+    dokumentace: { title: "Dokumentace", description: "Zápisy, pracovní dokumenty a návazné rady spojené s výpravou." },
+    emaily: { title: "E-mailová komunikace", description: "Připravujte návrhy a rozesílejte aktuální informace účastníkům." },
+    nastaveni: { title: "Nastavení výpravy", description: "Upravte hlavní údaje, pravidla přihlašování a vlastní otázky." },
+};
 
 const BENEFIT_OPTIONS = [
     "žákovský průkaz ČR",
@@ -33,15 +54,18 @@ const BENEFIT_OPTIONS = [
 export default function TripDashboardPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const tripId = params.tripId as Id<"trips">;
     const { showError, showSuccess } = useFeedback();
 
     const dashboard = useQuery(api.trips.getDashboard, tripId ? { tripId } : "skip");
+    const participantRows = useQuery(api.tripParticipants.list, dashboard?.role && dashboard.role !== "rover" ? { tripId } : "skip") as TripParticipantDTO[] | undefined;
     const updateTrip = useMutation(api.trips.update);
     const deleteTrip = useMutation(api.trips.remove);
     const unassignBase = useMutation(api.trips.unassignBase);
     const ensureParticipations = useMutation(api.trips.ensureParticipations);
-    const sendTripEmail = useAction(api.mailer.sendTripEmail);
+    const getParticipantCapability = useMutation(api.tripParticipants.getCapabilityUrl);
+    const regenerateParticipantCapability = useMutation(api.tripParticipants.regenerateCapability);
     const addTripStaffUser = useMutation(api.tripStaff.addUser);
     const addTripStaffExternal = useMutation(api.tripStaff.addExternal);
     const addTripStaffFromPreset = useMutation(api.tripStaff.addFromPreset);
@@ -54,16 +78,13 @@ export default function TripDashboardPage() {
     );
 
     const [activeTab, setActiveTab] = useState<TabType>('info');
+    const [settingsSection, setSettingsSection] = useState<"details" | "registration">("details");
+    const [emailView, setEmailView] = useState<"drafts" | "sent" | "responses">("drafts");
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
-    const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [viewResponse, setViewResponse] = useState<any | null>(null);
     const [showCreateDoc, setShowCreateDoc] = useState(false);
     const [newDocTitle, setNewDocTitle] = useState("");
-    const [emailSubject, setEmailSubject] = useState("");
-    const [emailBody, setEmailBody] = useState("");
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const [emailResult, setEmailResult] = useState<{ sentCount: number; skippedCount: number; total: number; failed: { email: string; error: string }[] } | null>(null);
     const [didEnsureParticipants, setDidEnsureParticipants] = useState(false);
     const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
     const [selectedLeaderId, setSelectedLeaderId] = useState<string>("");
@@ -73,33 +94,77 @@ export default function TripDashboardPage() {
     const [externalBenefit, setExternalBenefit] = useState<string>("");
     const [saveExternalAsPreset, setSaveExternalAsPreset] = useState(false);
 
+    useEffect(() => {
+        const requestedTab = searchParams.get("tab") || "overview";
+        setActiveTab(URL_TO_TAB[requestedTab] || "info");
+
+        const requestedEmailView = searchParams.get("emailView");
+        if (requestedEmailView === "drafts" || requestedEmailView === "sent" || requestedEmailView === "responses") {
+            setEmailView(requestedEmailView);
+            setActiveTab("emaily");
+        }
+
+        const requestedSettingsSection = searchParams.get("settingsSection");
+        if (requestedSettingsSection === "details" || requestedSettingsSection === "registration") {
+            setSettingsSection(requestedSettingsSection);
+            setActiveTab("nastaveni");
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (dashboard?.role !== "rover") return;
+        if (["finance", "ucastnici", "emaily", "nastaveni"].includes(activeTab)) {
+            router.replace(`/trips/${tripId}?tab=overview`, { scroll: false });
+        }
+    }, [activeTab, dashboard?.role, router, tripId]);
+
     const tripDocs = useQuery(api.meetings.listByTrip, { tripId });
     const createDoc = useMutation(api.meetings.create);
 
-    const copyLink = async (accessKey: string) => {
-        const url = `${window.location.origin}/rsvp/${accessKey}`;
+    const copyLink = async (participationId: string) => {
         try {
+            const { url: capabilityUrl } = await getParticipantCapability({ participationId: participationId as Id<"participations"> });
+            const url = capabilityUrl.startsWith("/") ? `${window.location.origin}${capabilityUrl}` : capabilityUrl;
             await navigator.clipboard.writeText(url);
-            setCopiedKey(accessKey);
+            setCopiedKey(participationId);
             setTimeout(() => setCopiedKey(null), 2000);
-        } catch (err) {
-            console.warn("Standard copy failed", err);
-            // Fallback
-            const textArea = document.createElement("textarea");
-            textArea.value = url;
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                setCopiedKey(accessKey);
-                setTimeout(() => setCopiedKey(null), 2000);
-            } catch (e) {
-                prompt("Zkopírujte odkaz:", url);
-            }
-            document.body.removeChild(textArea);
+        } catch (error) {
+            showError({ title: "Odkaz nelze zkopírovat", message: "Zkuste akci znovu.", icon: "error", details: error instanceof Error ? error.message : undefined });
         }
+    };
+
+    const regenerateLink = async (participationId: string, name: string) => {
+        showError({
+            title: "Vytvořit nový odkaz?",
+            message: `Předchozí bezpečný odkaz pro ${name} přestane fungovat.`,
+            icon: "warning",
+            buttons: [
+                { label: "Vytvořit nový", variant: "danger", onClick: async () => {
+                    const { url: capabilityUrl } = await regenerateParticipantCapability({ participationId: participationId as Id<"participations"> });
+                    const url = capabilityUrl.startsWith("/") ? `${window.location.origin}${capabilityUrl}` : capabilityUrl;
+                    await navigator.clipboard.writeText(url);
+                    setCopiedKey(participationId);
+                    showSuccess({ title: "Nový odkaz je zkopírovaný", message: "Starý bezpečný odkaz byl zneplatněn.", duration: 2500 });
+                } },
+                { label: "Zrušit", variant: "secondary", onClick: () => undefined },
+            ],
+        });
+    };
+
+    const confirmUnassignBase = () => showError({
+        title: "Odebrat přiřazenou základnu?",
+        message: "Výprava zůstane zachovaná, ale vazba na základnu se odstraní.",
+        icon: "warning",
+        buttons: [
+            { label: "Odebrat", variant: "danger", onClick: async () => { await unassignBase({ tripId }); } },
+            { label: "Ponechat", variant: "secondary", onClick: () => undefined },
+        ],
+    });
+
+    const selectTab = (tab: TabType) => {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("tab", TAB_TO_URL[tab]);
+        router.replace(`/trips/${tripId}?${params.toString()}`, { scroll: false });
     };
 
     const handleUpdate = async (data: TripFormData) => {
@@ -117,7 +182,6 @@ export default function TripDashboardPage() {
                 formType: data.formType,
                 customFields: data.customFields
             });
-            setIsEditing(false);
             showSuccess({
                 title: "✅ Uloženo",
                 message: "Změny byly úspěšně uloženy.",
@@ -166,7 +230,7 @@ export default function TripDashboardPage() {
                     variant: "danger",
                 },
                 {
-                    label: "Zrušit",
+                    label: "Ne, ponechat",
                     onClick: () => {},
                     variant: "secondary",
                 },
@@ -298,89 +362,12 @@ export default function TripDashboardPage() {
     };
 
     useEffect(() => {
-        if (!dashboard) return;
-        if (!emailSubject) {
-            setEmailSubject(`Pozvánka: ${dashboard.trip.name}`);
-        }
-        if (!emailBody) {
-            const formatDate = (dStr: string) => {
-                if (!dStr) return "";
-                const [y, m, d] = dStr.split("-");
-                return `${parseInt(d)}. ${parseInt(m)}. ${y}`;
-            };
-            const dateLabel = `${formatDate(dashboard.trip.startDate)}${dashboard.trip.endDate ? ` - ${formatDate(dashboard.trip.endDate)}` : ""}`;
-            setEmailBody(`Ahoj!\n\nPosíláme pozvánku na výpravu ${dashboard.trip.name} (${dateLabel}).\n\nProsíme o potvrzení účasti přes tento odkaz: @userlink\n\nDěkujeme!`);
-        }
-    }, [dashboard, emailSubject, emailBody]);
-
-    useEffect(() => {
-        if (!dashboard || didEnsureParticipants) return;
+        if (!dashboard || dashboard.role === "rover" || didEnsureParticipants) return;
         setDidEnsureParticipants(true);
         ensureParticipations({ tripId }).catch((error) => {
             console.error("Failed to ensure participations", error);
         });
     }, [dashboard, didEnsureParticipants, ensureParticipations, tripId]);
-
-    const handleSendEmail = async () => {
-        if (!emailSubject.trim() || !emailBody.trim()) {
-            showError({
-                title: "⚠️ Vyplňte pole",
-                message: "Musíte vyplnit předmět i text e-mailu.",
-                icon: "warning",
-            });
-            return;
-        }
-        setIsSendingEmail(true);
-        setEmailResult(null);
-        try {
-            const result = await sendTripEmail({
-                tripId,
-                subject: emailSubject.trim(),
-                body: emailBody,
-                baseUrl: window.location.origin
-            });
-            setEmailResult(result);
-            
-            // Show result modal
-            const failedCount = result.failed?.length || 0;
-            const successCount = result.sentCount || 0;
-            const skippedCount = result.skippedCount || 0;
-
-            if (failedCount === 0) {
-                showSuccess({
-                    title: "✅ Hotovo!",
-                    message: `Odesláno ${successCount} e-mailů${skippedCount > 0 ? `, ${skippedCount} přeskočeno` : ""}`,
-                    duration: 3000,
-                });
-            } else {
-                showError({
-                    title: "⚠️ Částečné selhání",
-                    message: `✅ ${successCount} odesláno | ⊘ ${skippedCount} přeskočeno | ❌ ${failedCount} selhalo`,
-                    icon: "warning",
-                    details: result.failed?.map(f => `${f.email}: ${f.error}`).join("\n"),
-                });
-            }
-        } catch (error: any) {
-            console.error(error);
-            
-            let errorMsg = error?.message || "Odeslání e-mailu selhalo.";
-            if (errorMsg.includes("Gmail")) {
-                errorMsg = "📧 " + errorMsg;
-            } else {
-                errorMsg = "❌ " + errorMsg;
-            }
-
-            showError({
-                title: "❌ Chyba",
-                message: errorMsg,
-                icon: "error",
-                canReport: true,
-                details: error?.message,
-            });
-        } finally {
-            setIsSendingEmail(false);
-        }
-    };
 
     if (dashboard === undefined) {
         return <div>Načítám přehled...</div>;
@@ -390,292 +377,110 @@ export default function TripDashboardPage() {
         return <div>Výprava nenalezena.</div>;
     }
 
-    const { trip, participants, base } = dashboard;
-    const validParticipants = participants.filter((p: any) => p.member);
-    const participantsWithEmail = validParticipants.filter((p: any) => p.member?.email);
+    const { trip, base } = dashboard;
+    const canSeeSensitive = Boolean(dashboard.role && dashboard.role !== "rover");
+    const validParticipants: any[] = canSeeSensitive ? (participantRows || []) : [];
+    const participantsWithEmail = validParticipants.filter((p) => p.primaryEmail);
     const tripStaff = (dashboard as any).tripStaff || [];
     const leaderPresets = (dashboard as any).leaderPresets || [];
-    const attendingCount = validParticipants.filter((p: any) => p.status === "attending").length;
-    const notAttendingCount = validParticipants.filter((p: any) => p.status === "not_attending").length;
-    const pendingCount = validParticipants.filter((p: any) => p.status === "pending").length;
-
-    if (isEditing) {
-        return (
-            <div style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.3)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 3000,
-                padding: "2rem"
-            }} onClick={() => setIsEditing(false)}>
-                <div style={{
-                    backgroundColor: "white",
-                    border: "2px solid var(--border-color)",
-                    borderRadius: "8px",
-                    boxShadow: "6px 6px 0 0 #000",
-                    padding: "2rem",
-                    maxWidth: "600px",
-                    width: "100%",
-                    maxHeight: "90vh",
-                    overflowY: "auto"
-                }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-                        <h2 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Upravit Výpravu</h2>
-                        <button
-                            onClick={() => setIsEditing(false)}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                fontSize: "1.5rem",
-                                cursor: "pointer",
-                                fontWeight: "bold"
-                            }}
-                        >
-                            ×
-                        </button>
-                    </div>
-                    <TripForm
-                        initialData={{
-                            name: trip.name,
-                            description: trip.description,
-                            location: trip.location,
-                            startDate: trip.startDate,
-                            endDate: trip.endDate || "",
-                            lastCancellationDate: trip.lastCancellationDate || "",
-                            lateCancellationMessage: trip.lateCancellationMessage || "",
-                            formType: trip.formType || "registration",
-                            customFields: trip.customFields || []
-                        }}
-                        onSubmit={handleUpdate}
-                        isLoading={isSaving}
-                        buttonText="Uložit Změny"
-                    />
-                </div>
-            </div>
-        );
-    }
+    const attendanceSummary = resolveAttendanceSummary(dashboard);
+    const attendingCount = attendanceSummary.attending;
+    const notAttendingCount = attendanceSummary.notAttending;
+    const pendingCount = attendanceSummary.pending;
+    const overviewParticipants = canSeeSensitive ? validParticipants : [
+        ...Array.from({ length: attendingCount }, () => ({ status: "attending" })),
+        ...Array.from({ length: notAttendingCount }, () => ({ status: "not_attending" })),
+        ...Array.from({ length: pendingCount }, () => ({ status: "pending" })),
+    ];
 
     return (
-        <div style={{ width: "100%", position: "relative", padding: "0 2rem 2rem" }}>
-            {/* Top Title Bar */}
-            <div style={{
-                backgroundColor: "white",
-                borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
-                margin: "0 -2rem 1rem -2rem",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "0.5rem"
-            }}>
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Výpravy</h1>
-            </div>
+        <div className={workspaceStyles.workspace}>
+            <aside className={workspaceStyles.rail}>
+                <div className={workspaceStyles.railBrand}><img src="/Logo-light.svg" alt="SkautREG" /><strong>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</strong></div>
+                <Link className={workspaceStyles.backLink} href="/trips"><ArrowLeft size={17} /> Zpět na všechny výpravy</Link>
+                <div className={workspaceStyles.tripIdentity}>
+                    <div className={workspaceStyles.identityTop}><span>Pracovní prostor</span><b>Výprava</b></div>
+                    <h1>{trip.name}</h1>
+                    <div className={workspaceStyles.tripMeta}><MapPin size={15} /> {trip.location || "Místo není vyplněno"}</div>
+                    <div className={workspaceStyles.tripMeta}><CalendarDays size={15} /> {trip.startDate || "Datum není vyplněno"}{trip.endDate ? ` – ${trip.endDate}` : ""}</div>
+                </div>
 
-            {/* Controls Row & Info */}
-            <div style={{ marginBottom: "2rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", marginBottom: "2rem", flexWrap: "wrap" }}>
-                    <h2 style={{ fontSize: "clamp(1.5rem, 5vw, 2.5rem)", fontWeight: "900", margin: 0, lineHeight: 1.2, wordBreak: "break-word", flex: "1 1 auto" }}>{trip.name}</h2>
-                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        style={{
-                            padding: "0.5rem 1rem",
-                            backgroundColor: "#86efac",
-                            border: "2px solid #000",
-                            borderRadius: "6px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            boxShadow: "4px 4px 0 0 #000",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem"
-                        }}
-                        onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                        onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                    >
-                        <img src="/edit-icon.svg" alt="Edit" style={{ width: "20px", height: "20px" }} /> Upravit
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        style={{
-                            padding: "0.5rem 1rem",
-                            backgroundColor: "#fca5a5",
-                            border: "2px solid #000",
-                            borderRadius: "6px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            boxShadow: "4px 4px 0 0 #000",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem"
-                        }}
-                        onMouseDown={e => e.currentTarget.style.transform = "translate(2px, 2px)"}
-                        onMouseUp={e => e.currentTarget.style.transform = "translate(0, 0)"}
-                    >
-                        <img src="/delete-icon.svg" alt="Delete" style={{ width: "20px", height: "20px" }} /> Smazat
-                    </button>
+                <nav className={workspaceStyles.workspaceNav} aria-label="Plánování výpravy">
+                    <span className={workspaceStyles.navLabel}>Plán</span>
+                    <button data-active={activeTab === 'info'} onClick={() => selectTab('info')}><ClipboardList size={18} /><span><strong>Přehled</strong><small>Základní plán a termíny</small></span></button>
+                    <button data-active={activeTab === 'zakladna'} onClick={() => selectTab('zakladna')}><MapPin size={18} /><span><strong>Základna</strong><small>Ubytování a místo</small></span></button>
+                    <button data-active={activeTab === 'doprava'} onClick={() => selectTab('doprava')}><Bus size={18} /><span><strong>Doprava</strong><small>Spoje, trasy a jízdenky</small></span></button>
+                    {canSeeSensitive && <button data-active={activeTab === 'finance'} onClick={() => selectTab('finance')}><WalletCards size={18} /><span><strong>Finance</strong><small>Rozpočet a platby</small></span></button>}
+                    <span className={workspaceStyles.navLabel}>Lidé a komunikace</span>
+                    {canSeeSensitive && <button data-active={activeTab === 'ucastnici'} onClick={() => selectTab('ucastnici')}><Users size={18} /><span><strong>Účastníci</strong><small>Přihlášky a odpovědi</small></span></button>}
+                    <button data-active={activeTab === 'dokumentace'} onClick={() => selectTab('dokumentace')}><FileText size={18} /><span><strong>Dokumentace</strong><small>Zápisy a pracovní soubory</small></span></button>
+                    <div className={workspaceStyles.navWithSubmenu}>
+                        {canSeeSensitive && <button data-active={activeTab === 'emaily'} onClick={() => selectTab('emaily')}><Mail size={18} /><span><strong>E-maily</strong><small>Komunikace s rodiči</small></span></button>}
+                        <div className={workspaceStyles.hoverSubmenu} aria-label="Části e-mailové komunikace">
+                            <button data-selected={emailView === "drafts"} onClick={() => { setEmailView("drafts"); setActiveTab("emaily"); }}>Koncepty</button>
+                            <button data-selected={emailView === "sent"} onClick={() => { setEmailView("sent"); setActiveTab("emaily"); }}>Odeslané zprávy</button>
+                            <button data-selected={emailView === "responses"} onClick={() => { setEmailView("responses"); setActiveTab("emaily"); }}>Odezva rodičů</button>
+                        </div>
                     </div>
-                </div>
-            </div>
+                    <span className={workspaceStyles.navLabel}>Správa</span>
+                    <div className={workspaceStyles.navWithSubmenu}>
+                        {canSeeSensitive && <button data-active={activeTab === 'nastaveni'} onClick={() => selectTab('nastaveni')}><Settings2 size={18} /><span><strong>Nastavení</strong><small>Údaje a přihlašování</small></span></button>}
+                        <div className={workspaceStyles.hoverSubmenu} aria-label="Části nastavení výpravy">
+                            <button data-selected={settingsSection === "details"} onClick={() => { setSettingsSection("details"); setActiveTab("nastaveni"); }}>Základní údaje</button>
+                            <button data-selected={settingsSection === "registration"} onClick={() => { setSettingsSection("registration"); setActiveTab("nastaveni"); }}>Přihlašování a otázky</button>
+                        </div>
+                    </div>
+                </nav>
 
-            {/* Info Card - inside tabs now */}
-
-            {/* Tab Navigation */}
-            <div style={{
-                borderBottom: "3px solid #000",
-                marginBottom: "2rem",
-                marginLeft: "-2rem",
-                marginRight: "-2rem",
-                overflow: "hidden"
-            }}>
-                <div style={{
-                    display: "flex",
-                    gap: "0.5rem",
-                    paddingLeft: "2rem",
-                    paddingRight: "2rem",
-                    overflowX: "auto",
-                    WebkitOverflowScrolling: "touch",
-                    scrollbarWidth: "none",
-                    msOverflowStyle: "none"
-                }} className="trip-tabs-container">
-                    <button
-                        onClick={() => setActiveTab('info')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'info' ? "white" : "#f0f0f0",
-                            border: activeTab === 'info' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'info' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        Info
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('zakladna')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'zakladna' ? "white" : "#f0f0f0",
-                            border: activeTab === 'zakladna' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'zakladna' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        Základna
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('doprava')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'doprava' ? "white" : "#f0f0f0",
-                            border: activeTab === 'doprava' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'doprava' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        Doprava
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('ucastnici')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'ucastnici' ? "white" : "#f0f0f0",
-                            border: activeTab === 'ucastnici' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'ucastnici' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        ÚČASTNÍCI
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('dokumentace')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'dokumentace' ? "white" : "#f0f0f0",
-                            border: activeTab === 'dokumentace' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'dokumentace' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        Dokumentace
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('emaily')}
-                        style={{
-                            padding: "1rem 1.5rem",
-                            backgroundColor: activeTab === 'emaily' ? "white" : "#f0f0f0",
-                            border: activeTab === 'emaily' ? "3px solid #000" : "2px solid #999",
-                            borderBottom: activeTab === 'emaily' ? "none" : "2px solid #999",
-                            borderRadius: "12px 12px 0 0",
-                            fontWeight: "900",
-                            fontSize: "1rem",
-                            cursor: "pointer",
-                            textTransform: "uppercase",
-                            transition: "all 0.2s",
-                            marginBottom: "-3px",
-                            whiteSpace: "nowrap",
-                            flexShrink: 0
-                        }}
-                    >
-                        E-maily
-                    </button>
+                <div className={workspaceStyles.railActions}>
+                    <span>Správa výpravy</span>
+                    <button className={workspaceStyles.deleteAction} onClick={handleDelete}><Trash2 size={16} /> Smazat</button>
                 </div>
-                <style jsx>{`
-                    .trip-tabs-container::-webkit-scrollbar {
-                        display: none;
-                    }
-                `}</style>
-            </div>
+            </aside>
+
+            <main className={workspaceStyles.workspaceContent}>
+                <div className={workspaceStyles.mobileContext}><span>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</span><strong>{trip.name}</strong><Link href="/trips"><ArrowLeft size={15} /> Zpět</Link></div>
+
+                <div key={activeTab} className={workspaceStyles.sectionTransition}>
+                    {activeTab === 'info' && <TripOverview trip={trip} participants={overviewParticipants} staff={tripStaff} onManageStaff={() => setIsStaffModalOpen(true)} onManageRegistration={() => { setSettingsSection("registration"); selectTab("nastaveni"); }} canManageStaff={canSeeSensitive} />}
+                    {activeTab === 'zakladna' && <TripBase base={base} onUnassign={confirmUnassignBase} />}
+                    {activeTab === 'doprava' && <TransportTab tripId={tripId} trip={trip} />}
+                    {activeTab === 'finance' && <FinanceTab tripId={tripId} />}
+                    {activeTab === 'ucastnici' && canSeeSensitive && <TripParticipants participants={validParticipants} copiedKey={copiedKey} onCopy={copyLink} onRegenerate={regenerateLink} />}
+                    {activeTab === 'dokumentace' && <TripDocumentation documents={tripDocs} onOpenMain={handleOpenTripDocs} onOpenDocument={id => router.push(`/rady/${id}`)} />}
+                    {activeTab === 'emaily' && <EmailDraftsTab tripId={tripId} view={emailView} isLeader={dashboard && troop ? (() => { const leaders = dashboard.leaders || []; const user = dashboard.currentUser; return leaders.some((leader: any) => leader?._id === user?._id && (leader.role === "owner" || leader.role === "main_leader")); })() : false} />}
+                    {activeTab === 'nastaveni' && <TripForm initialData={{ name: trip.name, description: trip.description, location: trip.location, startDate: trip.startDate, endDate: trip.endDate || "", lastCancellationDate: trip.lastCancellationDate || "", lateCancellationMessage: trip.lateCancellationMessage || "", formType: trip.formType || "registration", customFields: trip.customFields || [] }} onSubmit={handleUpdate} isLoading={isSaving} buttonText="Uložit změny" layout="workspace" section={settingsSection} showNavigation={false} />}
+                </div>
+
+                <TripStaffModal
+                    open={isStaffModalOpen}
+                    onClose={() => setIsStaffModalOpen(false)}
+                    leaders={dashboard.leaders || []}
+                    staff={tripStaff}
+                    presets={leaderPresets}
+                    selectedLeaderId={selectedLeaderId}
+                    setSelectedLeaderId={setSelectedLeaderId}
+                    onAddLeader={handleAddLeaderFromTeam}
+                    externalName={externalName}
+                    setExternalName={setExternalName}
+                    externalRole={externalRole}
+                    setExternalRole={setExternalRole}
+                    externalAge={externalAge}
+                    setExternalAge={setExternalAge}
+                    externalBenefit={externalBenefit}
+                    setExternalBenefit={setExternalBenefit}
+                    benefitOptions={BENEFIT_OPTIONS}
+                    saveAsPreset={saveExternalAsPreset}
+                    setSaveAsPreset={setSaveExternalAsPreset}
+                    onAddExternal={handleAddExternal}
+                    onAddPreset={async (presetId) => handleAddFromPreset(presetId as Id<"leader_presets">)}
+                    onRemovePreset={async (presetId) => { await removeLeaderPreset({ presetId: presetId as Id<"leader_presets"> }); }}
+                    onRemoveStaff={async (staffId) => { await removeTripStaff({ tripStaffId: staffId as Id<"trip_staff"> }); }}
+                />
 
             {/* Tab Content - INFO */}
-            {activeTab === 'info' && (
-                <>
+            {activeTab === ('legacy-info' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
                     <div style={{
                         display: "grid",
                         gridTemplateColumns: "minmax(0, 1fr) 460px",
@@ -1107,12 +912,12 @@ export default function TripDashboardPage() {
                             </div>
                         </div>
                     )}
-                </>
+                </div>
             )}
 
             {/* Tab Content - ZAKLADNA */}
-            {activeTab === 'zakladna' && (
-                <>
+            {activeTab === ('legacy-zakladna' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
                     {base ? (
                         <div style={{
                             backgroundColor: "#E3F2FD",
@@ -1436,19 +1241,26 @@ export default function TripDashboardPage() {
                             <p style={{ color: "#666", marginBottom: 0 }}>Přiřaďte základnu v aplikaci Hledač základen nebo v sekci s údaji o výpravě.</p>
                         </div>
                     )}
-                </>
+                </div>
             )}
 
             {/* Tab Content - DOPRAVA */}
-            {activeTab === 'doprava' && (
-                <div>
+            {activeTab === ('legacy-doprava' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
                     <TransportTab tripId={tripId} trip={trip} />
                 </div>
             )}
 
+            {/* Tab Content - FINANCE */}
+            {activeTab === ('legacy-finance' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
+                    <FinanceTab tripId={tripId} />
+                </div>
+            )}
+
             {/* Tab Content - ÚČASTNÍCI */}
-            {activeTab === 'ucastnici' && (
-                <div>
+            {activeTab === ('legacy-ucastnici' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
                     <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", fontWeight: "900" }}>Účastníci ({validParticipants.length})</h2>
 
                     <div style={{
@@ -1475,7 +1287,9 @@ export default function TripDashboardPage() {
                                     <tr key={p._id} style={{ borderBottom: index === validParticipants.length - 1 ? "none" : "2px solid #000" }}>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <div style={{ fontWeight: "800", fontSize: "1rem" }}>{p.member?.name}</div>
-                                            <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>Rodič: {p.member?.parentPhone}</div>
+                                            <div style={{ fontSize: "0.85rem", color: "#666", fontWeight: "600" }}>
+                                                Kontakt: {normalizeMemberContactFields(p.member)?.guardianPhone || "Bez telefonu"}
+                                            </div>
                                         </td>
                                         <td style={{ ...tdStyle, borderRight: "3px solid #000" }}>
                                             <span style={{
@@ -1570,8 +1384,8 @@ export default function TripDashboardPage() {
             )}
 
             {/* Tab Content - dokumentace */}
-            {activeTab === 'dokumentace' && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            {activeTab === ('legacy-dokumentace' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas} style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
                     {/* Documentation Banner */}
                     <div style={{
                         backgroundColor: "#FFF9E6",
@@ -1623,7 +1437,12 @@ export default function TripDashboardPage() {
                         boxShadow: "6px 6px 0 0 #000"
                     }}>
                         <h3 style={{ fontSize: "1.4rem", fontWeight: "900", margin: "0 0 1.5rem 0", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                            <span style={{ fontSize: "1.8rem" }}>📓</span> Připojené zápisy z rad
+                            <img
+                                src="/notepad.png"
+                                alt=""
+                                style={{ width: "1.8rem", height: "1.8rem", objectFit: "contain", display: "block" }}
+                            />
+                            <span>Připojené zápisy z rad</span>
                         </h3>
                         
                         {tripDocs === undefined ? (
@@ -1674,20 +1493,24 @@ export default function TripDashboardPage() {
             )}
 
             {/* Tab Content - emaily */}
-            {activeTab === 'emaily' && (
-                <EmailDraftsTab 
-                    tripId={tripId} 
-                    isLeader={
-                        dashboard && troop
-                            ? (() => {
-                                const leaders = dashboard.leaders || [];
-                                const user = dashboard.currentUser;
-                                return leaders.some((l: any) => l?._id === user?._id && (l.role === "owner" || l.role === "main_leader"));
-                            })()
-                            : false
-                    }
-                />
+            {activeTab === ('legacy-emaily' as TabType) && (
+                <div className={workspaceStyles.sectionCanvas}>
+                    <EmailDraftsTab
+                        tripId={tripId}
+                        isLeader={
+                            dashboard && troop
+                                ? (() => {
+                                    const leaders = dashboard.leaders || [];
+                                    const user = dashboard.currentUser;
+                                    return leaders.some((l: any) => l?._id === user?._id && (l.role === "owner" || l.role === "main_leader"));
+                                })()
+                                : false
+                        }
+                    />
+                </div>
             )}
+
+            </main>
 
 
             {/* Responses Modal */}

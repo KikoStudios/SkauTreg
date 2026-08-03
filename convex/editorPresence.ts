@@ -1,6 +1,7 @@
 // convex/editorPresence.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireCurrentUser, requirePageViewer } from "./lib/auth";
 
 // Update user's cursor position in the editor
 export const updateCursor = mutation({
@@ -13,15 +14,8 @@ export const updateCursor = mutation({
         })),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return null;
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) return null;
+        await requirePageViewer(ctx, args.pageId);
+        const user = await requireCurrentUser(ctx);
 
         // Find existing cursor record
         const existing = await ctx.db
@@ -58,13 +52,8 @@ export const updateCursor = mutation({
 export const getActiveCursors = query({
     args: { pageId: v.id("meeting_pages") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        const currentUser = identity
-            ? await ctx.db
-                  .query("users")
-                  .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-                  .first()
-            : null;
+        await requirePageViewer(ctx, args.pageId);
+        const currentUser = await requireCurrentUser(ctx);
 
         const fiveSecondsAgo = Date.now() - 5000;
 
@@ -96,15 +85,8 @@ export const getActiveCursors = query({
 export const removeCursor = mutation({
     args: { pageId: v.id("meeting_pages") },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) return;
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) return;
+        await requirePageViewer(ctx, args.pageId);
+        const user = await requireCurrentUser(ctx);
 
         const existing = await ctx.db
             .query("editor_cursors")

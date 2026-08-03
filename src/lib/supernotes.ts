@@ -69,8 +69,6 @@ export async function fetchSupernotesCollections(apiKey: string): Promise<Supern
 export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCard[]> {
   try {
     // Supernotes API uses POST for querying cards
-    console.log('[Supernotes] Calling API:', `${SUPERNOTES_API_BASE}/v1/cards/get/select`);
-    
     const requestBody: any = {
       limit: 100,
     };
@@ -84,17 +82,11 @@ export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCa
       body: JSON.stringify(requestBody),
     });
 
-    console.log('[Supernotes] Response status:', response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Supernotes] Error response:', errorText);
-      throw new Error(`Supernotes API error: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`Supernotes API error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('[Supernotes] Received data structure:', Object.keys(data).length, 'cards');
-    
     // API returns object with card IDs as keys, convert to array
     let cardsArray: SupernotesCard[] = Object.values(data).map((item: any) => {
       const rawTags = Array.isArray(item.data.tags) ? item.data.tags : [];
@@ -120,9 +112,6 @@ export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCa
       };
     });
     
-    // Log all cards with their tags for debugging
-    console.log('[Supernotes] All cards:', cardsArray.map(c => ({ name: c.name, tags: c.tags })));
-    
     // Only exclude junk/tasks/thoughts - show everything else
     cardsArray = cardsArray.filter(card => {
       const isJunk = (card.tags ?? []).some((tag: string) => 
@@ -132,8 +121,6 @@ export async function fetchSupernotesCards(apiKey: string): Promise<SupernotesCa
       );
       return !isJunk;
     });
-    
-    console.log('[Supernotes] After filtering:', cardsArray.length, 'cards');
     
     return cardsArray;
   } catch (error) {

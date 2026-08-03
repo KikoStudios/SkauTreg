@@ -1,0 +1,4 @@
+.contextShell { min-height: 72px; display: flex; align-items: center; padding: .85rem 2rem; background: #fff; border-bottom: var(--surface-border); }
+.headingCopy h1 { margin: 0 0 .18rem; font-size: clamp(1.3rem, 2.4vw, 1.65rem); line-height: 1.1; }
+.headingCopy p { margin: 0; color: #66696e; font-size: .76rem; font-weight: 600; }
+@media (max-width: 600px) { .contextShell { min-height: 64px; padding: .75rem 1rem; } .headingCopy p { display: none; } }

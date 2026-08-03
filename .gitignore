@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -36,6 +38,7 @@ yarn-error.log*
 .env.prod
 envs
 .env.*.local
+!.env.example
 
 # Secrets
 *.key
@@ -50,3 +53,7 @@ secrets/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local inspection and migration artifacts
+/tmp/
+/needtoorganize/

@@ -272,9 +272,8 @@ function ChangelogModal({ updates, latestVersion, onClose }: ChangelogModalProps
 }
 
 function MarkdownRenderer({ content }: { content?: string }) {
-  if (!content) return null;
-  
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
+  if (!content) return null;
 
   const sections = parseMarkdownSections(content);
 

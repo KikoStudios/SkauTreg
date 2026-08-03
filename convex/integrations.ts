@@ -1,14 +1,56 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+import { requireTroopManager } from "./lib/auth";
+import { decryptCredential, encryptCredential } from "./lib/credentials";
+
+function publicIntegration(integration: Doc<"integrations">) {
+    const {
+        configPayload: _configPayload,
+        webhookUrl: _webhookUrl,
+        phoneNumber: _phoneNumber,
+        ...safe
+    } = integration;
+    return safe;
+}
+
+function validateWebhookUrl(value: string | undefined) {
+    if (!value) return;
+    let url: URL;
+    try {
+        url = new URL(value);
+    } catch {
+        throw new Error("Webhook URL is invalid.");
+    }
+    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const blocked =
+        hostname === "localhost" ||
+        hostname === "::1" ||
+        hostname === "0.0.0.0" ||
+        hostname.endsWith(".local") ||
+        /^127\./.test(hostname) ||
+        /^10\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^fc/i.test(hostname) ||
+        /^fd/i.test(hostname) ||
+        /^fe[89ab]/i.test(hostname);
+    if (url.protocol !== "https:" || blocked || url.username || url.password) {
+        throw new Error("Webhook URL must use public HTTPS without embedded credentials.");
+    }
+}
 
 // get integrations for a troop
 export const getByTroop = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
-        return await ctx.db
+        await requireTroopManager(ctx, args.troopId);
+        const integrations = await ctx.db
             .query("integrations")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
             .collect();
+        return integrations.map(publicIntegration);
     },
 });
 
@@ -16,7 +58,10 @@ export const getByTroop = query({
 export const getById = query({
     args: { integrationId: v.id("integrations") },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.integrationId);
+        const integration = await ctx.db.get(args.integrationId);
+        if (!integration) return null;
+        await requireTroopManager(ctx, integration.troopId);
+        return publicIntegration(integration);
     },
 });
 
@@ -34,30 +79,8 @@ export const create = mutation({
         phoneNumber: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // Verify user is authorized for this troop
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const troop = await ctx.db.get(args.troopId);
-        if (!troop) throw new Error("Troop not found");
-
-        // Check if user is leader of this troop
-        const leaders = await ctx.db
-            .query("troop_leaders")
-            .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
-            .collect();
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) throw new Error("User not found");
-
-        const isLeader = leaders.some((l) => l.userId === user._id);
-        if (!isLeader && (troop as any).ownerId !== user._id) {
-            throw new Error("Not authorized");
-        }
+        const { user } = await requireTroopManager(ctx, args.troopId);
+        validateWebhookUrl(args.webhookUrl);
 
         // Create the integration
         const integrationId = await ctx.db.insert("integrations", {
@@ -65,8 +88,8 @@ export const create = mutation({
             name: args.name,
             serviceType: args.serviceType,
             isActive: true,
-            configPayload: args.configPayload,
-            webhookUrl: args.webhookUrl,
+            configPayload: await encryptCredential(args.configPayload) as string,
+            webhookUrl: await encryptCredential(args.webhookUrl),
             webhookName: args.webhookName,
             emailProvider: args.emailProvider,
             emailAddress: args.emailAddress,
@@ -98,16 +121,8 @@ export const update = mutation({
     handler: async (ctx, args) => {
         const integration = await ctx.db.get(args.integrationId);
         if (!integration) throw new Error("Integration not found");
-
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("Not authenticated");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) throw new Error("User not found");
+        await requireTroopManager(ctx, integration.troopId);
+        validateWebhookUrl(args.webhookUrl);
 
         // Build update payload
         const updateData: any = {
@@ -117,15 +132,16 @@ export const update = mutation({
         if (args.name !== undefined) updateData.name = args.name;
         if (args.serviceType !== undefined) updateData.serviceType = args.serviceType;
         if (args.isActive !== undefined) updateData.isActive = args.isActive;
-        if (args.configPayload !== undefined) updateData.configPayload = args.configPayload;
-        if (args.webhookUrl !== undefined) updateData.webhookUrl = args.webhookUrl;
+        if (args.configPayload !== undefined) updateData.configPayload = await encryptCredential(args.configPayload);
+        if (args.webhookUrl !== undefined) updateData.webhookUrl = await encryptCredential(args.webhookUrl);
         if (args.webhookName !== undefined) updateData.webhookName = args.webhookName;
         if (args.emailProvider !== undefined) updateData.emailProvider = args.emailProvider;
         if (args.emailAddress !== undefined) updateData.emailAddress = args.emailAddress;
         if (args.phoneNumber !== undefined) updateData.phoneNumber = args.phoneNumber;
 
         await ctx.db.patch(args.integrationId, updateData);
-        return await ctx.db.get(args.integrationId);
+        const updated = await ctx.db.get(args.integrationId);
+        return updated ? publicIntegration(updated) : null;
     },
 });
 
@@ -135,6 +151,7 @@ export const deleteIntegration = mutation({
     handler: async (ctx, args) => {
         const integration = await ctx.db.get(args.integrationId);
         if (!integration) throw new Error("Integration not found");
+        await requireTroopManager(ctx, integration.troopId);
 
         // Delete all actions associated with this integration
         const actions = await ctx.db
@@ -160,15 +177,17 @@ export const testIntegration = mutation({
     handler: async (ctx, args) => {
         const integration = await ctx.db.get(args.integrationId);
         if (!integration) throw new Error("Integration not found");
+        await requireTroopManager(ctx, integration.troopId);
 
         // Test based on service type
         let success = false;
         let error: string | undefined;
 
         try {
-            if (integration.serviceType === "discord" && integration.webhookUrl) {
+            const webhookUrl = await decryptCredential(integration.webhookUrl);
+            if (integration.serviceType === "discord" && webhookUrl) {
                 // Test Discord webhook
-                const response = await fetch(integration.webhookUrl, {
+                const response = await fetch(webhookUrl, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({

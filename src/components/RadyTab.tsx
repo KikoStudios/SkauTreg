@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, Fragment } from "react";
+import React, { useEffect, useState, Fragment } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -215,7 +215,7 @@ function DeleteModal({ onClose, onConfirm, notebookTitle }: DeleteModalProps) {
                     Smazat notebook?
                 </h2>
                 <p style={{ margin: "0 0 2rem 0", color: "#666", lineHeight: 1.6 }}>
-                    Opravdu chcete smazat notebook <strong>"{notebookTitle}"</strong>? Tato akce je nevratná a smaže všechny stránky a soubory v tomto notebooku.
+                    Opravdu chcete smazat notebook <strong>&quot;{notebookTitle}&quot;</strong>? Tato akce je nevratná a smaže všechny stránky a soubory v tomto notebooku.
                 </p>
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
                     <button
@@ -257,7 +257,7 @@ function DeleteModal({ onClose, onConfirm, notebookTitle }: DeleteModalProps) {
     );
 }
 
-export default function RadyTab() {
+export default function RadyTab({ troopId: fixedTroopId }: { troopId?: Id<"troops"> }) {
     const troops = useQuery(api.troops.getByUser);
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -265,7 +265,7 @@ export default function RadyTab() {
     const troopIdParam = searchParams.get("troopId");
 
     const [selectedTroopId, setSelectedTroopId] = useState<Id<"troops"> | null>(
-        troopIdParam ? (troopIdParam as Id<"troops">) : null
+        fixedTroopId || (troopIdParam ? (troopIdParam as Id<"troops">) : null)
     );
     const [activeTab, setActiveTab] = useState<"all" | "trips" | "personal">("all");
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -280,9 +280,21 @@ export default function RadyTab() {
         router.replace(`${pathname}?${params.toString()}`);
     };
 
-    if (troops && troops.length > 0 && !selectedTroopId) {
-        setSelectedTroopId(troops[0]._id);
-    }
+    useEffect(() => {
+        if (fixedTroopId) setSelectedTroopId(fixedTroopId);
+        else if (troopIdParam) setSelectedTroopId(troopIdParam as Id<"troops">);
+        else if (troops && troops.length > 0) setSelectedTroopId((current) => current || troops[0]._id);
+    }, [fixedTroopId, troopIdParam, troops]);
+
+    useEffect(() => {
+        const requestedTab = searchParams.get("tab");
+        if (requestedTab === "all" || requestedTab === "trips" || requestedTab === "personal") {
+            setActiveTab(requestedTab);
+        }
+        if (searchParams.get("create") === "true") {
+            setShowCreateModal(true);
+        }
+    }, [searchParams]);
 
     const selectedTroop = troops?.find(t => t._id === selectedTroopId);
 
@@ -388,7 +400,7 @@ export default function RadyTab() {
                 onMouseLeave={(e) => e.currentTarget.style.background = "white"}
                 title="Smazat radu"
             >
-                🗑️
+                <img src="/delete-icon.svg" alt="Smazat radu" style={{ width: "1.25rem", height: "1.25rem" }} />
             </button>
         </div>
     );
@@ -399,7 +411,7 @@ export default function RadyTab() {
 
             {/* Controls Row */}
             <div className="controls-row">
-                <div className="troop-selector-container">
+                {!fixedTroopId && <div className="troop-selector-container">
                     {troops.length > 0 && (
                         <div style={{ position: 'relative', zIndex: 1, width: '100%' }}>
                             <select
@@ -417,7 +429,7 @@ export default function RadyTab() {
                             <SpinningLogo src={selectedTroop.logo} />
                         </div>
                     )}
-                </div>
+                </div>}
 
                 {/* Tabs Navigation - Repositioned between selector and button */}
                 <div className="tabs-container">
@@ -505,7 +517,7 @@ export default function RadyTab() {
                     cursor: pointer;
                     display: flex;
                     align-items: center;
-                    gap: 0.5rem;
+                    gap: 1.25rem;
                     white-space: nowrap;
                     transition: all 0.1s;
                 }
@@ -519,26 +531,28 @@ export default function RadyTab() {
                     gap: 0.5rem;
                     flex: 1;
                     justify-content: center;
+                    border-bottom: 1px solid #ccc;
                 }
                 .tab-button {
-                    padding: 0.5rem 1rem;
-                    font-weight: 900;
-                    font-size: 1rem;
+                    padding: 0.7rem 0.1rem;
+                    font-weight: 800;
+                    font-size: .9rem;
                     cursor: pointer;
                     background: none;
-                    border: 3px solid transparent;
-                    border-radius: 10px;
+                    border: 0;
+                    border-bottom: 3px solid transparent;
+                    border-radius: 0;
                     transition: all 0.1s;
                     color: #666;
                 }
                 .tab-button.active {
                     color: #000;
-                    background: #fcd34d66;
-                    border-color: #000;
+                    background: transparent;
+                    border-bottom-color: #16803c;
                 }
                 .tab-button:hover {
                     color: #000;
-                    background: #f3f4f6;
+                    background: transparent;
                 }
                 .trip-folder {
                     grid-column: 1 / -1;
@@ -558,7 +572,10 @@ export default function RadyTab() {
                     width: fit-content;
                 }
                 .folder-icon {
-                    font-size: 1.5rem;
+                    width: 2rem;
+                    height: 2rem;
+                    object-fit: contain;
+                    display: block;
                 }
                 .trip-name {
                     font-weight: 900;
@@ -604,11 +621,7 @@ export default function RadyTab() {
                         return (
                             <Fragment key={tripId}>
                                 <div className="trip-folder" style={{ 
-                                    border: `3px solid ${accentColor}`,
-                                    borderRadius: "16px",
-                                    marginBottom: "1.5rem",
-                                    overflow: "hidden",
-                                    boxShadow: `6px 6px 0 0 ${accentColor}33`
+                                    marginBottom: "1.5rem"
                                 }}>
                                     <div className="trip-folder-header" style={{
                                         background: `${accentColor}15`,
@@ -619,7 +632,11 @@ export default function RadyTab() {
                                         gap: "1rem"
                                     }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                            <span style={{ fontSize: "2rem" }}>📂</span>
+                                            <img
+                                                src="/slozka.png"
+                                                alt=""
+                                                className="folder-icon"
+                                            />
                                             <div>
                                                 <div style={{ fontSize: "0.75rem", fontWeight: "900", color: accentColor, textTransform: "uppercase", letterSpacing: "0.1em" }}>Výprava</div>
                                                 <div style={{ fontSize: "1.25rem", fontWeight: "900", color: "#000" }}>{trip?.name || "Neznámá výprava"}</div>

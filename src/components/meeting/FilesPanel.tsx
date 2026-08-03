@@ -23,7 +23,7 @@ export default function FilesPanel({ meetingId, onImageClick }: FilesPanelProps)
         if (!selectedFiles || selectedFiles.length === 0) return;
 
         for (const file of Array.from(selectedFiles)) {
-            const uploadUrl = await generateUploadUrl();
+            const uploadUrl = await generateUploadUrl({ meetingId });
             const result = await fetch(uploadUrl, {
                 method: "POST",
                 headers: { "Content-Type": file.type },

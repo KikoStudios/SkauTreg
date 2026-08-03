@@ -1,6 +1,16 @@
 
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import {
+    authError,
+    requireCurrentUser,
+    requireMeetingEditor,
+    requireMeetingViewer,
+    requireTripEditor,
+    requireTripViewer,
+    requireTroopEditor,
+    requireTroopViewer,
+} from "./lib/auth";
 
 export const create = mutation({
     args: {
@@ -11,10 +21,13 @@ export const create = mutation({
         category: v.optional(v.string()), // "notebook" or "documentation"
     },
     handler: async (ctx, args) => {
-        // Check if user has permission
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            throw new Error("Unauthenticated");
+        if (args.tripId) {
+            const { trip } = await requireTripEditor(ctx, args.tripId);
+            if (trip.troopId !== args.troopId) {
+                authError("VALIDATION_ERROR", "Výprava nepatří do vybraného oddílu.");
+            }
+        } else {
+            await requireTroopEditor(ctx, args.troopId);
         }
 
         const meetingId = await ctx.db.insert("meetings", {
@@ -41,6 +54,7 @@ export const list = query({
         troopId: v.id("troops"),
     },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.troopId);
         const meetings = await ctx.db
             .query("meetings")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
@@ -55,6 +69,7 @@ export const listByTrip = query({
         tripId: v.id("trips"),
     },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         return await ctx.db
             .query("meetings")
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -65,7 +80,8 @@ export const listByTrip = query({
 export const get = query({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
-        return await ctx.db.get(args.meetingId);
+        const { meeting } = await requireMeetingViewer(ctx, args.meetingId);
+        return meeting;
     }
 });
 
@@ -80,15 +96,15 @@ export const update = mutation({
         category: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const { meeting } = await requireMeetingEditor(ctx, args.meetingId);
+        if (args.tripId) {
+            const { trip } = await requireTripEditor(ctx, args.tripId);
+            if (trip.troopId !== meeting.troopId) {
+                authError("VALIDATION_ERROR", "Výprava nepatří do stejného oddílu.");
+            }
+        }
         const { meetingId, ...updates } = args;
-        // Filter out undefined values to be extra safe
-        const patch: any = {};
-        if (updates.title !== undefined) patch.title = updates.title;
-        if (updates.description !== undefined) patch.description = updates.description;
-        if (updates.tripId !== undefined) patch.tripId = updates.tripId;
-        if (updates.category !== undefined) patch.category = updates.category;
-        
-        await ctx.db.patch(meetingId, patch);
+        await ctx.db.patch(meetingId, updates);
     }
 });
 
@@ -98,6 +114,7 @@ export const updateStatus = mutation({
         status: v.string(), // "prepared", "ongoing", "past"
     },
     handler: async (ctx, args) => {
+        await requireMeetingEditor(ctx, args.meetingId);
         await ctx.db.patch(args.meetingId, { status: args.status });
     }
 });
@@ -107,19 +124,8 @@ export const join = mutation({
         meetingId: v.id("meetings"),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) {
-            // throw new Error("Unauthenticated");
-            // Allow anonymous join? Use session ID?
-            return null; // or handle
-        }
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-            .first();
-
-        if (!user) return null;
+        await requireMeetingViewer(ctx, args.meetingId);
+        const user = await requireCurrentUser(ctx);
 
         const existing = await ctx.db
             .query("meeting_participants")
@@ -142,6 +148,7 @@ export const join = mutation({
 export const getParticipants = query({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
+        await requireMeetingViewer(ctx, args.meetingId);
         const participants = await ctx.db
             .query("meeting_participants")
             .withIndex("by_meeting", (q) => q.eq("meetingId", args.meetingId))
@@ -157,6 +164,7 @@ export const getParticipants = query({
 export const deleteMeeting = mutation({
     args: { meetingId: v.id("meetings") },
     handler: async (ctx, args) => {
+        await requireMeetingEditor(ctx, args.meetingId);
         // Delete all pages
         const pages = await ctx.db
             .query("meeting_pages")

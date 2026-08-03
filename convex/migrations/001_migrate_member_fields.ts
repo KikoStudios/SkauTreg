@@ -1,8 +1,8 @@
-import { mutation } from "../_generated/server";
+import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { DatabaseReader, DatabaseWriter } from "../_generated/server";
 
-export const migrateMemberFields = mutation({
+export const migrateMemberFields = internalMutation({
     args: {},
     handler: async (ctx) => {
         // Get all members from the database

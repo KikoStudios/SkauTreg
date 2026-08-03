@@ -36,7 +36,7 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
     const leaveMeeting = useMutation(api.presence.leave);
 
     const [activePageId, setActivePageId] = useState<Id<"meeting_pages"> | null>(null);
-    const [pageTitle, setPageTitle] = useState("");
+    const [titleDraft, setTitleDraft] = useState<{ pageId: Id<"meeting_pages">; value: string } | null>(null);
     const [showAnnotator, setShowAnnotator] = useState(false);
     const [showTripSelect, setShowTripSelect] = useState(false);
     const [selectedImage, setSelectedImage] = useState<{ fileId: Id<"meeting_files">; url: string } | null>(null);
@@ -50,13 +50,12 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
         setShowTripSelect(false);
     };
 
-    // Auto-select first page
-    useEffect(() => {
-        if (pages && pages.length > 0 && !activePageId) {
-            setActivePageId(pages[0]._id);
-            setPageTitle(pages[0].title);
-        }
-    }, [pages, activePageId]);
+    const effectivePageId = activePageId ?? pages?.[0]?._id ?? null;
+    const activePage = pages?.find((page) => page._id === effectivePageId)
+        ?? allTripPages?.find((page) => page._id === effectivePageId);
+    const pageTitle = titleDraft?.pageId === effectivePageId
+        ? titleDraft.value
+        : activePage?.title ?? "";
 
     // Join meeting and setup heartbeat
     useEffect(() => {
@@ -74,18 +73,9 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
         }
     }, [meetingId]);
 
-    // Update page title when switching pages
-    useEffect(() => {
-        // Search in current meeting pages first, then in all trip pages
-        const activePage = pages?.find(p => p._id === activePageId) || 
-                          allTripPages?.find(p => p._id === activePageId);
-        if (activePage) {
-            setPageTitle(activePage.title);
-        }
-    }, [activePageId, pages, allTripPages]);
-
     const handlePageSelect = (pageId: Id<"meeting_pages">) => {
         setActivePageId(pageId);
+        setTitleDraft(null);
     };
 
     const handleAddPage = async (targetMeetingId: Id<"meetings">) => {
@@ -97,8 +87,9 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
     };
 
     const handleTitleBlur = async () => {
-        if (activePageId && pageTitle) {
-            await updatePageTitle({ pageId: activePageId, title: pageTitle });
+        if (effectivePageId && pageTitle) {
+            await updatePageTitle({ pageId: effectivePageId, title: pageTitle });
+            setTitleDraft(null);
         }
     };
 
@@ -186,16 +177,16 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
                             type="text"
                             className={editorStyles.titleInput}
                             value={pageTitle}
-                            onChange={(e) => setPageTitle(e.target.value)}
+                            onChange={(e) => effectivePageId && setTitleDraft({ pageId: effectivePageId, value: e.target.value })}
                             onBlur={handleTitleBlur}
                             placeholder="Untitled"
                         />
 
                         {/* Collaborative Editor */}
-                        {activePageId && meeting && (
+                        {effectivePageId && meeting && (
                             <CollaborativeEditor
-                                key={activePageId}
-                                pageId={activePageId}
+                                key={effectivePageId}
+                                pageId={effectivePageId}
                                 troopId={meeting.troopId}
                                 editable={true}
                             />
@@ -207,7 +198,7 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
                 <MeetingSidebar
                     meetingId={meetingId}
                     tripId={tripId}
-                    activePageId={activePageId}
+                    activePageId={effectivePageId}
                     onPageSelect={handlePageSelect}
                     onAddPage={handleAddPage}
                     onImageClick={handleImageClick}

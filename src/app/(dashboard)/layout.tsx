@@ -3,14 +3,15 @@
 import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
 import styles from "./DashboardLayout.module.css";
 import ProfileModal from "../../components/ProfileModal";
 import { CommandMenu } from "../../components/CommandMenu";
-import Breadcrumbs from "../../components/Breadcrumbs";
 import { UpdateNotification } from "../../components/UpdateNotification";
+import { ChevronRight, Menu } from "lucide-react";
 
 export default function DashboardLayout({
     children,
@@ -32,75 +33,165 @@ function DashboardLayoutInner({
     const { isLoading, isAuthenticated } = useConvexAuth();
     const { isLoaded: isClerkLoaded, isSignedIn } = useAuth();
     const { signOut } = useClerk();
+    const router = useRouter();
+    const pathname = usePathname();
+    const isTripWorkspace = /^\/trips\/[^/]+/.test(pathname || "");
+    const previousTripWorkspace = useRef(isTripWorkspace);
+    const previousLoadingScreen = useRef(isLoading || !isClerkLoaded);
+    const transitionTimeout = useRef<number | null>(null);
+    const dashboardReadyListener = useRef<(() => void) | null>(null);
+    const [modeTransition, setModeTransition] = useState<{ mode: "trip" | "dashboard"; phase: "covering" | "revealing" } | null>(null);
+    const [showLoadingScreen, setShowLoadingScreen] = useState(isLoading || !isClerkLoaded);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
 
     const convexAuthReady = useMemo(() => !isLoading && isAuthenticated, [isLoading, isAuthenticated]);
+    const isAppLoading = isLoading || !isClerkLoaded;
 
     useEffect(() => {
-        console.log("DashboardLayout auth check:", { isLoading, isAuthenticated, isClerkLoaded, isSignedIn });
-    }, [isLoading, isAuthenticated, isClerkLoaded, isSignedIn]);
+        if (isClerkLoaded && !isSignedIn) {
+            router.replace("/sign-in");
+        }
+    }, [isClerkLoaded, isSignedIn, router]);
 
-    if (isLoading) {
+    useLayoutEffect(() => {
+        const modeChanged = previousTripWorkspace.current !== isTripWorkspace;
+        const loadingStopped = previousLoadingScreen.current && !isAppLoading;
+        previousTripWorkspace.current = isTripWorkspace;
+        previousLoadingScreen.current = isAppLoading;
+
+        if (isAppLoading) {
+            if (!showLoadingScreen) setShowLoadingScreen(true);
+            return;
+        }
+
+        if (loadingStopped) {
+            if (!isSignedIn || !convexAuthReady) {
+                setShowLoadingScreen(false);
+                return;
+            }
+
+            if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+            setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "covering" });
+            transitionTimeout.current = window.setTimeout(() => {
+                setShowLoadingScreen(false);
+                const revealApplication = () => {
+                    if (dashboardReadyListener.current) {
+                        window.removeEventListener("skautreg:dashboard-ready", dashboardReadyListener.current);
+                        dashboardReadyListener.current = null;
+                    }
+                    if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+                    setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
+                    transitionTimeout.current = window.setTimeout(() => {
+                        setModeTransition(null);
+                        transitionTimeout.current = null;
+                    }, 760);
+                };
+
+                if (pathname === "/" || pathname === "/home") {
+                    dashboardReadyListener.current = revealApplication;
+                    window.addEventListener("skautreg:dashboard-ready", revealApplication, { once: true });
+                    transitionTimeout.current = window.setTimeout(revealApplication, 4000);
+                } else {
+                    transitionTimeout.current = window.setTimeout(revealApplication, 350);
+                }
+            }, 590);
+            return;
+        }
+
+        if (!modeChanged) return;
+
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
+        transitionTimeout.current = window.setTimeout(() => {
+            setModeTransition(null);
+            transitionTimeout.current = null;
+        }, 760);
+    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace, pathname, showLoadingScreen]);
+
+    useEffect(() => () => {
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        if (dashboardReadyListener.current) window.removeEventListener("skautreg:dashboard-ready", dashboardReadyListener.current);
+    }, []);
+
+    const handleModeNavigation = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (!(event.target instanceof Element)) return;
+
+        const anchor = event.target.closest("a[href]");
+        if (!anchor || anchor.hasAttribute("download") || (anchor.getAttribute("target") && anchor.getAttribute("target") !== "_self")) return;
+
+        const destination = new URL(anchor.getAttribute("href") || "", window.location.href);
+        if (destination.origin !== window.location.origin) return;
+
+        const destinationIsTripWorkspace = /^\/trips\/[^/]+/.test(destination.pathname);
+        if (destinationIsTripWorkspace === isTripWorkspace) return;
+
+        event.preventDefault();
+        const mode = destinationIsTripWorkspace ? "trip" : "dashboard";
+        const href = `${destination.pathname}${destination.search}${destination.hash}`;
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        setModeTransition({ mode, phase: "covering" });
+        transitionTimeout.current = window.setTimeout(() => {
+            transitionTimeout.current = null;
+            router.push(href);
+        }, 590);
+    };
+
+    if (isAppLoading || showLoadingScreen) {
         return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-                Loading...
+            <div className={styles.loadingScreen} role="status" aria-live="polite">
+                <div className={styles.loadingContent}>
+                    <img src="/Logo-light.svg" alt="SkauTreg" />
+                    <div className={styles.loadingTrack} aria-hidden="true"><span /></div>
+                    <span className={styles.loadingLabel}>Načítám…</span>
+                </div>
+                {modeTransition && (
+                    <div className={styles.modeTransition} data-mode={modeTransition.mode} data-phase={modeTransition.phase} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                    </div>
+                )}
             </div>
         );
     }
 
     // If Clerk is loaded and user is not signed in, bounce to sign-in for safety
     if (isClerkLoaded && !isSignedIn) {
-        if (typeof window !== "undefined") {
-            window.location.href = "/sign-in";
-        }
         return null;
     }
 
     // Surface a clear error when Clerk session exists but Convex auth failed
     if (isClerkLoaded && isSignedIn && !convexAuthReady) {
         return (
-            <div style={{ padding: "2rem", maxWidth: 600, margin: "4rem auto", textAlign: "center" }}>
-                <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Unable to load dashboard</h2>
-                <p style={{ color: "#4b5563", marginBottom: "1.5rem" }}>
-                    Your Clerk session is active, but Convex authentication failed. This could mean:
+            <div className={styles.statusScreen}>
+              <div className={styles.statusCard}>
+                <span className={styles.statusEyebrow}>Problém s připojením</span>
+                <h2>Pracovní prostor se nepodařilo načíst</h2>
+                <p>
+                    Relace Clerk je aktivní, ale ověření Convex selhalo. Může to znamenat:
                     <br />
-                    • Convex service is down or misconfigured
+                    • služba Convex neběží nebo je špatně nastavená
                     <br />
-                    • CLERK_ISSUER_URL not set in Convex environment
+                    • v prostředí Convex chybí CLERK_ISSUER_URL
                     <br />
-                    • NEXT_PUBLIC_CONVEX_URL not set correctly
+                    • NEXT_PUBLIC_CONVEX_URL není nastavená správně
                 </p>
-                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+                <div className={styles.statusActions}>
                     <button
                         onClick={() => window.location.reload()}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            border: "1px solid var(--border-color)",
-                            borderRadius: "8px",
-                            background: "white",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                        }}
                     >
-                        Retry
+                        Zkusit znovu
                     </button>
                     <button
                         onClick={() => signOut()}
-                        style={{
-                            padding: "0.75rem 1.5rem",
-                            border: "1px solid #ef4444",
-                            color: "#ef4444",
-                            borderRadius: "8px",
-                            background: "white",
-                            cursor: "pointer",
-                            fontWeight: 600,
-                        }}
                     >
-                        Sign out
+                        Odhlásit se
                     </button>
                 </div>
+              </div>
             </div>
         );
     }
@@ -111,38 +202,37 @@ function DashboardLayoutInner({
 
     return (
         <ProfileModalProvider>
-            <div className={styles.container}>
-                {/* Mobile Header */}
-                <div className={styles.mobileHeader}>
-                    <button className={styles.hamburgerButton} onClick={() => setIsSidebarOpen(true)}>
-                        ☰
-                    </button>
-                    <img src="/Logo-light.svg" alt="SkautReg" className={styles.mobileLogo} />
-                    <div style={{ width: "40px" }}></div> {/* Spacer for balancing */}
-                </div>
-
-                <Sidebar 
+            <div className={styles.container} onClickCapture={handleModeNavigation}>
+                {modeTransition && (
+                    <div className={styles.modeTransition} data-mode={modeTransition.mode} data-phase={modeTransition.phase} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                    </div>
+                )}
+                {!isTripWorkspace && <Sidebar
                     isOpen={isSidebarOpen} 
                     onClose={() => setIsSidebarOpen(false)}
                     isCollapsed={isSidebarCollapsed}
                     onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                />
+                />}
+                {!isTripWorkspace && <button className={styles.mobileMenuButton} onClick={() => setIsSidebarOpen(true)} aria-label="Otevřít navigaci"><Menu size={22} /></button>}
 
                 {/* Desktop Sidebar Expand Button */}
-                {isSidebarCollapsed && (
+                {isSidebarCollapsed && !isTripWorkspace && (
                     <button 
                         className={styles.expandButton}
                         onClick={() => setIsSidebarCollapsed(false)}
                         title="Rozbalit sidebar"
                     >
-                        ‹
+                        <ChevronRight size={28} strokeWidth={3} />
                     </button>
                 )}
 
                 <CommandMenu />
                 <UpdateNotification />
 
-                <main className={`${styles.mainContent} ${isSidebarCollapsed ? styles.mainContentExpanded : ''}`}>
+                <main className={`${styles.mainContent} ${isSidebarCollapsed || isTripWorkspace ? styles.mainContentExpanded : ''}`}>
                     {children}
                 </main>
                 <ProfileModal />

@@ -33,7 +33,6 @@ export default function CalendarPage() {
         <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
             {/* Top Title Bar */}
             <div className="headingContainer">
-                <Breadcrumbs />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                     <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Kalendář</h1>
                     <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>

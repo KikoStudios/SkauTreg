@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import QRCode from "qrcode";
 
 export async function GET(req: NextRequest) {
   const dataRaw = req.nextUrl.searchParams.get("data") || "";
@@ -11,17 +12,17 @@ export async function GET(req: NextRequest) {
 
   const data = dataRaw.startsWith("/") ? `${req.nextUrl.origin}${dataRaw}` : dataRaw;
 
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
-  const r = await fetch(upstream, { cache: "force-cache" });
-  if (!r.ok) {
-    return new Response("QR upstream failed", { status: 502 });
-  }
-
-  const bytes = await r.arrayBuffer();
-  return new Response(bytes, {
+  const bytes = await QRCode.toBuffer(data, {
+    type: "png",
+    width: size,
+    margin: 2,
+    errorCorrectionLevel: "M",
+  });
+  return new Response(new Uint8Array(bytes), {
     headers: {
-      "Content-Type": r.headers.get("content-type") || "image/png",
+      "Content-Type": "image/png",
       "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

@@ -13,13 +13,24 @@ interface GmailSettingsProps {
     isAuthorized: boolean;
 }
 
+const oauthErrorMessages: Record<string, string> = {
+    OAUTH_CANCELLED: "Propojení bylo zrušeno dříve, než Google udělil oprávnění.",
+    OAUTH_ADMIN_BLOCKED: "Správce vaší Google Workspace domény musí aplikaci SkauTreg povolit v administraci aplikací třetích stran.",
+    OAUTH_INVALID_STATE: "Bezpečnostní relace propojení není platná. Spusťte propojení znovu.",
+    OAUTH_SESSION_EXPIRED: "Přihlášení vypršelo. Přihlaste se znovu a propojení zopakujte.",
+    OAUTH_NOT_CONFIGURED: "Gmail není na tomto prostředí nakonfigurován.",
+    OAUTH_TOKEN_EXCHANGE_FAILED: "Google nedokončil propojení. Zkuste jej spustit znovu.",
+    OAUTH_SCOPE_MISSING: "Google neudělil oprávnění k odesílání zpráv.",
+    OAUTH_EMAIL_UNAVAILABLE: "Google nepotvrdil adresu připojeného účtu.",
+    OAUTH_CONNECTION_FAILED: "Propojení se nepodařilo bezpečně dokončit. Zkuste to znovu.",
+};
+
 export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsProps) {
     const { showError, showSuccess } = useFeedback();
     const troop = useQuery(api.troops.getById, { id: troopId });
     const members = useQuery(api.members.list, { troopId });
     const sentHistory = useQuery(api.emailDrafts.listSentByTroop, { troopId });
-    const connectGmail = useMutation(api.troops.connectGmail);
-    const disconnectGmail = useMutation(api.troops.disconnectGmail);
+    const disconnectGmail = useMutation(api.troops.disconnectEmailProvider);
     const searchParams = useSearchParams();
     const router = useRouter();
 
@@ -35,83 +46,55 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
 
         let gmailConnected: string | null = null;
         let email: string | null = null;
-        let refreshToken: string | null = null;
         let gmailError: string | null = null;
+        let gmailErrorCode: string | null = null;
 
         // Try useSearchParams hook first
         gmailConnected = searchParams?.get('gmail_connected');
         email = searchParams?.get('email');
-        refreshToken = searchParams?.get('refresh_token');
         gmailError = searchParams?.get('gmail_error');
+        gmailErrorCode = searchParams?.get('gmail_error_code');
 
         // Fallback: read from window.location.search
-        if (!gmailConnected && !email && !gmailError && typeof window !== 'undefined') {
+        if (!gmailConnected && !email && !gmailError && !gmailErrorCode && typeof window !== 'undefined') {
             const urlParams = new URLSearchParams(window.location.search);
             gmailConnected = urlParams.get('gmail_connected');
             email = urlParams.get('email');
-            refreshToken = urlParams.get('refresh_token');
             gmailError = urlParams.get('gmail_error');
-            console.log('Fallback params from window.location:', { gmailConnected, email, gmailError });
+            gmailErrorCode = urlParams.get('gmail_error_code');
         }
 
-        console.log('OAuth callback detected:', { gmailConnected, email, gmailError });
-
-        if (gmailError) {
+        if (gmailError || gmailErrorCode) {
             showError({
-                title: "❌ Chyba OAuth",
-                message: decodeURIComponent(gmailError),
+                title: "Gmail se nepodařilo propojit",
+                message: gmailErrorCode ? (oauthErrorMessages[gmailErrorCode] || oauthErrorMessages.OAUTH_CONNECTION_FAILED) : decodeURIComponent(gmailError || ""),
                 icon: "error",
-                canReport: true,
+                canReport: gmailErrorCode !== "OAUTH_ADMIN_BLOCKED",
             });
             window.history.replaceState({}, document.title, window.location.pathname);
             setParamsProcessed(true);
             return;
         }
 
-        if (gmailConnected === 'true' && email && refreshToken) {
-            console.log('Calling handleOAuthCallback with:', { email, refreshToken });
-            handleOAuthCallback(email, refreshToken);
+        if (gmailConnected === 'true') {
+            window.history.replaceState({}, document.title, window.location.pathname);
+            showSuccess({
+                title: "Úspěch",
+                message: email
+                    ? `Gmail účet ${email} byl připojen.`
+                    : "Gmail účet byl připojen.",
+                duration: 4000,
+            });
         }
 
         setParamsProcessed(true);
     }, []); // Empty dependency array - run once on mount
 
 
-    const handleOAuthCallback = async (email: string, refreshToken: string) => {
-        setIsConnecting(true);
-        try {
-            console.log('Saving Gmail connection:', { email });
-            const result = await connectGmail({ troopId, email, refreshToken });
-            console.log('connectGmail result:', result);
-            // Clean URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            showSuccess({
-                title: "✅ Úspěch",
-                message: `Gmail účet ${email} připojen. Nyní můžete odesílat e-maily z tohoto účtu.`,
-                duration: 4000,
-            });
-        } catch (error: any) {
-            console.error('connectGmail error:', error);
-            showError({
-                title: "❌ Chyba při uložení",
-                message: "Nepodařilo se uložit Gmail propojení. Zkuste znovu.",
-                icon: "error",
-                details: error?.message || "Unknown error",
-                canReport: true,
-            });
-        } finally {
-            setIsConnecting(false);
-        }
-    };
-
     const handleLoginClick = () => {
+        setIsConnecting(true);
         router.push(`/settings/${troopId}/gmail-connect`);
     };
-
-    const debugClientId = "(fetched from API)";
-    const debugRedirectUri = typeof window !== "undefined"
-        ? `${window.location.origin}/api/auth/gmail/callback`
-        : "(dynamic)";
 
     const handleDisconnect = async () => {
         showError({
@@ -154,8 +137,10 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
         return <div>Načítání...</div>;
     }
 
-    const gmailOAuth = (troop as any).gmailOAuth;
+    const emailProvider = (troop as any).emailProvider;
+    const gmailOAuth = emailProvider?.provider === "gmail" ? emailProvider : (troop as any).gmailOAuth;
     const isConnected = !!gmailOAuth;
+    const verificationStatus = process.env.NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS || "testing";
     const memberEmails = Array.from(
         new Set(
             (members || [])
@@ -220,6 +205,10 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
                     Propojte oficiální e-mailovou adresu oddílu (např. info@vasoddil.cz) přes Google OAuth 2.0. Tento e-mail bude použit jako odesílatel pro všechny zprávy k výpravám.
                 </p>
+                {gmailOAuth?.requiresReconnect && <p role="alert" style={{ padding: ".75rem", background: "#fef3c7", border: "2px solid #92400e", borderRadius: 8, fontWeight: 800 }}>Připojení je potřeba bezpečně obnovit. Klikněte na „Připojit Gmail“ a znovu udělte oprávnění.</p>}
+                {verificationStatus !== "verified" && <p role="status" style={{ padding: ".75rem", background: "#fff7d6", border: "2px solid #7c5c00", borderRadius: 8, fontWeight: 750 }}>
+                    Ověření aplikace u Googlu: {verificationStatus === "submitted" ? "odesláno ke kontrole" : "testovací režim"}. Účty ve spravované doméně, například skaut.cz, může navíc blokovat správce organizace.
+                </p>}
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                     <div style={{
                         padding: "0.5rem 0.75rem",
@@ -310,17 +299,11 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                                 </svg>
-                                {isConnecting ? "Propojuji..." : "Propojit s Gmailu"}
+                                {isConnecting ? "Přesměrovávám…" : "Propojit s Gmailem"}
                             </button>
                             <p className="text-xs text-gray-500 mt-2">
                                 Budete přesměrováni na Google pro přihlášení.
                             </p>
-                            {process.env.NODE_ENV !== "production" && (
-                                <div className="mt-2 text-xs text-gray-500">
-                                    <div>client_id: {debugClientId}</div>
-                                    <div>redirect_uri: {debugRedirectUri}</div>
-                                </div>
-                            )}
                         </div>
                     )}
                 </>
@@ -335,7 +318,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
             }}>
                 <div style={{ fontWeight: "900", color: "#1e3a8a", marginBottom: "0.5rem" }}>Jak funguje OAuth?</div>
                 <ol style={{ margin: 0, paddingLeft: "1.25rem", color: "#1e40af", fontWeight: "600", display: "grid", gap: "0.25rem" }}>
-                    <li>Klikněte na "Propojit s Gmailu"</li>
+                    <li>Klikněte na &quot;Propojit s Gmailem&quot;</li>
                     <li>Přihlaste se ke svému Google účtu</li>
                     <li>Udělte oprávnění pro odesílání e-mailů</li>
                     <li>Budete vráceni zpět sem</li>
@@ -343,6 +326,9 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 </ol>
                 <div style={{ marginTop: "0.75rem", color: "#1e3a8a", fontWeight: "700" }}>
                     Bezpečnost: aplikace nikdy nezná vaše heslo. Používáme OAuth 2.0.
+                </div>
+                <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid #93c5fd", color: "#1e3a8a", fontWeight: "650" }}>
+                    Pokud účet skaut.cz zobrazí „Přístup zablokován“, klikněte u Googlu na „Požádat o přístup“. Správce skaut.cz musí následně schválit OAuth klienta SkauTreg; samotné ověření aplikace u Googlu toto organizační pravidlo nepřepíše.
                 </div>
             </div>
 

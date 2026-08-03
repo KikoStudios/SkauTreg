@@ -5,6 +5,8 @@ import { api } from "../../../../convex/_generated/api";
 import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import { useFeedback } from "@/context/FeedbackContext";
+import { getErrorDetails } from "@/lib/errors";
 
 // Components & Styles
 const Header = () => (
@@ -147,13 +149,14 @@ const radioLabelStyle = {
 };
 
 export default function PublicRSVPPage() {
+    const { showError, showSuccess } = useFeedback();
     const params = useParams();
     const accessKey = params.accessKey as string;
 
     const data = useQuery(api.public_rsvp.getByAccessKey, { accessKey });
     const submitRSVP = useMutation(api.public_rsvp.submit);
 
-    const [status, setStatus] = useState<string | null>(null);
+    const [status, setStatus] = useState<"attending" | "not_attending" | null>(null);
     const [responses, setResponses] = useState<any>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
@@ -162,8 +165,20 @@ export default function PublicRSVPPage() {
 
     useEffect(() => {
         if (data) {
-            if (data.currentStatus !== "pending") setStatus(data.currentStatus);
-            if (data.currentResponses) setResponses(data.currentResponses);
+            if (data.currentStatus === "attending" || data.currentStatus === "not_attending") {
+                setStatus(data.currentStatus);
+            }
+            if (data.currentResponses) {
+                if (typeof data.currentResponses === "string") {
+                    try {
+                        setResponses(JSON.parse(data.currentResponses));
+                    } catch {
+                        setResponses({});
+                    }
+                } else {
+                    setResponses(data.currentResponses);
+                }
+            }
         }
     }, [data]);
 
@@ -204,19 +219,27 @@ export default function PublicRSVPPage() {
         return `https://calendar.google.com/calendar/render?${params.toString()}`;
     }, [data]);
 
-    const handleSubmit = async (chosenStatus: string) => {
+    const handleSubmit = async (chosenStatus: "attending" | "not_attending") => {
         setIsSubmitting(true);
         try {
             await submitRSVP({
                 accessKey,
                 status: chosenStatus,
-                responses: JSON.stringify(responses)
+                responses,
             });
             setStatus(chosenStatus);
             setIsSuccess(true);
+            showSuccess({
+                title: "Uloženo",
+                message: "Odpověď byla uložena.",
+                duration: 2500,
+            });
         } catch (error) {
-            console.error("Failed to submit RSVP", error);
-            alert("Něco se pokazilo. Zkuste to prosím znovu.");
+            showError({
+                title: "Odpověď se nepodařilo uložit",
+                message: getErrorDetails(error) || "Zkuste to prosím znovu.",
+                icon: "error",
+            });
         } finally {
             setIsSubmitting(false);
         }
@@ -558,7 +581,6 @@ export default function PublicRSVPPage() {
                 )}
 
                 <style jsx global>{`
-                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
                 
                 @keyframes slideDown {
                     from { opacity: 0; transform: translateY(-10px); }

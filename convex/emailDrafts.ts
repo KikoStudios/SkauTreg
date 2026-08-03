@@ -1,6 +1,13 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internalQuery, mutation, query } from "./_generated/server";
+import { getMemberEmailTargets, normalizeMemberContactFields } from "./lib/memberEmails";
+import { authError, requireTripLeader, requireTroopEditor, requireTroopManager } from "./lib/auth";
+
+function validateMessage(subject?: string, body?: string) {
+    if (subject !== undefined && (subject.trim().length < 1 || subject.length > 180)) authError("VALIDATION_ERROR", "Předmět musí mít 1 až 180 znaků.");
+    if (subject !== undefined && /[\r\n]/.test(subject)) authError("VALIDATION_ERROR", "Předmět nesmí obsahovat zalomení řádku.");
+    if (body !== undefined && (body.trim().length < 1 || body.length > 20_000)) authError("VALIDATION_ERROR", "Text musí mít 1 až 20 000 znaků.");
+}
 
 // Create a new email draft for a trip
 export const create = mutation({
@@ -10,20 +17,8 @@ export const create = mutation({
         body: v.string(),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro vytvoření konceptu.");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen. Zkuste se odhlásit a přihlásit znovu.");
-
-        const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("🚗 Výprava nebyla nalezena. Zkuste načíst stránku znovu.");
+        validateMessage(args.subject, args.body);
+        const { user } = await requireTripLeader(ctx, args.tripId);
 
         const now = new Date().toISOString();
 
@@ -49,11 +44,10 @@ export const update = mutation({
         body: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro úpravu konceptu.");
-
+        validateMessage(args.subject, args.body);
         const draft = await ctx.db.get(args.id);
         if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná byl smazán.");
+        await requireTripLeader(ctx, draft.tripId);
 
         if (draft.status === "sent") {
             throw new Error("📨 Nelze upravit již odeslaný e-mail. Vytvořte nový koncept.");
@@ -73,6 +67,7 @@ export const remove = mutation({
     handler: async (ctx, args) => {
         const draft = await ctx.db.get(args.id);
         if (!draft) throw new Error("📄 Koncept nebyl nalezen. Možná již byl smazán.");
+        await requireTripLeader(ctx, draft.tripId);
 
         await ctx.db.delete(args.id);
     },
@@ -82,6 +77,7 @@ export const remove = mutation({
 export const listByTrip = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const drafts = await ctx.db
             .query("email_drafts")
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -110,6 +106,7 @@ export const getById = query({
     handler: async (ctx, args) => {
         const draft = await ctx.db.get(args.id);
         if (!draft) return null;
+        await requireTripLeader(ctx, draft.tripId);
 
         const creator = await ctx.db.get(draft.createdBy);
         const sender = draft.sentBy ? await ctx.db.get(draft.sentBy) : null;
@@ -129,17 +126,10 @@ export const markAsSent = mutation({
         recipientCount: v.number(),
     },
     handler: async (ctx, args) => {
-        const identity = await ctx.auth.getUserIdentity();
-        if (!identity) throw new Error("🔐 Musíte se přihlásit pro označení konceptu jako odeslaného.");
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("by_token", (q) =>
-                q.eq("tokenIdentifier", identity.tokenIdentifier)
-            )
-            .unique();
-
-        if (!user) throw new Error("👤 Váš uživatelský profil nebyl nalezen.");
+        const draft = await ctx.db.get(args.id);
+        if (!draft) throw new Error("Koncept nebyl nalezen.");
+        const { user, troop } = await requireTripLeader(ctx, draft.tripId);
+        await requireTroopManager(ctx, troop._id);
 
         await ctx.db.patch(args.id, {
             status: "sent",
@@ -154,8 +144,7 @@ export const markAsSent = mutation({
 export const getRecipients = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
-        const trip = await ctx.db.get(args.tripId);
-        if (!trip) throw new Error("🚗 Výprava nebyla nalezena.");
+        await requireTripLeader(ctx, args.tripId);
 
         const participations = await ctx.db
             .query("participations")
@@ -164,13 +153,22 @@ export const getRecipients = query({
 
         const recipients = await Promise.all(
             participations.map(async (p) => {
-                const member = await ctx.db.get(p.memberId);
+                const member = normalizeMemberContactFields(await ctx.db.get(p.memberId));
+                const emails = getMemberEmailTargets(member);
+                const contacts = member ? [
+                    member.email ? { name: member.name || "Člen", email: member.email, role: "member" } : null,
+                    member.guardianEmail ? { name: member.guardianName || "Rodič / zástupce", email: member.guardianEmail, role: "guardian" } : null,
+                    member.guardian2Email ? { name: member.guardian2Name || "Druhý rodič / zástupce", email: member.guardian2Email, role: "guardian" } : null,
+                ].filter(Boolean) : [];
                 return {
                     memberId: member?._id,
                     name: member?.name,
-                    email: member?.guardianEmail,
-                    accessKey: p.accessKey,
-                    hasEmail: !!member?.guardianEmail,
+                    email: emails[0],
+                    emails,
+                    contacts,
+                    hasEmail: emails.length > 0,
+                    participationStatus: p.status,
+                    responses: p.responses,
                 };
             })
         );
@@ -184,10 +182,41 @@ export const getRecipients = query({
     },
 });
 
+export const getSendConfiguration = query({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        const { troop } = await requireTripLeader(ctx, args.tripId);
+        await requireTroopManager(ctx, troop._id);
+        const provider = troop.emailProvider?.provider === "gmail" ? troop.emailProvider : undefined;
+        return {
+            provider: provider ? "gmail" as const : null,
+            senderEmail: provider?.email ?? troop.gmailOAuth?.email ?? null,
+            connected: Boolean(provider?.refreshToken || troop.gmailOAuth?.refreshToken),
+            requiresReconnect: provider?.requiresReconnect === true,
+        };
+    },
+});
+
+export const listRecipientsForSend = internalQuery({
+    args: { tripId: v.id("trips") },
+    handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
+        const trip = await ctx.db.get(args.tripId);
+        if (!trip) return [];
+        await requireTroopManager(ctx, trip.troopId);
+        const rows = await ctx.db.query("participations").withIndex("by_trip", (q) => q.eq("tripId", args.tripId)).collect();
+        return await Promise.all(rows.map(async (participation) => ({
+            participation,
+            member: normalizeMemberContactFields(await ctx.db.get(participation.memberId)),
+        })));
+    },
+});
+
 // List sent drafts across all trips in a troop
 export const listSentByTroop = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopEditor(ctx, args.troopId);
         const trips = await ctx.db
             .query("trips")
             .filter((q) => q.eq(q.field("troopId"), args.troopId))

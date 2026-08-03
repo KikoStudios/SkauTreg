@@ -85,6 +85,14 @@ export default function BaseFinder() {
     const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
     const [selectedTripForAssignment, setSelectedTripForAssignment] = useState<Trip | null>(null);
 
+    useEffect(() => {
+        setSelectedBaseId(baseIdParam ? (baseIdParam as Id<"bases">) : null);
+        const requestedTab = searchParams?.get('tab');
+        if (requestedTab === 'info' || requestedTab === 'doprava') {
+            setActiveTab(requestedTab);
+        }
+    }, [baseIdParam, searchParams]);
+
     // Auto-show panel when base is selected
     useEffect(() => {
         if (selectedBaseId) {
@@ -110,14 +118,31 @@ export default function BaseFinder() {
     );
 
     useEffect(() => {
+        setSelectedStation('');
+        setDestinationCity('');
+        setTrips([]);
+        setTripError('');
+        setDisplayedTripsCount(8);
+        setIsLoadingTrips(false);
+        setIsStationPickerOpen(false);
+        setDepartureDate('');
+        setDepartureTime('');
+        setIsArrivalTime(false);
+        setAssignedTrip(null);
+        setSelectedTripForAssignment(null);
+        setRouteToAssign(null);
+        setTripAssignMode("base");
+        setRouteAssignDirection("outbound");
+        setIsTripAssignModalOpen(false);
+        setIsRouteDirectionModalOpen(false);
+    }, [selectedBaseId]);
+
+    useEffect(() => {
         if (!selectedBaseData) return;
         if (!selectedStation && selectedBaseData.stations && selectedBaseData.stations.length > 0) {
             setSelectedStation(selectedBaseData.stations[0].name);
         }
-        if (!destinationCity && selectedBaseData.location?.city) {
-            setDestinationCity(selectedBaseData.location.city);
-        }
-    }, [selectedBaseData, selectedStation, destinationCity]);
+    }, [selectedBaseData, selectedStation]);
 
     // Transform bases for map
     const mapBases = useMemo(() => {
@@ -154,8 +179,8 @@ export default function BaseFinder() {
     };
 
     const getIdosUrlForTrip = (trip: Trip): string => {
-        const fallbackFrom = selectedStation || selectedBaseData?.stations?.[0]?.name || "";
-        const fallbackTo = destinationCity || selectedBaseData?.location?.city || selectedBaseData?.name || "";
+        const fallbackFrom = selectedStation.trim();
+        const fallbackTo = destinationCity.trim();
         if (trip.shareLink) {
             try {
                 return new URL(trip.shareLink, "https://idos.cz").toString();
@@ -176,8 +201,8 @@ export default function BaseFinder() {
     
     // Fetch trip connections with streaming
     const fetchTrips = async () => {
-        const resolvedFrom = selectedStation || selectedBaseData?.stations?.[0]?.name || "";
-        const resolvedTo = destinationCity || selectedBaseData?.location?.city || selectedBaseData?.name || "";
+        const resolvedFrom = selectedStation.trim();
+        const resolvedTo = destinationCity.trim();
         if (!resolvedFrom || !resolvedTo) {
             showError({
                 title: "⚠️ Chyby ve formuláři",
@@ -190,20 +215,31 @@ export default function BaseFinder() {
         setIsLoadingTrips(true);
         setTripError('');
         setTrips([]);
-        setDisplayedTripsCount(5);
+        setDisplayedTripsCount(8);
         
+        let receivedTrips = 0;
+
         try {
             const params = new URLSearchParams({
                 from: resolvedFrom,
                 to: resolvedTo,
-                maxPages: '2'
+                maxPages: '4'
             });
             
             if (departureDate) params.append('date', departureDate);
             if (departureTime) params.append('time', departureTime);
             if (isArrivalTime) params.append('arrival', 'true');
             
-            const response = await fetch(`/api/idos/connections?${params}`);
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 30000);
+            let response: Response;
+            try {
+                response = await fetch(`/api/idos/connections?${params}`, {
+                    signal: controller.signal,
+                });
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
             
             if (!response.ok) {
                 throw new Error('Chyba při načítání spojení. Zkuste znovu.');
@@ -217,6 +253,16 @@ export default function BaseFinder() {
             if (!reader) {
                 throw new Error('Stream not available');
             }
+
+            const pushTripLine = (rawLine: string) => {
+                const trip = JSON.parse(rawLine) as Trip & { error?: unknown; details?: unknown };
+                if (trip.error) {
+                    const details = typeof trip.details === 'string' ? trip.details.trim() : '';
+                    throw new Error(details || 'IDOS nevratil pouzitelna spojeni.');
+                }
+                receivedTrips += 1;
+                setTrips(prev => [...prev, trip]);
+            };
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -229,16 +275,16 @@ export default function BaseFinder() {
                 
                 for (const line of lines) {
                     if (line.trim()) {
-                        try {
-                            const trip = JSON.parse(line);
-                            if (!trip.error) {
-                                setTrips(prev => [...prev, trip]);
-                            }
-                        } catch (e) {
-                            console.error('Error parsing trip:', e);
-                        }
+                        pushTripLine(line);
                     }
                 }
+            }
+            if (buffer.trim()) {
+                pushTripLine(buffer);
+            }
+
+            if (receivedTrips === 0) {
+                setTripError('IDOS nenasel zadne spoje nebo odpoved selhala. Zkuste jiny cas nebo stanici.');
             }
         } catch (error) {
             console.error('Error fetching trips:', error);
@@ -611,70 +657,72 @@ export default function BaseFinder() {
                                     <div className={styles.tripPlanner}>
                                         <h3>Plánování cesty</h3>
                                         <div className={styles.tripForm}>
-                                            <div className={styles.formGroup}>
-                                                <label>Ze stanice:</label>
-                                                <div className={styles.inputWithButton}>
-                                                    <input 
-                                                        type="text"
-                                                        value={selectedStation}
-                                                        onChange={(e) => setSelectedStation(e.target.value)}
-                                                        placeholder="Vyberte stanici"
-                                                        className={styles.input}
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        className={styles.stationPickerButton}
-                                                        onClick={() => setIsStationPickerOpen(!isStationPickerOpen)}
-                                                        title="Nejbližší stanice"
-                                                    >
-                                                        #
-                                                    </button>
-                                                    {isStationPickerOpen && (
-                                                        <div className={styles.stationPickerPopup}>
-                                                            <div className={styles.stationPickerHeader}>Nejbližší stanice</div>
-                                                            {selectedBaseData.stations && selectedBaseData.stations.length > 0 ? (
-                                                                <div className={styles.stationPickerList}>
-                                                                    {selectedBaseData.stations.slice(0, 10).map((station: any) => (
-                                                                        <div 
-                                                                            key={station._id} 
-                                                                            className={`${styles.stationItem} ${selectedStation === station.name ? styles.stationItemSelected : ''}`}
-                                                                            onClick={() => {
-                                                                                setSelectedStation(station.name);
-                                                                                setIsStationPickerOpen(false);
-                                                                            }}
-                                                                        >
-                                                                            <div className={styles.stationRank}>#{station.rank}</div>
-                                                                            <div className={styles.stationInfo}>
-                                                                                <div className={styles.stationName}>{station.name}</div>
-                                                                                <div className={styles.stationDetails}>
-                                                                                    <span className={styles.stationType}>{station.type}</span>
-                                                                                    <span className={styles.stationDistance}>{station.distanceKm.toFixed(1)} km</span>
-                                                                                    {station.transportModes && station.transportModes.length > 0 && (
-                                                                                        <span className={styles.stationModes}>
-                                                                                            {station.transportModes.join(', ')}
-                                                                                        </span>
-                                                                                    )}
+                                            <div className={styles.formRow}>
+                                                <div className={styles.formGroup}>
+                                                    <label>Ze stanice:</label>
+                                                    <div className={styles.inputWithButton}>
+                                                        <input 
+                                                            type="text"
+                                                            value={selectedStation}
+                                                            onChange={(e) => setSelectedStation(e.target.value)}
+                                                            placeholder="Vyberte stanici"
+                                                            className={styles.input}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            className={styles.stationPickerButton}
+                                                            onClick={() => setIsStationPickerOpen(!isStationPickerOpen)}
+                                                            title="Nejbližší stanice"
+                                                        >
+                                                            #
+                                                        </button>
+                                                        {isStationPickerOpen && (
+                                                            <div className={styles.stationPickerPopup}>
+                                                                <div className={styles.stationPickerHeader}>Nejbližší stanice</div>
+                                                                {selectedBaseData.stations && selectedBaseData.stations.length > 0 ? (
+                                                                    <div className={styles.stationPickerList}>
+                                                                        {selectedBaseData.stations.slice(0, 10).map((station: any) => (
+                                                                            <div 
+                                                                                key={station._id} 
+                                                                                className={`${styles.stationItem} ${selectedStation === station.name ? styles.stationItemSelected : ''}`}
+                                                                                onClick={() => {
+                                                                                    setSelectedStation(station.name);
+                                                                                    setIsStationPickerOpen(false);
+                                                                                }}
+                                                                            >
+                                                                                <div className={styles.stationRank}>#{station.rank}</div>
+                                                                                <div className={styles.stationInfo}>
+                                                                                    <div className={styles.stationName}>{station.name}</div>
+                                                                                    <div className={styles.stationDetails}>
+                                                                                        <span className={styles.stationType}>{station.type}</span>
+                                                                                        <span className={styles.stationDistance}>{station.distanceKm.toFixed(1)} km</span>
+                                                                                        {station.transportModes && station.transportModes.length > 0 && (
+                                                                                            <span className={styles.stationModes}>
+                                                                                                {station.transportModes.join(', ')}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <div className={styles.stationPickerEmpty}>Žádné dopravní stanice v blízkosti</div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className={styles.stationPickerEmpty}>Žádné dopravní stanice v blízkosti</div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className={styles.formGroup}>
-                                                <label>Do města:</label>
-                                                <input 
-                                                    type="text"
-                                                    value={destinationCity}
-                                                    onChange={(e) => setDestinationCity(e.target.value)}
-                                                    placeholder="např. Praha"
-                                                    className={styles.input}
-                                                />
+                                                <div className={styles.formGroup}>
+                                                    <label>Do města:</label>
+                                                    <input 
+                                                        type="text"
+                                                        value={destinationCity}
+                                                        onChange={(e) => setDestinationCity(e.target.value)}
+                                                        placeholder="např. Praha"
+                                                        className={styles.input}
+                                                    />
+                                                </div>
                                             </div>
                                             <div className={styles.formRow}>
                                                 <div className={styles.formGroup}>
@@ -821,7 +869,7 @@ export default function BaseFinder() {
                                                 {trips.length > displayedTripsCount && (
                                                     <button
                                                         className={styles.loadMoreButton}
-                                                        onClick={() => setDisplayedTripsCount(prev => prev + 5)}
+                                                        onClick={() => setDisplayedTripsCount(prev => prev + 8)}
                                                     >
                                                         Načíst další spojení
                                                     </button>
@@ -982,7 +1030,7 @@ export default function BaseFinder() {
                                         setIsTripAssignModalOpen(true);
                                     }}
                                 >
-                                    Cesta zpÄ›t
+                                    Cesta zpět
                                 </button>
                             </div>
                         </div>

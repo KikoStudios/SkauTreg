@@ -1,178 +1,135 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from "node:crypto";
+import { auth } from "@clerk/nextjs/server";
+import { fetchMutation } from "convex/nextjs";
+import { NextRequest, NextResponse } from "next/server";
+import { api } from "../../../../../../convex/_generated/api";
+import type { Id } from "../../../../../../convex/_generated/dataModel";
+import { verifyOAuthState } from "../../../../../lib/oauthState";
 
-/**
- * Gmail OAuth Callback Handler
- * 
- * Flow:
- * 1. User clicks "Propojit Gmail"
- * 2. Redirected to Google login
- * 3. User approves
- * 4. Google redirects here with authorization code
- * 5. We exchange code for refresh token
- * 6. Store refresh token in Convex
- * 7. Redirect back to settings page
- */
+type GmailOAuthErrorCode =
+  | "OAUTH_CANCELLED"
+  | "OAUTH_ADMIN_BLOCKED"
+  | "OAUTH_INVALID_STATE"
+  | "OAUTH_SESSION_EXPIRED"
+  | "OAUTH_NOT_CONFIGURED"
+  | "OAUTH_TOKEN_EXCHANGE_FAILED"
+  | "OAUTH_SCOPE_MISSING"
+  | "OAUTH_EMAIL_UNAVAILABLE"
+  | "OAUTH_CONNECTION_FAILED";
+
+function allowedOrigin(requestOrigin: string) {
+  const origins = [
+    process.env.APP_ORIGIN,
+    process.env.STAGING_ORIGIN,
+    process.env.NODE_ENV !== "production" ? requestOrigin : undefined,
+  ].filter((value): value is string => Boolean(value)).map((value) => value.replace(/\/$/, ""));
+  return origins.includes(requestOrigin) ? requestOrigin : null;
+}
+
+function redirect(req: NextRequest, troopId: string | null, params: Record<string, string>) {
+  const origin = allowedOrigin(req.nextUrl.origin) ?? process.env.APP_ORIGIN ?? req.nextUrl.origin;
+  const url = new URL(troopId ? `/settings/${troopId}` : "/settings", origin);
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = NextResponse.redirect(url);
+  response.cookies.delete("skautreg_oauth_nonce");
+  return response;
+}
+
+function errorRedirect(req: NextRequest, troopId: string | null, code: GmailOAuthErrorCode) {
+  return redirect(req, troopId, { gmail_error_code: code });
+}
+
 export async function GET(req: NextRequest) {
-  const GMAIL_CLIENT_ID = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
-  const GMAIL_CLIENT_SECRET = process.env.GMAIL_CLIENT_SECRET;
+  if (!allowedOrigin(req.nextUrl.origin)) return errorRedirect(req, null, "OAUTH_INVALID_STATE");
 
-  const searchParams = req.nextUrl.searchParams;
-  const code = searchParams.get('code');
-  const state = searchParams.get('state');
-  const error = searchParams.get('error');
-  const redirectUri = `${req.nextUrl.origin}/api/auth/gmail/callback`;
-
-  // Parse state to get troopId and returnAction early for use in all redirects
-  let troopId = null;
+  const authData = await auth();
+  const state = req.nextUrl.searchParams.get("state");
+  let troopId: string | null = null;
   let returnAction = "";
-  if (state) {
-    try {
-      const decoded = JSON.parse(Buffer.from(state, 'base64').toString());
-      troopId = decoded.troopId;
-      returnAction = decoded.returnAction || "";
-    } catch (e) {
-      console.error('Failed to decode state:', e);
-    }
-  }
-
-  const getRedirectUrl = (errorOrParams: string) => {
-    const path = troopId ? `/settings/${troopId}` : '/settings';
-    const separator = errorOrParams ? '?' : '';
-    return `${path}${separator}${errorOrParams}`;
-  };
-
-  // Handle errors from Google
-  if (error) {
-    const errorDescription = searchParams.get('error_description') || error;
-    console.error('Gmail OAuth Error:', errorDescription);
-    return NextResponse.redirect(
-      new URL(
-        getRedirectUrl(`gmail_error=${encodeURIComponent(errorDescription)}`),
-        req.url
-      )
-    );
-  }
-
-  // Validate we got the code
-  if (!code) {
-    console.error('No authorization code received');
-    return NextResponse.redirect(
-      new URL(
-        getRedirectUrl('gmail_error=Neobdržen autorizační kód'),
-        req.url
-      )
-    );
-  }
+  let nonceHash = "";
 
   try {
-    // Use server-side client credentials
-    if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) {
-      console.error('Missing Gmail configuration');
-      return NextResponse.redirect(
-        new URL(
-          getRedirectUrl('gmail_error=Chyba konfigurace Gmail'),
-          req.url
-        )
-      );
-    }
+    if (!state) throw new Error("Missing state");
+    const decoded = verifyOAuthState(state);
+    const nonce = req.cookies.get("skautreg_oauth_nonce")?.value;
+    if (!nonce || nonce !== decoded.nonce || authData.userId !== decoded.userId) throw new Error("State mismatch");
+    troopId = decoded.troopId;
+    returnAction = decoded.returnAction;
+    nonceHash = createHash("sha256").update(decoded.nonce).digest("hex");
+  } catch {
+    return errorRedirect(req, troopId, "OAUTH_INVALID_STATE");
+  }
 
-    // Exchange authorization code for tokens
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const googleError = req.nextUrl.searchParams.get("error");
+  if (googleError) {
+    const adminBlocked = googleError === "admin_policy_enforced" || googleError === "access_not_configured";
+    return errorRedirect(req, troopId, adminBlocked ? "OAUTH_ADMIN_BLOCKED" : "OAUTH_CANCELLED");
+  }
+
+  const code = req.nextUrl.searchParams.get("code");
+  if (!code) return errorRedirect(req, troopId, "OAUTH_TOKEN_EXCHANGE_FAILED");
+
+  const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return errorRedirect(req, troopId, "OAUTH_NOT_CONFIGURED");
+
+  const token = await authData.getToken({ template: "convex" });
+  if (!authData.userId || !token || !troopId) return errorRedirect(req, troopId, "OAUTH_SESSION_EXPIRED");
+
+  try {
+    // This both rechecks owner/main-leader permission and consumes the nonce once.
+    await fetchMutation(api.gmailOAuthStates.consume, {
+      nonceHash,
+      troopId: troopId as Id<"troops">,
+    }, { token });
+
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: GMAIL_CLIENT_ID,
-        client_secret: GMAIL_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+        redirect_uri: `${req.nextUrl.origin}/api/auth/gmail/callback`,
       }).toString(),
+      signal: AbortSignal.timeout(10_000),
     });
+    if (!tokenResponse.ok) return errorRedirect(req, troopId, "OAUTH_TOKEN_EXCHANGE_FAILED");
 
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      console.error('Token exchange error:', errorData);
-      return NextResponse.redirect(
-        new URL(
-          getRedirectUrl(`gmail_error=${encodeURIComponent(
-            errorData.error_description || 'Chyba při výměně tokenu'
-          )}`),
-          req.url
-        )
-      );
+    const tokens = await tokenResponse.json() as {
+      refresh_token?: string;
+      access_token?: string;
+      scope?: string;
+    };
+    if (!tokens.refresh_token || !tokens.access_token) return errorRedirect(req, troopId, "OAUTH_TOKEN_EXCHANGE_FAILED");
+    if (!tokens.scope?.split(" ").includes("https://www.googleapis.com/auth/gmail.send")) {
+      return errorRedirect(req, troopId, "OAUTH_SCOPE_MISSING");
     }
 
-    const tokens = await tokenResponse.json();
-    const refreshToken = tokens.refresh_token;
-    const accessToken = tokens.access_token;
-
-    if (!refreshToken) {
-      console.error('No refresh token in response');
-      return NextResponse.redirect(
-        new URL(
-          getRedirectUrl('gmail_error=Neobdržen refresh token. Zkuste znovu s prompt=consent'),
-          req.url
-        )
-      );
+    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!userInfoResponse.ok) return errorRedirect(req, troopId, "OAUTH_EMAIL_UNAVAILABLE");
+    const userInfo = await userInfoResponse.json() as { email?: string; email_verified?: boolean };
+    const email = userInfo.email?.trim().toLowerCase();
+    if (!email || userInfo.email_verified !== true || !/^\S+@\S+\.\S+$/.test(email)) {
+      return errorRedirect(req, troopId, "OAUTH_EMAIL_UNAVAILABLE");
     }
 
-    // Get user email from Google
-    let email: string | undefined;
-
-    const userInfoResponse = await fetch(
-      'https://www.googleapis.com/oauth2/v3/userinfo',
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
-    );
-
-    if (userInfoResponse.ok) {
-      const userInfo = await userInfoResponse.json();
-      email = userInfo.email;
-    }
-
-    // Fallback: try to read email from id_token (JWT)
-    if (!email && tokens.id_token) {
-      try {
-        const payload = tokens.id_token.split('.')[1];
-        const padded = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(payload.length + (4 - (payload.length % 4)) % 4, '=');
-        const decoded = JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
-        email = decoded.email;
-      } catch (e) {
-        console.error('Failed to decode id_token for email', e);
-      }
-    }
-
-    if (!email) {
-      console.error('Failed to get user info');
-      return NextResponse.redirect(
-        new URL(
-          getRedirectUrl('gmail_error=Nelze načíst informace o uživateli'),
-          req.url
-        )
-      );
-    }
-
-    // Success: Redirect to settings page with connection params
-    const successParams = new URLSearchParams({
-      gmail_connected: 'true',
+    await fetchMutation(api.troops.connectEmailProvider, {
+      troopId: troopId as Id<"troops">,
+      provider: "gmail",
       email,
-      refresh_token: refreshToken,
-    });
-    if (returnAction) {
-      successParams.set('returnAction', returnAction);
-    }
+      refreshToken: tokens.refresh_token,
+    }, { token });
 
-    return NextResponse.redirect(
-      new URL(getRedirectUrl(successParams.toString()), req.url)
-    );
-  } catch (error: any) {
-    console.error('Gmail callback error:', error);
-    return NextResponse.redirect(
-      new URL(
-        getRedirectUrl(`gmail_error=${encodeURIComponent(error.message || 'Neznámá chyba')}`),
-        req.url
-      )
-    );
+    const params: Record<string, string> = { gmail_connected: "true" };
+    if (returnAction) params.returnAction = returnAction;
+    return redirect(req, troopId, params);
+  } catch {
+    console.error("Gmail OAuth callback failed", { operation: "gmail_oauth_callback" });
+    return errorRedirect(req, troopId, "OAUTH_CONNECTION_FAILED");
   }
 }

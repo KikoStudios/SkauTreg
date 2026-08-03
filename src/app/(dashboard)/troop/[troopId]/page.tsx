@@ -11,8 +11,8 @@ import { useMemo } from "react";
 
 const SpinningLogo = ({ src, alt = "Logo" }: { src?: string; alt?: string }) => (
     <div style={{
-        width: "60px",
-        height: "60px",
+        width: "48px",
+        height: "48px",
         borderRadius: "50%",
         border: "2px solid #000",
         backgroundColor: "#ccc",
@@ -112,7 +112,8 @@ export default function TroopDashboard() {
             <div style={{
                 backgroundColor: "white",
                 borderBottom: "3px solid #000",
-                padding: "1rem 2rem",
+                height: "72px",
+                padding: ".625rem 2rem",
                 margin: "0 -2rem 2rem -2rem", // Break out to full width
                 width: "calc(100% + 4rem)",
                 display: "flex",
@@ -176,8 +177,12 @@ export default function TroopDashboard() {
                 {!trips ? (
                     <div>Načítám výpravy...</div>
                 ) : trips.length === 0 ? (
-                    <div style={{ padding: "2rem", textAlign: "center", border: "3px dashed #ccc", borderRadius: "12px", fontWeight: "bold", color: "#888" }}>
-                        Zatím žádné naplánované výpravy.
+                    <div style={{ minHeight: "190px", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: "2rem", padding: "1.5rem 2rem", border: "3px dashed #bbb", borderRadius: "12px", background: "#fff9e8" }}>
+                        <img src="/illustrations/ill-no-upcoming-trips.png" alt="" aria-hidden="true" style={{ width: "140px", height: "130px", objectFit: "contain" }} />
+                        <div style={{ maxWidth: "360px" }}>
+                            <strong style={{ display: "block", marginBottom: ".35rem", color: "#242824", fontSize: "1.05rem" }}>Zatím žádné naplánované výpravy</strong>
+                            <span style={{ color: "#6f746f", fontSize: ".82rem", lineHeight: 1.5 }}>Nová výprava se po vytvoření objeví tady, připravená k dalšímu plánování.</span>
+                        </div>
                     </div>
                 ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "2rem" }}>

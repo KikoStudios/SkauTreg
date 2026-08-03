@@ -4,11 +4,12 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../../convex/_generated/api";
 import { Id } from "../../../../../../convex/_generated/dataModel";
 import { useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Button from "../../../../../components/Button";
 import Select from "../../../../../components/Select";
 import { useFeedback } from "../../../../../context/FeedbackContext";
 import styles from "./page.module.css";
+import TroopWorkspaceHeader from "../../../../../components/TroopWorkspaceHeader";
 
 const ROLE_OPTIONS = [
     { value: "main_leader", label: "Hl. vedoucí" },
@@ -116,7 +117,6 @@ function RoleBadge({ role }: { role: string }) {
 
 export default function TroopLeadersPage() {
     const params = useParams();
-    const router = useRouter();
     const troopId = params.troopId as Id<"troops">;
     const { showError, showSuccess } = useFeedback();
 
@@ -265,44 +265,13 @@ export default function TroopLeadersPage() {
 
     return (
         <div className={styles.page}>
+            <TroopWorkspaceHeader troopId={troopId} troopName={troop.name} current="leaders" title="Vedení oddílu" description="Role, oprávnění a kontaktní údaje lidí, kteří oddíl vedou." note="Role určují, kdo může spravovat členy a plánování. Osobní kontakty zobrazujte jen tehdy, když je skutečně potřebujete." />
             <div className={styles.shell}>
-                <div className={styles.headerBar}>
-                    <div className={styles.headerInfo}>
-                        <div className={styles.headerBadge}>
-                            {troop.logo ? (
-                                <img src={troop.logo} alt={troop.name} className={styles.headerLogoImage} />
-                            ) : (
-                                <span className={styles.headerLogoFallback}>{getInitials(troop.name)}</span>
-                            )}
-                        </div>
-
-                        <div className={styles.headerCopy}>
-                            <div className={styles.kicker}>Vedení oddílu</div>
-                            <h1 className={styles.title}>{troop.name}</h1>
-                        </div>
-                    </div>
-
-                    <div className={styles.headerActions}>
-                        {canManageLeaders && (
-                            <button
-                                type="button"
-                                className={styles.plusButton}
-                                onClick={() => setIsAddModalOpen(true)}
-                                aria-label="Přidat člena vedení"
-                            >
-                                +
-                            </button>
-                        )}
-                        <Button variant="outline" onClick={() => router.push(`/troop/${troopId}`)}>
-                            Zpět na oddíl
-                        </Button>
-                    </div>
-                </div>
-
                 <div className={styles.contentGrid}>
                     <section className={styles.sectionCard}>
                         <div className={styles.sectionHeader}>
-                            <h2 className={styles.sectionTitle}>Aktuální tým</h2>
+                            <div><h2 className={styles.sectionTitle}>Členové vedení</h2><span className={styles.memberCount}>{leaders.length} {leaders.length === 1 ? "člen" : "členové"}</span></div>
+                            {canManageLeaders && <button type="button" className={styles.plusButton} onClick={() => setIsAddModalOpen(true)}>+ Přidat</button>}
                         </div>
 
                         <div className={styles.listWrap}>
@@ -340,7 +309,7 @@ export default function TroopLeadersPage() {
                                                                 variant="outline"
                                                                 onClick={() => setSelectedLeaderForInfo(leader)}
                                                             >
-                                                                Info
+                                                                Detail
                                                             </Button>
                                                             <select
                                                                 className={styles.roleSelect}
@@ -371,7 +340,7 @@ export default function TroopLeadersPage() {
                                                     variant="outline"
                                                     onClick={() => setSelectedLeaderForInfo(leader)}
                                                 >
-                                                    Info
+                                                    Detail
                                                 </Button>
                                             )}
                                         </div>

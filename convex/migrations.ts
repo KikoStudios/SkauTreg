@@ -1,6 +1,6 @@
-import { mutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 
-export const migrateTroops = mutation({
+export const migrateTroops = internalMutation({
     args: {},
     handler: async (ctx) => {
         const troops = await ctx.db.query("troops").collect();
@@ -36,7 +36,7 @@ export const migrateTroops = mutation({
     },
 });
 
-export const removeIntegrationFields = mutation({
+export const removeIntegrationFields = internalMutation({
     args: {},
     handler: async (ctx) => {
         const troops = await ctx.db.query("troops").collect();

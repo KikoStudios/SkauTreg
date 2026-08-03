@@ -61,6 +61,16 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         setSuccessConfig(null);
     }, []);
 
+    React.useEffect(() => {
+        const handleSuccessEvent = (event: Event) => {
+            const customEvent = event as CustomEvent<SuccessModalConfig>;
+            setSuccessConfig(customEvent.detail);
+        };
+
+        window.addEventListener("showSuccess", handleSuccessEvent);
+        return () => window.removeEventListener("showSuccess", handleSuccessEvent);
+    }, []);
+
     return (
         <FeedbackContext.Provider value={{
             showError,

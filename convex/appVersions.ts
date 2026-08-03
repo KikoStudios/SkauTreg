@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { requireCurrentUser, requireDataAdmin } from "./lib/auth";
 
 /**
  * Get the current active version of the app
@@ -124,15 +125,7 @@ export const markVersionAsSeen = mutation({
     version: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const user = await requireCurrentUser(ctx);
 
     const existing = await ctx.db
       .query("user_version_tracking")
@@ -165,15 +158,7 @@ export const dismissVersion = mutation({
     version: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const user = await requireCurrentUser(ctx);
 
     const existing = await ctx.db
       .query("user_version_tracking")
@@ -218,15 +203,7 @@ export const createVersion = mutation({
     setAsActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    const user = await requireDataAdmin(ctx);
 
     // If setting as active, deactivate all other versions
     if (args.setAsActive) {
@@ -262,8 +239,7 @@ export const setActiveVersion = mutation({
     versionId: v.id("app_versions"),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    await requireDataAdmin(ctx);
 
     // Deactivate all versions
     const allVersions = await ctx.db.query("app_versions").collect();
@@ -290,15 +266,7 @@ export const syncVersionFromSupernotes = mutation({
     setAsActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
-      .first();
-
-    if (!user) throw new Error("User not found");
+    await requireDataAdmin(ctx);
 
     // This will be called from the client after fetching from Supernotes
     // For now, just create a placeholder that will be updated with the actual content

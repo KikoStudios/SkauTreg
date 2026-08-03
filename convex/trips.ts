@@ -1,5 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { normalizeLeaderRole, normalizeMemberContactFields } from "./lib/memberEmails";
+import { authError, requireTripEditor, requireTripLeader, requireTripViewer, requireTroopEditor, requireTroopViewer } from "./lib/auth";
+import { generateSecureToken } from "./lib/tokens";
 
 function parseDateParts(value?: string | null) {
     if (!value) return null;
@@ -67,6 +70,7 @@ export const create = mutation({
         }))),
     },
     handler: async (ctx, args) => {
+        await requireTroopEditor(ctx, args.troopId);
         // 1. Create the Trip
         const tripId = await ctx.db.insert("trips", {
             troopId: args.troopId,
@@ -88,12 +92,13 @@ export const create = mutation({
             .collect();
 
         for (const member of members) {
-            const accessKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const accessKey = generateSecureToken();
             await ctx.db.insert("participations", {
                 tripId,
                 memberId: member._id,
                 status: "pending",
                 accessKey: accessKey,
+                secureAccessKey: accessKey,
                 responses: {},
             });
         }
@@ -123,6 +128,18 @@ export const update = mutation({
         }))),
     },
     handler: async (ctx, args) => {
+        const authorization = await requireTripEditor(ctx, args.id);
+        if (
+            authorization.role === "rover" &&
+            (
+                args.lastCancellationDate !== undefined ||
+                args.lateCancellationMessage !== undefined ||
+                args.formType !== undefined ||
+                args.customFields !== undefined
+            )
+        ) {
+            authError("FORBIDDEN", "Rover může upravovat pouze logistické údaje přiřazené výpravy.");
+        }
         const { id, ...updates } = args;
         await ctx.db.patch(id, updates);
     },
@@ -131,6 +148,7 @@ export const update = mutation({
 export const remove = mutation({
     args: { id: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.id);
         // Delete participations first
         const participations = await ctx.db
             .query("participations")
@@ -148,6 +166,7 @@ export const remove = mutation({
 export const getDashboard = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        const authorization = await requireTripViewer(ctx, args.tripId);
         const trip = await ctx.db.get(args.tripId);
         if (!trip) return null;
 
@@ -156,15 +175,12 @@ export const getDashboard = query({
             .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
             .collect();
 
-        const participantsWithDetails = await Promise.all(
-            participations.map(async (p) => {
-                const member = await ctx.db.get(p.memberId);
-                return {
-                    ...p,
-                    member,
-                };
-            })
-        );
+        const attendanceSummary = {
+            total: participations.length,
+            attending: participations.filter((row) => row.status === "attending").length,
+            notAttending: participations.filter((row) => row.status === "not_attending").length,
+            pending: participations.filter((row) => row.status !== "attending" && row.status !== "not_attending").length,
+        };
 
         // Fetch assigned base if exists
         let base = null;
@@ -196,8 +212,10 @@ export const getDashboard = query({
                         const user = await ctx.db.get(record.userId);
                         if (!user) return null;
                         return {
-                            ...user,
-                            role: record.role,
+                            _id: user._id,
+                            name: user.name,
+                            image: user.image,
+                            role: normalizeLeaderRole(record.role),
                             isOwner: user._id === troop.ownerId,
                         };
                     })
@@ -207,7 +225,7 @@ export const getDashboard = query({
                 const ownerInList = validLeaders.find((l) => l?._id === troop.ownerId);
 
                 if (!ownerInList && owner) {
-                    return [{ ...owner, role: "owner", isOwner: true }, ...validLeaders];
+                    return [{ _id: owner._id, name: owner.name, image: owner.image, role: "owner", isOwner: true }, ...validLeaders];
                 }
 
                 return validLeaders;
@@ -222,21 +240,23 @@ export const getDashboard = query({
         const tripStaffWithUsers = await Promise.all(
             tripStaff.map(async (row) => {
                 const user = row.userId ? await ctx.db.get(row.userId) : null;
-                return { ...row, user };
+                return { ...row, user: user ? { _id: user._id, name: user.name, image: user.image } : null };
             })
         );
 
-        const leaderPresets = await ctx.db
+        const leaderPresets = authorization.role === "rover" ? [] : await ctx.db
             .query("leader_presets")
             .withIndex("by_troop", (q) => q.eq("troopId", trip.troopId))
             .collect();
 
         return {
             trip,
-            participants: participantsWithDetails,
+            participants: [],
+            attendanceSummary,
             base,
             leaders,
-            currentUser,
+            currentUser: currentUser ? { _id: currentUser._id, name: currentUser.name, image: currentUser.image } : null,
+            role: authorization.role,
             tripStaff: tripStaffWithUsers,
             leaderPresets,
         };
@@ -246,6 +266,7 @@ export const getDashboard = query({
 export const getAttendanceCounts = query({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripViewer(ctx, args.tripId);
         const trip = await ctx.db.get(args.tripId);
         const refDate = trip?.startDate ?? null;
         const studentBenefits = new Set([
@@ -268,8 +289,8 @@ export const getAttendanceCounts = query({
         const attending = participations.filter((p) => p.status === "attending");
         let kidCount = 0;
         let adultCount = 0;
-        let studentCount = 0;
-        let unknownCount = 0;
+        const studentCount = 0;
+        const unknownCount = 0;
 
         for (const p of attending) {
             const member = await ctx.db.get(p.memberId);
@@ -325,6 +346,7 @@ export const getAttendanceCounts = query({
 export const ensureParticipations = mutation({
     args: { tripId: v.id("trips") },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         const trip = await ctx.db.get(args.tripId);
         if (!trip) throw new Error("🚗 Výprava nebyla nalezena. Zkuste načíst stránku znovu.");
 
@@ -344,12 +366,13 @@ export const ensureParticipations = mutation({
         for (const member of members) {
             if (existingMemberIds.has(member._id)) continue;
 
-            const accessKey = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const accessKey = generateSecureToken();
             await ctx.db.insert("participations", {
                 tripId: args.tripId,
                 memberId: member._id,
                 status: "pending",
                 accessKey,
+                secureAccessKey: accessKey,
                 responses: {},
             });
             createdCount++;
@@ -362,6 +385,7 @@ export const ensureParticipations = mutation({
 export const list = query({
     args: { troopId: v.id("troops") },
     handler: async (ctx, args) => {
+        await requireTroopViewer(ctx, args.troopId);
         const trips = await ctx.db
             .query("trips")
             .withIndex("by_troop", (q) => q.eq("troopId", args.troopId))
@@ -454,6 +478,7 @@ export const assignBase = mutation({
         baseId: v.id("bases"),
     },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         await ctx.db.patch(args.tripId, { baseId: args.baseId });
     },
 });
@@ -463,6 +488,7 @@ export const unassignBase = mutation({
         tripId: v.id("trips"),
     },
     handler: async (ctx, args) => {
+        await requireTripLeader(ctx, args.tripId);
         await ctx.db.patch(args.tripId, { baseId: undefined });
     },
 });

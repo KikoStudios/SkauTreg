@@ -1,9 +1,11 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { requireTripLeader, requireTripViewer } from "./lib/auth";
 
 export const listByTrip = query({
   args: { tripId: v.id("trips") },
   handler: async (ctx, args) => {
+    await requireTripViewer(ctx, args.tripId);
     const routes = await ctx.db
       .query("transport_routes")
       .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -16,6 +18,7 @@ export const listByTrip = query({
 export const getLatestByTrip = query({
   args: { tripId: v.id("trips") },
   handler: async (ctx, args) => {
+    await requireTripViewer(ctx, args.tripId);
     const routes = await ctx.db
       .query("transport_routes")
       .withIndex("by_trip", (q) => q.eq("tripId", args.tripId))
@@ -52,6 +55,7 @@ export const addFromIdos = mutation({
     idosTrip: v.any(),
   },
   handler: async (ctx, args) => {
+    await requireTripLeader(ctx, args.tripId);
     const now = new Date().toISOString();
     const idosTrip = args.idosTrip as Record<string, unknown>;
     const departureTime = typeof idosTrip["departureTime"] === "string" ? (idosTrip["departureTime"] as string) : undefined;
@@ -86,6 +90,9 @@ export const addFromIdos = mutation({
 export const remove = mutation({
   args: { routeId: v.id("transport_routes") },
   handler: async (ctx, args) => {
+    const route = await ctx.db.get(args.routeId);
+    if (!route) return;
+    await requireTripLeader(ctx, route.tripId);
     const now = new Date().toISOString();
 
     const tickets = await ctx.db

@@ -38,6 +38,10 @@ export default defineSchema({
         accentColor: v.optional(v.string()), // Hex code (pastel preferred)
         contactEmail: v.optional(v.string()),
         infoEmail: v.optional(v.string()),
+        publicDirectoryOptIn: v.optional(v.boolean()),
+        archivedAt: v.optional(v.string()),
+        archivedBy: v.optional(v.id("users")),
+        archiveReason: v.optional(v.string()),
         
         // Email provider integration (OAuth or SMTP)
         emailProvider: v.optional(v.object({
@@ -59,6 +63,7 @@ export default defineSchema({
             // Metadata
             connectedAt: v.string(), // ISO timestamp
             connectedBy: v.id("users"), // User who connected
+            requiresReconnect: v.optional(v.boolean()),
         })),
         
         // Legacy Gmail OAuth (deprecated, keeping for backward compatibility)
@@ -127,7 +132,44 @@ export default defineSchema({
             placeholder: v.optional(v.string()),
             options: v.optional(v.array(v.string()))
         }))),
+        financeSettings: v.optional(v.object({
+            currency: v.string(), // "CZK"
+            manualPricePerParticipant: v.optional(v.number()),
+            paymentDueDate: v.optional(v.string()),
+            useManualParticipantPrice: v.optional(v.boolean()),
+            notes: v.optional(v.string()),
+        })),
     }).index("by_troop", ["troopId"]),
+
+    trip_budget_items: defineTable({
+        tripId: v.id("trips"),
+        category: v.string(),
+        subcategory: v.string(),
+        name: v.string(),
+        plannedAmount: v.optional(v.number()),
+        actualAmount: v.optional(v.number()),
+        quantity: v.optional(v.number()),
+        unitLabel: v.optional(v.string()),
+        note: v.optional(v.string()),
+        sortOrder: v.number(),
+        createdAt: v.string(),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_category", ["tripId", "category"]),
+
+    trip_member_payments: defineTable({
+        tripId: v.id("trips"),
+        memberId: v.id("members"),
+        status: v.string(), // "unpaid" | "partial" | "paid" | "excused"
+        expectedAmount: v.optional(v.number()),
+        paidAmount: v.optional(v.number()),
+        paidAt: v.optional(v.string()),
+        note: v.optional(v.string()),
+        updatedAt: v.string(),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_trip_member", ["tripId", "memberId"]),
 
     transport_routes: defineTable({
         tripId: v.id("trips"),
@@ -159,6 +201,7 @@ export default defineSchema({
         shareEnabled: v.optional(v.boolean()),
         shareSlug: v.optional(v.string()),
         shareUpdatedAt: v.optional(v.string()),
+        shareExpiresAt: v.optional(v.string()),
         priceOverview: v.optional(v.object({
             // v2 (preferred): unit prices + counts
             kidUnitCzk: v.optional(v.number()),
@@ -179,17 +222,72 @@ export default defineSchema({
         .index("by_route", ["routeId"])
         .index("by_share_slug", ["shareSlug"]),
 
+    trip_ticket_shares: defineTable({
+        tripId: v.id("trips"),
+        shareSlug: v.string(),
+        enabled: v.boolean(),
+        selectedTicketIds: v.array(v.id("transport_tickets")),
+        expiresAt: v.string(),
+        createdAt: v.string(),
+        createdBy: v.id("users"),
+        updatedAt: v.string(),
+        updatedBy: v.id("users"),
+        revokedAt: v.optional(v.string()),
+    })
+        .index("by_trip", ["tripId"])
+        .index("by_share_slug", ["shareSlug"]),
+
     participations: defineTable({
         tripId: v.id("trips"),
         memberId: v.id("members"),
         status: v.string(), // "attending", "not_attending", "pending"
         accessKey: v.string(), // unique random key for public link
+        secureAccessKey: v.optional(v.string()),
+        legacyAccessExpiresAt: v.optional(v.string()),
         responses: v.optional(v.any()), // flexible JSON for form answers
         lateCancellation: v.optional(v.boolean()),
         lateCancellationAt: v.optional(v.string()),
     })
         .index("by_trip", ["tripId"])
-        .index("by_access_key", ["accessKey"]),
+        .index("by_access_key", ["accessKey"])
+        .index("by_secure_access_key", ["secureAccessKey"]),
+
+    gmail_oauth_states: defineTable({
+        nonceHash: v.string(),
+        troopId: v.id("troops"),
+        userId: v.id("users"),
+        expiresAt: v.number(),
+        consumedAt: v.optional(v.string()),
+        createdAt: v.string(),
+    }).index("by_nonce_hash", ["nonceHash"]),
+
+    email_send_attempts: defineTable({
+        draftId: v.id("email_drafts"),
+        tripId: v.id("trips"),
+        requestedBy: v.id("users"),
+        retryOfAttemptId: v.optional(v.id("email_send_attempts")),
+        idempotencyKey: v.string(),
+        status: v.string(),
+        recipientCount: v.number(),
+        sentCount: v.number(),
+        failedCount: v.number(),
+        createdAt: v.string(),
+        completedAt: v.optional(v.string()),
+    })
+        .index("by_draft", ["draftId"])
+        .index("by_idempotency_key", ["idempotencyKey"]),
+
+    email_deliveries: defineTable({
+        attemptId: v.id("email_send_attempts"),
+        memberId: v.id("members"),
+        contactKind: v.string(),
+        status: v.string(),
+        providerMessageId: v.optional(v.string()),
+        errorCode: v.optional(v.string()),
+        sentAt: v.optional(v.string()),
+    })
+        .index("by_attempt", ["attemptId"])
+        .index("by_attempt_member_contact", ["attemptId", "memberId", "contactKind"]),
 
     trip_staff: defineTable({
         tripId: v.id("trips"),
@@ -467,6 +565,7 @@ export default defineSchema({
         updatedAt: v.string(), // ISO timestamp
         testStatus: v.optional(v.string()), // "pending", "success", "failed"
         testError: v.optional(v.string()), // Error message if test failed
+        requiresReconnect: v.optional(v.boolean()),
     })
         .index("by_troop", ["troopId"])
         .index("by_service", ["troopId", "serviceType"]),
@@ -557,5 +656,32 @@ export default defineSchema({
         dismissedVersions: v.optional(v.array(v.string())), // Versions user explicitly dismissed
     })
         .index("by_user", ["userId"]),
+
+    data_requests: defineTable({
+        userId: v.id("users"),
+        requestType: v.literal("deletion"),
+        status: v.union(
+            v.literal("requested"),
+            v.literal("in_review"),
+            v.literal("blocked"),
+            v.literal("approved"),
+            v.literal("completed"),
+            v.literal("cancelled"),
+            v.literal("rejected")
+        ),
+        requestedAt: v.string(),
+        updatedAt: v.string(),
+        completedAt: v.optional(v.string()),
+        ownershipBlockers: v.optional(v.array(v.id("troops"))),
+        resolutionNote: v.optional(v.string()),
+    })
+        .index("by_user", ["userId"])
+        .index("by_status", ["status"]),
+
+    rate_limits: defineTable({
+        key: v.string(),
+        windowStartedAt: v.number(),
+        count: v.number(),
+    }).index("by_key", ["key"]),
 
 });

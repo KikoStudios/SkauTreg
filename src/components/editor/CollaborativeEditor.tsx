@@ -367,7 +367,7 @@ export default function CollaborativeEditor({
                             className={`${styles.toolbarButton} ${editor.isActive("blockquote") ? styles.isActive : ""}`}
                             title="Quote"
                         >
-                            "
+                            &quot;
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleCode().run()}

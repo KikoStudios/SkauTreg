@@ -7,7 +7,7 @@ import { useState } from "react";
 import styles from "./ErrorModal.module.css";
 
 export default function ErrorModal() {
-    const { errorConfig, closeError } = useFeedback();
+    const { errorConfig, closeError, showSuccess } = useFeedback();
     const reportError = useMutation(api.feedback.createErrorReport);
     const [isReporting, setIsReporting] = useState(false);
     const [reportNotes, setReportNotes] = useState("");
@@ -24,17 +24,11 @@ export default function ErrorModal() {
                 userNotes: reportNotes,
             });
             closeError();
-            // Show success toast
-            const event = new CustomEvent("showSuccess", {
-                detail: {
-                    title: "✅ Přijato",
-                    message: "Díky! Poslali jsme tvůj report našemu týmu.",
-                    duration: 3000,
-                }
+            showSuccess({
+                title: "Přijato",
+                message: "Díky. Report jsme poslali týmu.",
+                duration: 3000,
             });
-            window.dispatchEvent(event);
-        } catch (err) {
-            console.error("Failed to report error:", err);
         } finally {
             setIsReporting(false);
         }
@@ -64,7 +58,7 @@ export default function ErrorModal() {
                         </h2>
                     </div>
                     <button className={styles.closeBtn} onClick={closeError}>
-                        ✕
+                        ×
                     </button>
                 </div>
 
@@ -86,7 +80,7 @@ export default function ErrorModal() {
                             <textarea
                                 value={reportNotes}
                                 onChange={(e) => setReportNotes(e.target.value)}
-                                placeholder="Popište co se stalo (např. co jste dělali když se chyba objevila)..."
+                                placeholder="Popište, co se stalo."
                                 className={styles.textarea}
                                 rows={3}
                             />
@@ -115,16 +109,18 @@ export default function ErrorModal() {
                                 onClick={handleReport}
                                 disabled={isReporting}
                             >
-                                {isReporting ? "Odesílám..." : "🐛 Poslat na kontrolu"}
+                                {isReporting ? "Odesílám..." : "Poslat report"}
                             </button>
                         )}
 
-                        <button
-                            className={`${styles.button} ${styles.secondary}`}
-                            onClick={closeError}
-                        >
-                            Zavřít
-                        </button>
+                        {!errorConfig.buttons?.length && (
+                            <button
+                                className={`${styles.button} ${styles.secondary}`}
+                                onClick={closeError}
+                            >
+                                Zavřít
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
