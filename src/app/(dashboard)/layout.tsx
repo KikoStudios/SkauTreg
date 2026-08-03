@@ -3,7 +3,7 @@
 import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
@@ -37,12 +37,15 @@ function DashboardLayoutInner({
     const pathname = usePathname();
     const isTripWorkspace = /^\/trips\/[^/]+/.test(pathname || "");
     const previousTripWorkspace = useRef(isTripWorkspace);
+    const previousLoadingScreen = useRef(isLoading || !isClerkLoaded);
+    const transitionTimeout = useRef<number | null>(null);
     const [modeTransition, setModeTransition] = useState<"trip" | "dashboard" | null>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
 
     const convexAuthReady = useMemo(() => !isLoading && isAuthenticated, [isLoading, isAuthenticated]);
+    const isAppLoading = isLoading || !isClerkLoaded;
 
     useEffect(() => {
         if (isClerkLoaded && !isSignedIn) {
@@ -50,20 +53,37 @@ function DashboardLayoutInner({
         }
     }, [isClerkLoaded, isSignedIn, router]);
 
-    useEffect(() => {
-        if (previousTripWorkspace.current === isTripWorkspace) return;
-
+    useLayoutEffect(() => {
+        const modeChanged = previousTripWorkspace.current !== isTripWorkspace;
+        const loadingFinished = previousLoadingScreen.current && !isAppLoading && Boolean(isSignedIn) && convexAuthReady;
         previousTripWorkspace.current = isTripWorkspace;
-        setModeTransition(isTripWorkspace ? "trip" : "dashboard");
-        const timeout = window.setTimeout(() => setModeTransition(null), 720);
-        return () => window.clearTimeout(timeout);
-    }, [isTripWorkspace]);
+        previousLoadingScreen.current = isAppLoading;
 
-    if (isLoading) {
+        if (isAppLoading || (!modeChanged && !loadingFinished)) return;
+
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        setModeTransition(isTripWorkspace ? "trip" : "dashboard");
+        transitionTimeout.current = window.setTimeout(() => {
+            setModeTransition(null);
+            transitionTimeout.current = null;
+        }, 720);
+    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace]);
+
+    useEffect(() => () => {
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+    }, []);
+
+    if (isAppLoading) {
         return (
-            <div className={styles.statusScreen} role="status">
-                <div className={styles.loadingMark} />
-                <strong>Načítám váš pracovní prostor…</strong>
+            <div className={styles.loadingScreen} role="status" aria-live="polite">
+                <div className={styles.loadingStripes} aria-hidden="true"><span /><span /><span /></div>
+                <section className={styles.loadingCard}>
+                    <img src="/Logo-light.svg" alt="SkauTreg" />
+                    <span className={styles.loadingEyebrow}>Bezpečný pracovní prostor</span>
+                    <strong>Připravuji SkauTreg</strong>
+                    <p>Ověřuji přihlášení a připojuji vaše data…</p>
+                    <div className={styles.loadingTrack} aria-hidden="true"><span /></div>
+                </section>
             </div>
         );
     }
