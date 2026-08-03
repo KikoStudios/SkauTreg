@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import {
@@ -94,6 +94,11 @@ export default function Home() {
     api.members.list,
     troops && troops.length > 0 ? { troopId: troops[0]._id } : "skip",
   );
+  const dashboardDataReady = troops !== undefined && (troops.length === 0 || (trips !== undefined && members !== undefined));
+
+  useEffect(() => {
+    if (dashboardDataReady) window.dispatchEvent(new Event("skautreg:dashboard-ready"));
+  }, [dashboardDataReady]);
 
   const filteredTopics = helpTopics.filter(
     (topic) =>

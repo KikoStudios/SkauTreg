@@ -39,6 +39,7 @@ function DashboardLayoutInner({
     const previousTripWorkspace = useRef(isTripWorkspace);
     const previousLoadingScreen = useRef(isLoading || !isClerkLoaded);
     const transitionTimeout = useRef<number | null>(null);
+    const dashboardReadyListener = useRef<(() => void) | null>(null);
     const [modeTransition, setModeTransition] = useState<{ mode: "trip" | "dashboard"; phase: "covering" | "revealing" } | null>(null);
     const [showLoadingScreen, setShowLoadingScreen] = useState(isLoading || !isClerkLoaded);
 
@@ -75,11 +76,26 @@ function DashboardLayoutInner({
             setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "covering" });
             transitionTimeout.current = window.setTimeout(() => {
                 setShowLoadingScreen(false);
-                setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
-                transitionTimeout.current = window.setTimeout(() => {
-                    setModeTransition(null);
-                    transitionTimeout.current = null;
-                }, 760);
+                const revealApplication = () => {
+                    if (dashboardReadyListener.current) {
+                        window.removeEventListener("skautreg:dashboard-ready", dashboardReadyListener.current);
+                        dashboardReadyListener.current = null;
+                    }
+                    if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+                    setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
+                    transitionTimeout.current = window.setTimeout(() => {
+                        setModeTransition(null);
+                        transitionTimeout.current = null;
+                    }, 760);
+                };
+
+                if (pathname === "/" || pathname === "/home") {
+                    dashboardReadyListener.current = revealApplication;
+                    window.addEventListener("skautreg:dashboard-ready", revealApplication, { once: true });
+                    transitionTimeout.current = window.setTimeout(revealApplication, 4000);
+                } else {
+                    transitionTimeout.current = window.setTimeout(revealApplication, 350);
+                }
             }, 590);
             return;
         }
@@ -92,10 +108,11 @@ function DashboardLayoutInner({
             setModeTransition(null);
             transitionTimeout.current = null;
         }, 760);
-    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace, showLoadingScreen]);
+    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace, pathname, showLoadingScreen]);
 
     useEffect(() => () => {
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        if (dashboardReadyListener.current) window.removeEventListener("skautreg:dashboard-ready", dashboardReadyListener.current);
     }, []);
 
     const handleModeNavigation = (event: ReactMouseEvent<HTMLDivElement>) => {
