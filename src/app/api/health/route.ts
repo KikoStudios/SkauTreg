@@ -21,7 +21,11 @@ export async function GET() {
   return NextResponse.json(
     {
       status: convex === "ok" ? "ok" : "degraded",
-      release: process.env.SENTRY_RELEASE || process.env.COMMIT_REF || "development",
+      release:
+        process.env.SENTRY_RELEASE ||
+        process.env.VERCEL_GIT_COMMIT_SHA ||
+        process.env.COMMIT_REF ||
+        "development",
       checks: {
         app: "ok",
         convex,
