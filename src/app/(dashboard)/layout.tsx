@@ -3,7 +3,7 @@
 import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
@@ -36,6 +36,8 @@ function DashboardLayoutInner({
     const router = useRouter();
     const pathname = usePathname();
     const isTripWorkspace = /^\/trips\/[^/]+/.test(pathname || "");
+    const previousTripWorkspace = useRef(isTripWorkspace);
+    const [modeTransition, setModeTransition] = useState<"trip" | "dashboard" | null>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
@@ -47,6 +49,15 @@ function DashboardLayoutInner({
             router.replace("/sign-in");
         }
     }, [isClerkLoaded, isSignedIn, router]);
+
+    useEffect(() => {
+        if (previousTripWorkspace.current === isTripWorkspace) return;
+
+        previousTripWorkspace.current = isTripWorkspace;
+        setModeTransition(isTripWorkspace ? "trip" : "dashboard");
+        const timeout = window.setTimeout(() => setModeTransition(null), 720);
+        return () => window.clearTimeout(timeout);
+    }, [isTripWorkspace]);
 
     if (isLoading) {
         return (
@@ -102,6 +113,13 @@ function DashboardLayoutInner({
     return (
         <ProfileModalProvider>
             <div className={styles.container}>
+                {modeTransition && (
+                    <div className={styles.modeTransition} data-mode={modeTransition} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                    </div>
+                )}
                 {!isTripWorkspace && <Sidebar
                     isOpen={isSidebarOpen} 
                     onClose={() => setIsSidebarOpen(false)}
