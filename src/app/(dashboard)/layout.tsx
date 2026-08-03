@@ -40,6 +40,7 @@ function DashboardLayoutInner({
     const previousLoadingScreen = useRef(isLoading || !isClerkLoaded);
     const transitionTimeout = useRef<number | null>(null);
     const [modeTransition, setModeTransition] = useState<{ mode: "trip" | "dashboard"; phase: "covering" | "revealing" } | null>(null);
+    const [showLoadingScreen, setShowLoadingScreen] = useState(isLoading || !isClerkLoaded);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
@@ -55,11 +56,35 @@ function DashboardLayoutInner({
 
     useLayoutEffect(() => {
         const modeChanged = previousTripWorkspace.current !== isTripWorkspace;
-        const loadingFinished = previousLoadingScreen.current && !isAppLoading && Boolean(isSignedIn) && convexAuthReady;
+        const loadingStopped = previousLoadingScreen.current && !isAppLoading;
         previousTripWorkspace.current = isTripWorkspace;
         previousLoadingScreen.current = isAppLoading;
 
-        if (isAppLoading || (!modeChanged && !loadingFinished)) return;
+        if (isAppLoading) {
+            if (!showLoadingScreen) setShowLoadingScreen(true);
+            return;
+        }
+
+        if (loadingStopped) {
+            if (!isSignedIn || !convexAuthReady) {
+                setShowLoadingScreen(false);
+                return;
+            }
+
+            if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+            setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "covering" });
+            transitionTimeout.current = window.setTimeout(() => {
+                setShowLoadingScreen(false);
+                setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
+                transitionTimeout.current = window.setTimeout(() => {
+                    setModeTransition(null);
+                    transitionTimeout.current = null;
+                }, 760);
+            }, 590);
+            return;
+        }
+
+        if (!modeChanged) return;
 
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
         setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
@@ -67,7 +92,7 @@ function DashboardLayoutInner({
             setModeTransition(null);
             transitionTimeout.current = null;
         }, 760);
-    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace]);
+    }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace, showLoadingScreen]);
 
     useEffect(() => () => {
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
@@ -97,7 +122,7 @@ function DashboardLayoutInner({
         }, 590);
     };
 
-    if (isAppLoading) {
+    if (isAppLoading || showLoadingScreen) {
         return (
             <div className={styles.loadingScreen} role="status" aria-live="polite">
                 <div className={styles.loadingContent}>
@@ -105,6 +130,13 @@ function DashboardLayoutInner({
                     <div className={styles.loadingTrack} aria-hidden="true"><span /></div>
                     <span className={styles.loadingLabel}>Načítám…</span>
                 </div>
+                {modeTransition && (
+                    <div className={styles.modeTransition} data-mode={modeTransition.mode} data-phase={modeTransition.phase} aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                    </div>
+                )}
             </div>
         );
     }
