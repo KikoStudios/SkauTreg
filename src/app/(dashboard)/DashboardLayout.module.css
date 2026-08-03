@@ -13,7 +13,7 @@
   inset: 0;
   z-index: 200;
   overflow: hidden;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .modeTransition span {
@@ -22,20 +22,31 @@
   width: 136vw;
   height: 36%;
   border-block: 1px solid rgb(0 0 0 / 18%);
-  transform: translate3d(0, 0, 0) skewX(-8deg);
   will-change: transform;
-  animation: modeStripeReveal 620ms cubic-bezier(.72, 0, .22, 1) both;
 }
 
-.modeTransition span:nth-child(1) { top: -3%; animation-delay: 0ms; }
-.modeTransition span:nth-child(2) { top: 32%; animation-delay: 45ms; }
-.modeTransition span:nth-child(3) { top: 67%; animation-delay: 90ms; }
+.modeTransition span:nth-child(1) { top: -3%; }
+.modeTransition span:nth-child(2) { top: 32%; }
+.modeTransition span:nth-child(3) { top: 67%; }
 .modeTransition[data-mode="trip"] span:nth-child(1) { background: #101112; }
 .modeTransition[data-mode="trip"] span:nth-child(2) { background: #c9b45c; }
 .modeTransition[data-mode="trip"] span:nth-child(3) { background: #e8d99a; }
 .modeTransition[data-mode="dashboard"] span:nth-child(1) { background: #101112; }
 .modeTransition[data-mode="dashboard"] span:nth-child(2) { background: #315f3f; }
 .modeTransition[data-mode="dashboard"] span:nth-child(3) { background: var(--color-primary); }
+.modeTransition[data-phase="covering"] span { transform: translate3d(-115%, 0, 0) skewX(-8deg); animation: modeStripeCover 500ms cubic-bezier(.72, 0, .22, 1) both; }
+.modeTransition[data-phase="covering"] span:nth-child(1) { animation-delay: 0ms; }
+.modeTransition[data-phase="covering"] span:nth-child(2) { animation-delay: 45ms; }
+.modeTransition[data-phase="covering"] span:nth-child(3) { animation-delay: 90ms; }
+.modeTransition[data-phase="revealing"] span { transform: translate3d(0, 0, 0) skewX(-8deg); animation: modeStripeReveal 620ms cubic-bezier(.72, 0, .22, 1) both; }
+.modeTransition[data-phase="revealing"] span:nth-child(3) { animation-delay: 0ms; }
+.modeTransition[data-phase="revealing"] span:nth-child(2) { animation-delay: 45ms; }
+.modeTransition[data-phase="revealing"] span:nth-child(1) { animation-delay: 90ms; }
+
+@keyframes modeStripeCover {
+  from { transform: translate3d(-115%, 0, 0) skewX(-8deg); }
+  to { transform: translate3d(0, 0, 0) skewX(-8deg); }
+}
 
 @keyframes modeStripeReveal {
   0%, 12% { transform: translate3d(0, 0, 0) skewX(-8deg); }

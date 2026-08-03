@@ -4,6 +4,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import TripForm, { TripFormData } from "../../../../components/TripForm";
 import Button from "../../../../components/Button";
@@ -395,7 +396,7 @@ export default function TripDashboardPage() {
         <div className={workspaceStyles.workspace}>
             <aside className={workspaceStyles.rail}>
                 <div className={workspaceStyles.railBrand}><img src="/Logo-light.svg" alt="SkautREG" /><strong>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</strong></div>
-                <button className={workspaceStyles.backLink} onClick={() => router.push("/trips")}><ArrowLeft size={17} /> Zpět na všechny výpravy</button>
+                <Link className={workspaceStyles.backLink} href="/trips"><ArrowLeft size={17} /> Zpět na všechny výpravy</Link>
                 <div className={workspaceStyles.tripIdentity}>
                     <div className={workspaceStyles.identityTop}><span>Pracovní prostor</span><b>Výprava</b></div>
                     <h1>{trip.name}</h1>
@@ -437,7 +438,7 @@ export default function TripDashboardPage() {
             </aside>
 
             <main className={workspaceStyles.workspaceContent}>
-                <div className={workspaceStyles.mobileContext}><span>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</span><strong>{trip.name}</strong><button onClick={() => router.push("/trips")}><ArrowLeft size={15} /> Zpět</button></div>
+                <div className={workspaceStyles.mobileContext}><span>{dashboard.role === "rover" ? "Náhled výpravy" : "Editor výpravy"}</span><strong>{trip.name}</strong><Link href="/trips"><ArrowLeft size={15} /> Zpět</Link></div>
 
                 <div key={activeTab} className={workspaceStyles.sectionTransition}>
                     {activeTab === 'info' && <TripOverview trip={trip} participants={overviewParticipants} staff={tripStaff} onManageStaff={() => setIsStaffModalOpen(true)} canManageStaff={canSeeSensitive} />}

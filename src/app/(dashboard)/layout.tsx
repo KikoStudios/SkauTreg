@@ -3,7 +3,7 @@
 import { useConvexAuth } from "convex/react";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Sidebar from "../../components/Sidebar";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ProfileModalProvider } from "../../context/ProfileModalContext";
 import { SidebarProvider, useSidebar } from "../../context/SidebarContext";
@@ -39,7 +39,7 @@ function DashboardLayoutInner({
     const previousTripWorkspace = useRef(isTripWorkspace);
     const previousLoadingScreen = useRef(isLoading || !isClerkLoaded);
     const transitionTimeout = useRef<number | null>(null);
-    const [modeTransition, setModeTransition] = useState<"trip" | "dashboard" | null>(null);
+    const [modeTransition, setModeTransition] = useState<{ mode: "trip" | "dashboard"; phase: "covering" | "revealing" } | null>(null);
 
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { isSidebarCollapsed, setIsSidebarCollapsed } = useSidebar();
@@ -62,16 +62,40 @@ function DashboardLayoutInner({
         if (isAppLoading || (!modeChanged && !loadingFinished)) return;
 
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
-        setModeTransition(isTripWorkspace ? "trip" : "dashboard");
+        setModeTransition({ mode: isTripWorkspace ? "trip" : "dashboard", phase: "revealing" });
         transitionTimeout.current = window.setTimeout(() => {
             setModeTransition(null);
             transitionTimeout.current = null;
-        }, 720);
+        }, 760);
     }, [convexAuthReady, isAppLoading, isSignedIn, isTripWorkspace]);
 
     useEffect(() => () => {
         if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
     }, []);
+
+    const handleModeNavigation = (event: ReactMouseEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (!(event.target instanceof Element)) return;
+
+        const anchor = event.target.closest("a[href]");
+        if (!anchor || anchor.hasAttribute("download") || (anchor.getAttribute("target") && anchor.getAttribute("target") !== "_self")) return;
+
+        const destination = new URL(anchor.getAttribute("href") || "", window.location.href);
+        if (destination.origin !== window.location.origin) return;
+
+        const destinationIsTripWorkspace = /^\/trips\/[^/]+/.test(destination.pathname);
+        if (destinationIsTripWorkspace === isTripWorkspace) return;
+
+        event.preventDefault();
+        const mode = destinationIsTripWorkspace ? "trip" : "dashboard";
+        const href = `${destination.pathname}${destination.search}${destination.hash}`;
+        if (transitionTimeout.current !== null) window.clearTimeout(transitionTimeout.current);
+        setModeTransition({ mode, phase: "covering" });
+        transitionTimeout.current = window.setTimeout(() => {
+            transitionTimeout.current = null;
+            router.push(href);
+        }, 590);
+    };
 
     if (isAppLoading) {
         return (
@@ -132,9 +156,9 @@ function DashboardLayoutInner({
 
     return (
         <ProfileModalProvider>
-            <div className={styles.container}>
+            <div className={styles.container} onClickCapture={handleModeNavigation}>
                 {modeTransition && (
-                    <div className={styles.modeTransition} data-mode={modeTransition} aria-hidden="true">
+                    <div className={styles.modeTransition} data-mode={modeTransition.mode} data-phase={modeTransition.phase} aria-hidden="true">
                         <span />
                         <span />
                         <span />
