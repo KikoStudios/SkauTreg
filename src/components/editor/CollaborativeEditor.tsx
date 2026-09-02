@@ -14,7 +14,9 @@ import Highlight from "@tiptap/extension-highlight";
 import { useConvex, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { mergeAttributes } from "@tiptap/core";
+import { Extension, mergeAttributes } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { createMentionSuggestion, MentionItem } from "./MentionSuggestion";
 import CollaborativeCursors from "./CollaborativeCursors";
 import PromptModal from "../PromptModal";
@@ -22,6 +24,66 @@ import ColorPicker from "../ColorPicker";
 import styles from "./Editor.module.css";
 import { useRef, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Link2, RemoveFormatting, Unlink2 } from "lucide-react";
+
+const anchoredNodeTypes = ["paragraph", "heading", "bulletList", "orderedList", "blockquote", "codeBlock"];
+
+const BlockAnchor = Extension.create({
+    name: "blockAnchor",
+    addGlobalAttributes() {
+        return [{
+            types: anchoredNodeTypes,
+            attributes: {
+                blockId: {
+                    default: null,
+                    parseHTML: (element) => element.getAttribute("data-block-id"),
+                    renderHTML: (attributes) => attributes.blockId ? { "data-block-id": attributes.blockId, id: `b_${attributes.blockId}` } : {},
+                },
+                gameId: {
+                    default: null,
+                    parseHTML: (element) => element.getAttribute("data-game-id"),
+                    renderHTML: (attributes) => attributes.gameId ? { "data-game-id": attributes.gameId } : {},
+                },
+            },
+        }];
+    },
+});
+
+const AgendaTimeDecorations = Extension.create({
+    name: "agendaTimeDecorations",
+    addProseMirrorPlugins() {
+        return [new Plugin({
+            key: new PluginKey("agenda-time-decorations"),
+            props: {
+                decorations(state) {
+                    const decorations: Decoration[] = [];
+                    const pattern = /\b(?:[01]?\d|2[0-3]):[0-5]\d\s*(?:-|–|—)\s*(?:[01]?\d|2[0-3]):[0-5]\d\b/g;
+                    state.doc.descendants((node, position) => {
+                        if (!node.isText || !node.text) return;
+                        for (const match of node.text.matchAll(pattern)) {
+                            const start = position + (match.index ?? 0);
+                            decorations.push(Decoration.inline(start, start + match[0].length, {
+                                class: "agenda-time-token",
+                                title: "Rozpoznaný časový blok",
+                            }));
+                        }
+                    });
+                    return DecorationSet.create(state.doc, decorations);
+                },
+            },
+        })];
+    },
+});
+
+function ensureBlockAnchors(editor: NonNullable<ReturnType<typeof useEditor>>) {
+    const transaction = editor.state.tr;
+    editor.state.doc.forEach((node, offset) => {
+        if (anchoredNodeTypes.includes(node.type.name) && !node.attrs.blockId) {
+            transaction.setNodeMarkup(offset, undefined, { ...node.attrs, blockId: crypto.randomUUID() });
+        }
+    });
+    if (transaction.docChanged) editor.view.dispatch(transaction);
+}
 
 interface CollaborativeEditorProps {
     pageId: Id<"meeting_pages">;
@@ -46,6 +108,7 @@ export default function CollaborativeEditor({
     const [showLinkModal, setShowLinkModal] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+    const [hasSelection, setHasSelection] = useState(false);
 
     // Search mentions function
     const searchMentions = async (query: string): Promise<MentionItem[]> => {
@@ -106,10 +169,13 @@ export default function CollaborativeEditor({
 
     // Create editor with sync extension
     const editor = useEditor({
+        immediatelyRender: false,
         extensions: [
             StarterKit.configure({
                 history: false, // Disable local history when using collaboration
             }),
+            BlockAnchor,
+            AgendaTimeDecorations,
             Underline,
             TextStyle,
             Color,
@@ -121,7 +187,7 @@ export default function CollaborativeEditor({
                 },
             }),
             Placeholder.configure({
-                placeholder: "Start typing your notes...",
+                placeholder: "Začněte psát. Pomocí @ vložíte odkaz na člověka nebo výpravu.",
             }),
             Image.configure({
                 HTMLAttributes: {
@@ -142,7 +208,7 @@ export default function CollaborativeEditor({
             attributes: {
                 class: "prose prose-invert max-w-none",
             },
-            handleClickOn: (view, pos, node, nodePos, event, direct) => {
+            handleClickOn: (view, pos, node, nodePos, event) => {
                 // Allow clicks on links and mentions to pass through
                 const target = event.target as HTMLElement;
                 if (target.tagName === 'A' || target.closest('a')) {
@@ -152,6 +218,7 @@ export default function CollaborativeEditor({
             },
         },
         onSelectionUpdate: ({ editor }) => {
+            setHasSelection(!editor.state.selection.empty);
             // Update cursor position when selection changes
             if (editable) {
                 const { from } = editor.state.selection;
@@ -165,6 +232,8 @@ export default function CollaborativeEditor({
                 }).catch((err) => console.error("Failed to update cursor:", err));
             }
         },
+        onCreate: ({ editor }) => ensureBlockAnchors(editor),
+        onUpdate: ({ editor }) => ensureBlockAnchors(editor),
     }, [sync.initialContent, sync.extension, pageId, editable]);
 
     // Cleanup cursor on unmount
@@ -174,7 +243,7 @@ export default function CollaborativeEditor({
                 // Ignore errors on cleanup
             });
         };
-    }, [pageId]);
+    }, [pageId, removeCursor]);
 
     // Handle link clicks to prevent default navigation
     useEffect(() => {
@@ -211,28 +280,38 @@ export default function CollaborativeEditor({
         return () => editorElement.removeEventListener('click', handleLinkClick);
     }, [editor, router]);
 
+    useEffect(() => {
+        if (!editor) return;
+        const insertGame = (event: Event) => {
+            const detail = (event as CustomEvent<{
+                pageId: Id<"meeting_pages">;
+                game: { id: string; name: string; description: string; instructions: string; durationMinutes: number; equipment: string[] };
+            }>).detail;
+            if (!detail || detail.pageId !== pageId) return;
+            const equipment = detail.game.equipment.length
+                ? `Vybavení: ${detail.game.equipment.join(", ")}`
+                : "Bez zvláštního vybavení";
+            editor.chain().focus().insertContent([
+                { type: "heading", attrs: { level: 2, gameId: detail.game.id }, content: [{ type: "text", text: detail.game.name }] },
+                { type: "paragraph", content: [{ type: "text", text: `${detail.game.durationMinutes} min · ${detail.game.description}` }] },
+                { type: "paragraph", content: [{ type: "text", text: equipment }] },
+                { type: "paragraph", content: [{ type: "text", text: detail.game.instructions }] },
+            ]).run();
+        };
+        window.document.addEventListener("documents:insert-game", insertGame);
+        return () => window.document.removeEventListener("documents:insert-game", insertGame);
+    }, [editor, pageId]);
+
     // Loading state
     if (sync.isLoading) {
-        return (
-            <div style={{
-                padding: "2rem",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontStyle: "italic",
-            }}>
-                Loading editor...
-            </div>
-        );
+        return <div className={styles.editorState}><span /> Načítám obsah…</div>;
     }
 
     // No document exists - show create button
     if (sync.initialContent === null) {
         return (
-            <div style={{
-                padding: "2rem",
-                textAlign: "center",
-            }}>
-                <button
+            <div className={styles.editorStart}>
+                <button type="button"
                     onClick={() => sync.create({
                         type: "doc",
                         content: [{
@@ -240,34 +319,15 @@ export default function CollaborativeEditor({
                             content: [],
                         }],
                     })}
-                    style={{
-                        padding: "0.75rem 1.5rem",
-                        background: "#10b981",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "8px",
-                        fontSize: "1rem",
-                        cursor: "pointer",
-                        fontWeight: "600",
-                    }}
                 >
-                    Create Notebook
+                    Začít psát
                 </button>
             </div>
         );
     }
 
     if (!editor) {
-        return (
-            <div style={{
-                padding: "2rem",
-                textAlign: "center",
-                color: "#9ca3af",
-                fontStyle: "italic",
-            }}>
-                Initializing editor...
-            </div>
-        );
+        return <div className={styles.editorState}><span /> Připravuji editor…</div>;
     }
 
     return (
@@ -286,34 +346,34 @@ export default function CollaborativeEditor({
             </div>
             
             {/* Formatting Toolbar - Right Side */}
-            {editable && (
+            {editable && hasSelection && (
                 <div className={styles.toolbar}>
                     <div className={styles.toolbarGroup}>
                         <button
                             onClick={() => editor.chain().focus().toggleBold().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("bold") ? styles.isActive : ""}`}
-                            title="Bold"
+                            title="Tučně"
                         >
                             <strong>B</strong>
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleItalic().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("italic") ? styles.isActive : ""}`}
-                            title="Italic"
+                            title="Kurzíva"
                         >
                             <em>I</em>
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleStrike().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("strike") ? styles.isActive : ""}`}
-                            title="Strikethrough"
+                            title="Přeškrtnout"
                         >
                             <s>S</s>
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleUnderline().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("underline") ? styles.isActive : ""}`}
-                            title="Underline"
+                            title="Podtrhnout"
                         >
                             <u>U</u>
                         </button>
@@ -325,21 +385,21 @@ export default function CollaborativeEditor({
                         <button
                             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
                             className={`${styles.toolbarButton} ${editor.isActive("heading", { level: 1 }) ? styles.isActive : ""}`}
-                            title="Heading 1"
+                            title="Nadpis 1"
                         >
                             H1
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                             className={`${styles.toolbarButton} ${editor.isActive("heading", { level: 2 }) ? styles.isActive : ""}`}
-                            title="Heading 2"
+                            title="Nadpis 2"
                         >
                             H2
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
                             className={`${styles.toolbarButton} ${editor.isActive("heading", { level: 3 }) ? styles.isActive : ""}`}
-                            title="Heading 3"
+                            title="Nadpis 3"
                         >
                             H3
                         </button>
@@ -351,28 +411,28 @@ export default function CollaborativeEditor({
                         <button
                             onClick={() => editor.chain().focus().toggleBulletList().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("bulletList") ? styles.isActive : ""}`}
-                            title="Bullet List"
+                            title="Odrážkový seznam"
                         >
                             •
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleOrderedList().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("orderedList") ? styles.isActive : ""}`}
-                            title="Numbered List"
+                            title="Číslovaný seznam"
                         >
                             1.
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleBlockquote().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("blockquote") ? styles.isActive : ""}`}
-                            title="Quote"
+                            title="Citace"
                         >
                             &quot;
                         </button>
                         <button
                             onClick={() => editor.chain().focus().toggleCode().run()}
                             className={`${styles.toolbarButton} ${editor.isActive("code") ? styles.isActive : ""}`}
-                            title="Code"
+                            title="Kód"
                         >
                             {"</>"}
                         </button>
@@ -385,7 +445,7 @@ export default function CollaborativeEditor({
                             ref={colorButtonRef}
                             onClick={() => setShowColorPicker(!showColorPicker)}
                             className={`${styles.toolbarButton}`}
-                            title="Text Color"
+                            title="Barva textu"
                         >
                             A
                         </button>
@@ -393,18 +453,18 @@ export default function CollaborativeEditor({
                             ref={highlightButtonRef}
                             onClick={() => setShowHighlightPicker(!showHighlightPicker)}
                             className={`${styles.toolbarButton} ${editor.isActive("highlight") ? styles.isActive : ""}`}
-                            title="Highlight"
+                            title="Zvýraznit"
                         >
-                            ⬛
+                            H
                         </button>
                         <button
                             onClick={() => {
                                 editor.chain().focus().unsetAllMarks().run();
                             }}
                             className={`${styles.toolbarButton}`}
-                            title="Clear Formatting"
+                            title="Vyčistit formátování"
                         >
-                            ✕
+                            <RemoveFormatting size={14} />
                         </button>
                     </div>
 
@@ -420,9 +480,9 @@ export default function CollaborativeEditor({
                                 }
                             }}
                             className={`${styles.toolbarButton} ${editor.isActive("link") ? styles.isActive : ""}`}
-                            title={editor.isActive("link") ? "Remove Link" : "Add Link"}
+                            title={editor.isActive("link") ? "Odebrat odkaz" : "Přidat odkaz"}
                         >
-                            {editor.isActive("link") ? "🔗✕" : "🔗"}
+                            {editor.isActive("link") ? <Unlink2 size={14} /> : <Link2 size={14} />}
                         </button>
                     </div>
                 </div>

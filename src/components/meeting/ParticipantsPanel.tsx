@@ -27,12 +27,17 @@ export default function ParticipantsPanel({
                         style={{
                             backgroundImage: participant.user?.image ? `url(${participant.user.image})` : 'none'
                         }}
-                        title={participant.user?.name || "Anonymous"}
+                        title={participant.user?.name || "Anonymní účastník"}
                     >
-                        {!participant.user?.image && "👤"}
+                        {!participant.user?.image && getInitials(participant.user?.name)}
                     </div>
                 ))}
             </div>
         </div>
     );
+}
+
+function getInitials(name?: string) {
+    if (!name) return "?";
+    return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }

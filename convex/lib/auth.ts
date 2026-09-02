@@ -197,6 +197,32 @@ export async function requireMeetingEditor(
   return { ...authorization, meeting };
 }
 
+export async function requireDocumentViewer(
+  ctx: AuthCtx,
+  documentId: Id<"documents">,
+) {
+  const document = await ctx.db.get(documentId);
+  if (!document) authError("NOT_FOUND", "Dokument nebyl nalezen.");
+  const authorization = await requireMeetingViewer(ctx, document.meetingId);
+  if (authorization.meeting.troopId !== document.troopId) {
+    authError("FORBIDDEN", "Dokument nepatří do tohoto oddílu.");
+  }
+  return { ...authorization, document };
+}
+
+export async function requireDocumentEditor(
+  ctx: AuthCtx,
+  documentId: Id<"documents">,
+) {
+  const document = await ctx.db.get(documentId);
+  if (!document) authError("NOT_FOUND", "Dokument nebyl nalezen.");
+  const authorization = await requireMeetingEditor(ctx, document.meetingId);
+  if (authorization.meeting.troopId !== document.troopId) {
+    authError("FORBIDDEN", "Dokument nepatří do tohoto oddílu.");
+  }
+  return { ...authorization, document };
+}
+
 export async function requirePageViewer(ctx: AuthCtx, pageId: Id<"meeting_pages">) {
   const page = await ctx.db.get(pageId);
   if (!page) authError("NOT_FOUND", "Stránka nebyla nalezena.");

@@ -1,12 +1,9 @@
-:root {
+.page {
   --green: #5aa31b;
   --green-dark: #3c7a0f;
   --yellow: #ffd31a;
   --black: #101010;
   --bg: #f7f7f7;
-}
-
-.page {
   min-height: 100vh;
   position: relative;
   overflow: hidden;

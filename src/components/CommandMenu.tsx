@@ -10,7 +10,6 @@ import {
     CircleUserRound,
     ClipboardList,
     FileText,
-    Flag,
     FolderKanban,
     House,
     Lightbulb,
@@ -139,9 +138,6 @@ export function CommandMenu() {
                             <PaletteItem icon={Users} label="Členové" description="Seznam členů" value="členové skauti lidé" onSelect={() => go("/members")} />
                             <PaletteItem icon={TentTree} label="Výpravy – nadcházející" description="Plánované výpravy" value="výpravy nadcházející budoucí" onSelect={() => go("/trips?tab=upcoming")} />
                             <PaletteItem icon={TentTree} label="Výpravy – archiv" description="Proběhlé výpravy" value="výpravy archiv staré historie" onSelect={() => go("/trips?tab=old")} />
-                            <PaletteItem icon={Flag} label="Rady – vše" description="Všechny zápisy a dokumentace" value="rady vše zápisy dokumentace" onSelect={() => go("/rady?tab=all")} />
-                            <PaletteItem icon={Flag} label="Rady – výpravy" description="Dokumentace výprav" value="rady výpravy dokumentace" onSelect={() => go("/rady?tab=trips")} />
-                            <PaletteItem icon={Flag} label="Rady – samostatné" description="Oddílové rady a zápisy" value="rady osobní samostatné zápisy" onSelect={() => go("/rady?tab=personal")} />
                             <PaletteItem icon={MapPinned} label="Vyhledávač základen" description="Mapa základen" value="vyhledávač základen mapa ubytování" onSelect={() => go("/tools/basefinder")} />
                             <PaletteItem icon={Lightbulb} label="Nápady na funkce" description="Nápady a hlasování" value="nápady funkce feedback" onSelect={() => go("/fae?tab=features")} />
                             <PaletteItem icon={Lightbulb} label="Hlášené chyby" description="Seznam chyb" value="chyby bug hlášení" onSelect={() => go("/fae?tab=errors")} />
@@ -154,7 +150,7 @@ export function CommandMenu() {
                             <PaletteItem icon={Plus} label="Vytvořit nový oddíl" value="akce vytvořit přidat nový oddíl" onSelect={() => go("/troop?create=true")} />
                             <PaletteItem icon={Plus} label="Naplánovat výpravu" value="akce vytvořit přidat nová výprava" onSelect={() => go("/trips?create=true")} />
                             <PaletteItem icon={Plus} label="Přidat člena" value="akce vytvořit přidat nový člen" onSelect={() => go("/members?create=true")} />
-                            <PaletteItem icon={Plus} label="Vytvořit radu" value="akce vytvořit přidat nová rada zápis" onSelect={() => go("/rady?create=true")} />
+                            {troops[0] && <PaletteItem icon={Plus} label="Nový dokument" value="akce vytvořit dokument schůzka rada zápis" onSelect={() => go(`/troop/${troops[0]._id}/documents?create=true`)} />}
                             <PaletteItem icon={CircleUserRound} label="Můj profil" value="účet profil předvolby" onSelect={() => run(openProfile)} />
                         </Group>
 
@@ -165,7 +161,7 @@ export function CommandMenu() {
                                     <PaletteItem key={`${troop._id}-members`} icon={Users} label={`${troop.name} – členové`} description="Členové oddílu" value={`${troop.name} členové skauti`} onSelect={() => go(`/members?troopId=${troop._id}`)} />,
                                     <PaletteItem key={`${troop._id}-trips`} icon={TentTree} label={`${troop.name} – výpravy`} description="Nadcházející výpravy oddílu" value={`${troop.name} výpravy nadcházející`} onSelect={() => go(`/trips?troopId=${troop._id}&tab=upcoming`)} />,
                                     <PaletteItem key={`${troop._id}-archive`} icon={TentTree} label={`${troop.name} – archiv výprav`} value={`${troop.name} výpravy archiv staré`} onSelect={() => go(`/trips?troopId=${troop._id}&tab=old`)} />,
-                                    <PaletteItem key={`${troop._id}-meetings`} icon={Flag} label={`${troop.name} – rady a zápisy`} value={`${troop.name} rady zápisy`} onSelect={() => go(`/troop/${troop._id}/meetings?tab=all`)} />,
+                                    <PaletteItem key={`${troop._id}-documents`} icon={FileText} label={`${troop.name} – Dokumenty`} value={`${troop.name} dokumenty rady zápisy úkoly hry`} onSelect={() => go(`/troop/${troop._id}/documents`)} />,
                                     <PaletteItem key={`${troop._id}-leaders`} icon={CircleUserRound} label={`${troop.name} – vedení`} value={`${troop.name} vedení vedoucí`} onSelect={() => go(`/troop/${troop._id}/leaders`)} />,
                                     <PaletteItem key={`${troop._id}-general`} icon={Settings} label={`${troop.name} – základní údaje`} value={`${troop.name} nastavení základní údaje`} onSelect={() => go(`/settings/${troop._id}?section=general`)} />,
                                     <PaletteItem key={`${troop._id}-branding`} icon={Settings} label={`${troop.name} – vzhled a logo`} value={`${troop.name} nastavení vzhled logo branding`} onSelect={() => go(`/settings/${troop._id}?section=branding`)} />,

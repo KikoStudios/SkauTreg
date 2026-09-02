@@ -81,11 +81,11 @@ export default function TroopDashboard() {
             action: () => router.push(`/trips?troopId=${troopId}`)
         },
         {
-            title: "Rady",
-            description: "Správa rad a zápisů.",
-            icon: <img src="/illustrations/meetings-illustartion.svg" alt="Rady" style={{ height: "80px", width: "auto", display: "block" }} />,
+            title: "Dokumenty",
+            description: "Schůzky, zápisy, úkoly a hry.",
+            icon: <img src="/illustrations/meetings-illustartion.svg" alt="Dokumenty" style={{ height: "80px", width: "auto", display: "block" }} />,
             status: "active",
-            action: () => router.push(`/troop/${troopId}/meetings`)
+            action: () => router.push(`/troop/${troopId}/documents`)
         },
         {
             title: "Vedení",

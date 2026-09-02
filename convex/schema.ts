@@ -678,6 +678,283 @@ export default defineSchema({
         .index("by_user", ["userId"])
         .index("by_status", ["status"]),
 
+    // Dokumenty is the product-level domain layer over the existing
+    // meetings/meeting_pages collaborative editor storage. Keeping the legacy
+    // references makes the migration non-destructive and preserves all
+    // ProseMirror document ids.
+    documents: defineTable({
+        troopId: v.id("troops"),
+        meetingId: v.id("meetings"),
+        tripId: v.optional(v.id("trips")),
+        kind: v.union(
+            v.literal("document"),
+            v.literal("schuzka"),
+            v.literal("trip_document"),
+            v.literal("decision"),
+        ),
+        lifecycle: v.union(
+            v.literal("plan"),
+            v.literal("in_session"),
+            v.literal("outcome"),
+            v.literal("final"),
+            v.literal("archived"),
+        ),
+        title: v.string(),
+        description: v.optional(v.string()),
+        tags: v.array(v.string()),
+        contentVersion: v.number(),
+        schemaVersion: v.number(),
+        createdBy: v.id("users"),
+        updatedBy: v.id("users"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        finalizedAt: v.optional(v.number()),
+        archivedAt: v.optional(v.number()),
+    })
+        .index("by_meeting", ["meetingId"])
+        .index("by_troop_updated", ["troopId", "updatedAt"])
+        .index("by_troop_kind_updated", ["troopId", "kind", "updatedAt"])
+        .index("by_trip", ["tripId"])
+        .searchIndex("search_title", {
+            searchField: "title",
+            filterFields: ["troopId", "kind", "lifecycle"],
+        }),
+
+    document_blocks: defineTable({
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        pageId: v.id("meeting_pages"),
+        blockId: v.string(),
+        parentBlockId: v.optional(v.string()),
+        blockType: v.string(),
+        phase: v.union(v.literal("plan"), v.literal("outcome"), v.literal("neutral")),
+        orderKey: v.string(),
+        text: v.string(),
+        normalizedText: v.string(),
+        contentHash: v.string(),
+        sourceVersion: v.number(),
+        agendaStartMinute: v.optional(v.number()),
+        agendaEndMinute: v.optional(v.number()),
+        gameId: v.optional(v.id("games")),
+        updatedAt: v.number(),
+        deletedAt: v.optional(v.number()),
+    })
+        .index("by_page_order", ["pageId", "orderKey"])
+        .index("by_page_block", ["pageId", "blockId"])
+        .index("by_document_updated", ["documentId", "updatedAt"]),
+
+    document_tasks: defineTable({
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        sourcePageId: v.id("meeting_pages"),
+        sourceBlockId: v.string(),
+        taskKey: v.string(),
+        title: v.string(),
+        description: v.optional(v.string()),
+        status: v.union(
+            v.literal("todo"),
+            v.literal("in_progress"),
+            v.literal("blocked"),
+            v.literal("done"),
+            v.literal("cancelled"),
+        ),
+        isOpen: v.boolean(),
+        priority: v.union(
+            v.literal("low"),
+            v.literal("normal"),
+            v.literal("high"),
+            v.literal("critical"),
+        ),
+        priorityRank: v.number(),
+        assigneeIds: v.array(v.id("users")),
+        dueAt: v.optional(v.number()),
+        tags: v.array(v.string()),
+        tagsNormalized: v.array(v.string()),
+        sourceDocumentTitle: v.string(),
+        sourceExcerpt: v.string(),
+        sourceVersion: v.number(),
+        sourceState: v.union(v.literal("linking"), v.literal("linked"), v.literal("orphaned")),
+        meetingStartAt: v.optional(v.number()),
+        aiSummary: v.optional(v.string()),
+        aiConfidence: v.optional(v.number()),
+        aiJobId: v.optional(v.id("document_ai_jobs")),
+        createdBy: v.id("users"),
+        updatedBy: v.id("users"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        completedAt: v.optional(v.number()),
+    })
+        .index("by_task_key", ["taskKey"])
+        .index("by_document_block", ["documentId", "sourceBlockId"])
+        .index("by_troop_open_due", ["troopId", "isOpen", "dueAt"])
+        .index("by_troop_document", ["troopId", "documentId"])
+        .index("by_troop_priority", ["troopId", "priorityRank", "dueAt"]),
+
+    document_task_assignees: defineTable({
+        troopId: v.id("troops"),
+        taskId: v.id("document_tasks"),
+        assigneeId: v.id("users"),
+        isOpen: v.boolean(),
+        dueAt: v.optional(v.number()),
+    })
+        .index("by_task", ["taskId"])
+        .index("by_task_assignee", ["taskId", "assigneeId"])
+        .index("by_assignee_open_due", ["troopId", "assigneeId", "isOpen", "dueAt"]),
+
+    schuzka_setups: defineTable({
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        scheduledStartAt: v.number(),
+        scheduledEndAt: v.number(),
+        timezone: v.string(),
+        location: v.optional(v.string()),
+        participantLeaderIds: v.array(v.id("users")),
+        facilitatorId: v.optional(v.id("users")),
+        metadata: v.optional(v.any()),
+        state: v.union(
+            v.literal("draft"),
+            v.literal("scheduled"),
+            v.literal("running"),
+            v.literal("finished"),
+            v.literal("cancelled"),
+        ),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_document", ["documentId"])
+        .index("by_troop_start", ["troopId", "scheduledStartAt"]),
+
+    games: defineTable({
+        troopId: v.id("troops"),
+        name: v.string(),
+        description: v.string(),
+        instructions: v.string(),
+        durationMinutes: v.number(),
+        minGroupSize: v.optional(v.number()),
+        maxGroupSize: v.optional(v.number()),
+        physicalIntensity: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+        environments: v.array(v.string()),
+        equipment: v.array(v.string()),
+        tags: v.array(v.string()),
+        searchText: v.string(),
+        createdBy: v.id("users"),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+        archivedAt: v.optional(v.number()),
+    })
+        .index("by_troop_updated", ["troopId", "updatedAt"])
+        .index("by_troop_name", ["troopId", "name"])
+        .searchIndex("search_games", {
+            searchField: "searchText",
+            filterFields: ["troopId", "physicalIntensity"],
+        }),
+
+    document_ai_runs: defineTable({
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        pageId: v.id("meeting_pages"),
+        requestedVersion: v.number(),
+        generation: v.number(),
+        status: v.union(
+            v.literal("queued"), v.literal("running"), v.literal("partial"),
+            v.literal("complete"), v.literal("stale"), v.literal("failed"),
+        ),
+        createdAt: v.number(),
+        completedAt: v.optional(v.number()),
+        scheduledId: v.optional(v.id("_scheduled_functions")),
+    })
+        .index("by_page_generation", ["pageId", "generation"])
+        .index("by_document_created", ["documentId", "createdAt"]),
+
+    document_ai_jobs: defineTable({
+        runId: v.id("document_ai_runs"),
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        pageId: v.id("meeting_pages"),
+        blockId: v.optional(v.string()),
+        processor: v.string(),
+        schemaVersion: v.string(),
+        modelProfile: v.string(),
+        inputHash: v.string(),
+        requestedVersion: v.number(),
+        status: v.union(
+            v.literal("queued"), v.literal("running"), v.literal("succeeded"),
+            v.literal("failed"), v.literal("timed_out"), v.literal("cancelled"),
+            v.literal("stale"), v.literal("cache_hit"),
+        ),
+        attempt: v.number(),
+        confidence: v.optional(v.number()),
+        outputJson: v.optional(v.any()),
+        errorCode: v.optional(v.string()),
+        durationMs: v.optional(v.number()),
+        createdAt: v.number(),
+        completedAt: v.optional(v.number()),
+    })
+        .index("by_run", ["runId"])
+        .index("by_input_processor", ["inputHash", "processor", "schemaVersion"])
+        .index("by_document_status", ["documentId", "status"]),
+
+    document_ai_suggestions: defineTable({
+        troopId: v.id("troops"),
+        documentId: v.id("documents"),
+        pageId: v.id("meeting_pages"),
+        blockId: v.string(),
+        jobId: v.id("document_ai_jobs"),
+        kind: v.string(),
+        payload: v.any(),
+        confidence: v.number(),
+        sourceVersion: v.number(),
+        state: v.union(
+            v.literal("pending"), v.literal("accepted"), v.literal("rejected"),
+            v.literal("expired"), v.literal("stale"),
+        ),
+        createdAt: v.number(),
+        resolvedAt: v.optional(v.number()),
+        resolvedBy: v.optional(v.id("users")),
+    })
+        .index("by_document_state", ["documentId", "state"])
+        .index("by_block_state", ["pageId", "blockId", "state"]),
+
+    document_search_chunks: defineTable({
+        troopId: v.id("troops"),
+        entityType: v.string(),
+        entityId: v.string(),
+        documentId: v.optional(v.id("documents")),
+        pageId: v.optional(v.id("meeting_pages")),
+        blockId: v.optional(v.string()),
+        title: v.string(),
+        text: v.string(),
+        searchText: v.string(),
+        href: v.string(),
+        contentHash: v.string(),
+        sourceVersion: v.number(),
+        updatedAt: v.number(),
+        deletedAt: v.optional(v.number()),
+    })
+        .index("by_document", ["documentId"])
+        .index("by_entity", ["entityType", "entityId"])
+        .searchIndex("search_content", {
+            searchField: "searchText",
+            filterFields: ["troopId", "entityType"],
+        }),
+
+    document_calendar_items: defineTable({
+        troopId: v.id("troops"),
+        sourceType: v.string(),
+        sourceId: v.string(),
+        sourceVersion: v.number(),
+        title: v.string(),
+        startsAt: v.number(),
+        endsAt: v.optional(v.number()),
+        allDay: v.boolean(),
+        status: v.string(),
+        href: v.string(),
+        assigneeIds: v.array(v.id("users")),
+        updatedAt: v.number(),
+    })
+        .index("by_source", ["sourceType", "sourceId"])
+        .index("by_troop_start", ["troopId", "startsAt"]),
+
     rate_limits: defineTable({
         key: v.string(),
         windowStartedAt: v.number(),

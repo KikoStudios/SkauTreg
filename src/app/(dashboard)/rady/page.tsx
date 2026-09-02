@@ -1,20 +1,17 @@
 "use client";
 
-import RadyTab from "../../../components/RadyTab";
-import Breadcrumbs from "../../../components/Breadcrumbs";
-import FeatureGate from "../../../components/FeatureGate";
+import { useEffect } from "react";
+import { useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
+import { api } from "../../../../convex/_generated/api";
 
-export default function RadyPage() {
-    return (
-        <div style={{ width: "100%", position: "relative", overflowX: "hidden", paddingBottom: "2rem" }}>
-            {/* Top Title Bar */}
-            <div className="headingContainer">
-                <h1 style={{ fontSize: "1.5rem", fontWeight: "900", margin: 0 }}>Rady a Dokumentace</h1>
-            </div>
-
-            <div className="dashboardContent">
-                <FeatureGate feature="collaborativeMeetings"><RadyTab /></FeatureGate>
-            </div>
-        </div>
-    );
+export default function LegacyRadyRedirect() {
+  const router = useRouter();
+  const troops = useQuery(api.troops.getByUser);
+  useEffect(() => {
+    if (troops?.[0]) router.replace(`/troop/${troops[0]._id}/documents`);
+  }, [router, troops]);
+  if (troops === undefined) return <div style={{ padding: "2rem", color: "#777" }}>Otevírám Dokumenty…</div>;
+  if (troops.length === 0) return <div style={{ padding: "2rem" }}>Nejdřív vytvořte Oddíl.</div>;
+  return <div style={{ padding: "2rem", color: "#777" }}>Otevírám Dokumenty…</div>;
 }

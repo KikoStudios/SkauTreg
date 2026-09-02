@@ -25,7 +25,10 @@ export default function Breadcrumbs() {
         "members": "Členové",
         "trips": "Výpravy",
         "settings": "Nastavení",
-        "calendar": "Kalendář"
+        "calendar": "Kalendář",
+        "documents": "Dokumenty",
+        "meetings": "Dokumenty",
+        "rady": "Dokumenty"
     };
 
     const searchParams = useSearchParams();

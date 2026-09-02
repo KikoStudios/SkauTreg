@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import styles from "../../app/(dashboard)/rady/[meetingId]/MeetingRoom.module.css";
 import { useState, useRef } from "react";
+import { FileText, Paperclip, UploadCloud } from "lucide-react";
 
 interface FilesPanelProps {
     meetingId: Id<"meetings">;
@@ -75,7 +76,7 @@ export default function FilesPanel({ meetingId, onImageClick }: FilesPanelProps)
 
     return (
         <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>SOUBORY</h3>
+            <h3 className={styles.sectionTitle}><Paperclip size={14} /> SOUBORY</h3>
             <div className={styles.filesGrid}>
                 {files?.map((file) => {
                     const isImg = isImage(file.type, file.name);
@@ -100,9 +101,7 @@ export default function FilesPanel({ meetingId, onImageClick }: FilesPanelProps)
                                     className={styles.fileCardImage}
                                 />
                             ) : (
-                                <span className={styles.fileCardIcon}>
-                                    {isPDF(file.type) ? "📄" : "📎"}
-                                </span>
+                                <span className={styles.fileCardIcon}><FileText size={23} strokeWidth={1.5} aria-label={isPDF(file.type) ? "PDF" : "Soubor"} /></span>
                             )}
                             <div className={styles.fileCardLabel}>
                                 {file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name}
@@ -118,12 +117,12 @@ export default function FilesPanel({ meetingId, onImageClick }: FilesPanelProps)
                     onClick={() => fileInputRef.current?.click()}
                     className={`${styles.uploadZone} ${isDragging ? styles.dragging : ''}`}
                 >
-                    📎 Nahrát soubory
+                    <UploadCloud size={15} /> Nahrát soubory
                     <input
                         ref={fileInputRef}
                         type="file"
                         multiple
-                        style={{ display: "none" }}
+                        className={styles.hiddenInput}
                         onChange={(e) => handleFileChange(e.target.files)}
                     />
                 </div>

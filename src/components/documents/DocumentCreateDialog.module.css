@@ -1,0 +1,24 @@
+.eyebrow { display:block; margin-bottom:.22rem; color:#787b77; font-size:.61rem; font-weight:900; letter-spacing:.11em; }
+.body { padding:0; }
+.kindGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:#dedfdb; border-bottom:1px solid #dedfdb; }
+.kindCard { position:relative; min-height:116px; display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:start; gap:.75rem; padding:1rem; border:0; background:#fff; color:#1c1d1b; text-align:left; cursor:pointer; }
+.kindCard:hover { background:#f7f8f5; }
+.kindCard[data-selected="true"] { z-index:1; background:#effbf2; box-shadow:inset 0 0 0 2px #151615; }
+.kindIcon { width:38px; height:38px; display:grid; place-items:center; border:1px solid #d8d9d5; border-radius:8px; background:#f5f5f2; }
+.kindCard strong,.kindCard small { display:block; }
+.kindCard strong { margin:.08rem 0 .25rem; font-size:.84rem; }
+.kindCard small { max-width:220px; color:#70736f; font-size:.69rem; font-weight:620; line-height:1.4; }
+.kindCheck { margin-top:.15rem; opacity:0; }
+.kindCard[data-selected="true"] .kindCheck { opacity:1; }
+.formSection { display:grid; gap:1rem; padding:1.25rem; }
+.formSection :global(input),.formSection :global(select) { border-width:1px; border-color:#caccc7; box-shadow:none; }
+.formSection :global(input:focus),.formSection :global(select:focus),.textarea:focus { border-color:#151615; box-shadow:0 0 0 3px rgba(134,239,172,.45); }
+.formSection :global(label) span { font-weight:600; color:#999b97; }
+.textarea { width:100%; resize:vertical; min-height:74px; padding:.7rem .75rem; border:1px solid #caccc7; border-radius:7px; outline:none; background:#fff; color:#191a18; font:inherit; font-size:.9rem; font-weight:650; line-height:1.45; }
+.setupGrid { display:grid; grid-template-columns:1.3fr .7fr; gap:.8rem; padding-top:.2rem; }
+.fullField { grid-column:1 / -1; }
+.iconField { display:flex; align-items:center; gap:.55rem; }
+.iconField > :global(input) { flex:1; }
+.error { margin:0 1.25rem 1.25rem; padding:.65rem .75rem; border-radius:6px; background:#fff0f0; color:#9b1c1c; font-size:.76rem; font-weight:700; }
+@media(max-width:620px){ .kindGrid{grid-template-columns:1fr}.kindCard{min-height:96px}.setupGrid{grid-template-columns:1fr}.fullField{grid-column:auto} }
+@media(prefers-reduced-motion:no-preference){ .kindCard,.kindCheck{transition:background-color 120ms ease,opacity 120ms ease} }

@@ -316,14 +316,14 @@ export const getLeaders = query({
         // Check if owner is already in the list via explicit role
         const ownerInList = validLeaders.find(l => l!._id === troop.ownerId);
 
-        if (!ownerInList) {
+        if (!ownerInList && owner) {
             // Add owner with default role if not assigned a specific one
             return [
                 {
-                    _id: owner?._id,
-                    name: owner?.name,
-                    email: owner?.email,
-                    image: owner?.image,
+                    _id: owner._id,
+                    name: owner.name,
+                    email: owner.email,
+                    image: owner.image,
                     role: "owner",
                     isOwner: true,
                 },
