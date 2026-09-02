@@ -1,9 +1,15 @@
 "use client";
 
-import { Component, type ErrorInfo, type ReactNode } from "react";
-import { useQuery } from "convex/react";
+import { useEffect, useState } from "react";
+import { useConvex } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import styles from "../app/page.module.css";
+
+type PublicTroop = {
+  _id: string;
+  name: string;
+  logo?: string | null;
+};
 
 function StaticBadges() {
   return (
@@ -13,25 +19,6 @@ function StaticBadges() {
       <img className={styles.badge} src="/bages/owner-bage.svg" alt="Vlastník" />
     </>
   );
-}
-
-class PublicTroopBadgesBoundary extends Component<
-  { children: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("[Public troop badges] Convex data unavailable:", error, info);
-  }
-
-  render() {
-    return this.state.failed ? <StaticBadges /> : this.props.children;
-  }
 }
 
 const getInitials = (name?: string) => {
@@ -47,8 +34,28 @@ const getInitials = (name?: string) => {
   );
 };
 
-function DynamicPublicTroopBadges() {
-  const troops = useQuery(api.troops.listPublic);
+export default function PublicTroopBadges() {
+  const convex = useConvex();
+  const [troops, setTroops] = useState<PublicTroop[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void convex
+      .query(api.troops.listPublic, {})
+      .then((result) => {
+        if (!cancelled) setTroops(result);
+      })
+      .catch(() => {
+        // Public troop logos are optional; keep the landing page usable when
+        // the Convex deployment is unavailable or temporarily disabled.
+        if (!cancelled) setTroops([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [convex]);
 
   if (!troops?.length) return <StaticBadges />;
 
@@ -77,13 +84,5 @@ function DynamicPublicTroopBadges() {
         <div className={styles.badgePlus}>+{troops.length - 4}</div>
       )}
     </>
-  );
-}
-
-export default function PublicTroopBadges() {
-  return (
-    <PublicTroopBadgesBoundary>
-      <DynamicPublicTroopBadges />
-    </PublicTroopBadgesBoundary>
   );
 }

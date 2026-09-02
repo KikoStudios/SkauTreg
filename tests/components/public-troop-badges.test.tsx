@@ -1,38 +1,38 @@
-import { render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import PublicTroopBadges from "../../src/components/PublicTroopBadges";
 
-const { useQueryMock } = vi.hoisted(() => ({ useQueryMock: vi.fn() }));
+const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
-vi.mock("convex/react", () => ({ useQuery: useQueryMock }));
+vi.mock("convex/react", () => ({
+  useConvex: () => ({ query: queryMock }),
+}));
 
 describe("PublicTroopBadges", () => {
   beforeEach(() => {
-    useQueryMock.mockReset();
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    queryMock.mockReset();
   });
 
-  afterEach(() => vi.restoreAllMocks());
-
-  it("renders the static badges when Convex is unavailable", () => {
-    useQueryMock.mockImplementation(() => {
-      throw new Error("Convex deployment disabled");
-    });
+  it("renders the static badges when Convex is unavailable", async () => {
+    queryMock.mockRejectedValue(new Error("Convex deployment disabled"));
 
     render(<PublicTroopBadges />);
 
     expect(screen.getByAltText("Roveři")).toBeInTheDocument();
     expect(screen.getByAltText("Vedoucí")).toBeInTheDocument();
     expect(screen.getByAltText("Vlastník")).toBeInTheDocument();
+    await waitFor(() => expect(queryMock).toHaveBeenCalledOnce());
   });
 
-  it("renders public troop data when Convex is healthy", () => {
-    useQueryMock.mockReturnValue([
+  it("renders public troop data when Convex is healthy", async () => {
+    queryMock.mockResolvedValue([
       { _id: "troop-1", name: "Testovací oddíl", logo: null },
     ]);
 
     render(<PublicTroopBadges />);
 
-    expect(screen.getByLabelText("Testovací oddíl")).toHaveTextContent("TO");
+    expect(await screen.findByLabelText("Testovací oddíl")).toHaveTextContent(
+      "TO",
+    );
   });
 });

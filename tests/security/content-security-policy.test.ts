@@ -26,6 +26,12 @@ describe("content security policy", () => {
     expect(policy).toContain(
       "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://*.clerk.com https://clerk.overload.studio",
     );
+    expect(policy).toContain(
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    );
+    expect(policy).toContain(
+      "font-src 'self' data: https://fonts.gstatic.com",
+    );
     expect(policy).toContain("upgrade-insecure-requests");
   });
 
