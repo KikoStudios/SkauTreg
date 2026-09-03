@@ -131,6 +131,66 @@ describe("Convex authorization", () => {
     expect(integrations[0]).not.toHaveProperty("webhookUrl");
   });
 
+  it("stores Gmail SMTP app passwords encrypted and redacts them from queries", async () => {
+    const { t, fixture } = await seed();
+    const owner = t.withIdentity({ tokenIdentifier: "test|owner" });
+    const previousKey = process.env.CREDENTIAL_ENCRYPTION_KEY;
+    process.env.CREDENTIAL_ENCRYPTION_KEY = "ef".repeat(32);
+    try {
+      await owner.mutation(internal.troops.storeGmailSmtp, {
+        troopId: fixture.troopId,
+        email: " Troop@Example.com ",
+        appPassword: "abcd efgh ijkl mnop",
+      });
+
+      const stored = await t.run((ctx) => ctx.db.get(fixture.troopId));
+      expect(stored?.emailProvider).toMatchObject({
+        provider: "gmail-smtp",
+        email: "troop@example.com",
+        smtpHost: "smtp.gmail.com",
+        smtpPort: 465,
+        requiresReconnect: false,
+      });
+      expect(stored?.emailProvider?.smtpPassword).toMatch(/^enc:v1:/);
+      expect(stored?.emailProvider?.smtpPassword).not.toContain("abcdefghijklmnop");
+
+      const publicTroop = await owner.query(api.troops.getById, { id: fixture.troopId });
+      expect(publicTroop?.emailProvider).toMatchObject({ provider: "gmail-smtp", email: "troop@example.com" });
+      expect(publicTroop?.emailProvider).not.toHaveProperty("smtpPassword");
+      expect(publicTroop?.emailProvider).not.toHaveProperty("smtpHost");
+
+      const sendConfiguration = await owner.query(api.emailDrafts.getSendConfiguration, { tripId: fixture.tripId });
+      expect(sendConfiguration).toEqual({
+        provider: "gmail-smtp",
+        senderEmail: "troop@example.com",
+        connected: true,
+        requiresReconnect: false,
+      });
+
+      await expect(owner.mutation(internal.troops.storeGmailSmtp, {
+        troopId: fixture.troopId,
+        email: "troop@example.com",
+        appPassword: "not-an-app-password",
+      })).rejects.toThrow("šestnáctimístné heslo aplikace Google");
+      await expect(t.withIdentity({ tokenIdentifier: "test|outsider" }).mutation(internal.troops.storeGmailSmtp, {
+        troopId: fixture.troopId,
+        email: "troop@example.com",
+        appPassword: "abcdefghijklmnop",
+      })).rejects.toThrow();
+
+      await expect(owner.mutation(api.troops.connectEmailProvider, {
+        troopId: fixture.troopId,
+        provider: "gmail-smtp",
+        email: "troop@example.com",
+        smtpPassword: "abcdefghijklmnop",
+        smtpHost: "attacker.example.com",
+      })).rejects.toThrow("starší Gmail OAuth");
+    } finally {
+      if (previousKey === undefined) delete process.env.CREDENTIAL_ENCRYPTION_KEY;
+      else process.env.CREDENTIAL_ENCRYPTION_KEY = previousKey;
+    }
+  });
+
   it("keeps participant PII out of the rover dashboard", async () => {
     const { t, fixture } = await seed();
     const rover = t.withIdentity({ tokenIdentifier: "test|rover" });

@@ -10,10 +10,10 @@ This page centralizes testing expectations previously spread across feature-spec
 - Trip CRUD works.
 - RSVP links open and save responses.
 
-## Email and OAuth Tests
+## Email and SMTP Tests
 
-- Gmail can be connected in settings.
-- OAuth callback succeeds and connected email persists.
+- Gmail SMTP can be connected in settings with a valid Google app password.
+- Invalid SMTP credentials are rejected before the encrypted connection is saved.
 - Draft creation/edit/delete works.
 - Leader can send; non-leader cannot send.
 - Smart tags resolve per recipient.

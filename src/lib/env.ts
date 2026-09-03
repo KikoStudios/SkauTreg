@@ -9,6 +9,10 @@ const httpsUrl = z.string().url().refine((value) => {
   return url.protocol === "https:" && url.hostname !== "localhost";
 }, "must be a public HTTPS URL");
 const featureStage = z.enum(["off", "beta", "stable"]);
+const optionalWhenBlank = <T extends z.ZodType>(schema: T) => z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+  schema.optional(),
+);
 
 export const productionEnvSchema = z.object({
   NEXT_PUBLIC_CONVEX_URL: httpsUrl,
@@ -16,12 +20,12 @@ export const productionEnvSchema = z.object({
   CLERK_SECRET_KEY: z.string().startsWith("sk_live_"),
   CREDENTIAL_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/),
   ANALYTICS_ID_SECRET: z.string().regex(/^[a-fA-F0-9]{64}$/),
-  OAUTH_STATE_SECRET: z.string().regex(/^[a-fA-F0-9]{64}$/),
+  OAUTH_STATE_SECRET: optionalWhenBlank(z.string().regex(/^[a-fA-F0-9]{64}$/)),
   APP_ORIGIN: httpsUrl,
   NEXT_PUBLIC_STREDISKO_NAME: realText,
-  NEXT_PUBLIC_GMAIL_CLIENT_ID: realText,
-  NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS: z.enum(["testing", "submitted", "verified"]),
-  GMAIL_CLIENT_SECRET: z.string().min(16),
+  NEXT_PUBLIC_GMAIL_CLIENT_ID: optionalWhenBlank(realText),
+  NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS: optionalWhenBlank(z.enum(["testing", "submitted", "verified"])),
+  GMAIL_CLIENT_SECRET: optionalWhenBlank(z.string().min(16)),
   NEXT_PUBLIC_LEGAL_OPERATOR_NAME: realText,
   NEXT_PUBLIC_LEGAL_OPERATOR_ADDRESS: realText.optional(),
   NEXT_PUBLIC_PRIVACY_EMAIL: z.string().email(),

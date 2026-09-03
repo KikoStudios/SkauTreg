@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import { useRouter, useSearchParams } from "next/navigation";
 import Button from "./Button";
 import { useFeedback } from "../context/FeedbackContext";
 
@@ -13,93 +12,47 @@ interface GmailSettingsProps {
     isAuthorized: boolean;
 }
 
-const oauthErrorMessages: Record<string, string> = {
-    OAUTH_CANCELLED: "Propojení bylo zrušeno dříve, než Google udělil oprávnění.",
-    OAUTH_ADMIN_BLOCKED: "Správce vaší Google Workspace domény musí aplikaci SkauTreg povolit v administraci aplikací třetích stran.",
-    OAUTH_INVALID_STATE: "Bezpečnostní relace propojení není platná. Spusťte propojení znovu.",
-    OAUTH_SESSION_EXPIRED: "Přihlášení vypršelo. Přihlaste se znovu a propojení zopakujte.",
-    OAUTH_NOT_CONFIGURED: "Gmail není na tomto prostředí nakonfigurován.",
-    OAUTH_TOKEN_EXCHANGE_FAILED: "Google nedokončil propojení. Zkuste jej spustit znovu.",
-    OAUTH_SCOPE_MISSING: "Google neudělil oprávnění k odesílání zpráv.",
-    OAUTH_EMAIL_UNAVAILABLE: "Google nepotvrdil adresu připojeného účtu.",
-    OAUTH_CONNECTION_FAILED: "Propojení se nepodařilo bezpečně dokončit. Zkuste to znovu.",
-};
-
 export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsProps) {
     const { showError, showSuccess } = useFeedback();
     const troop = useQuery(api.troops.getById, { id: troopId });
     const members = useQuery(api.members.list, { troopId });
     const sentHistory = useQuery(api.emailDrafts.listSentByTroop, { troopId });
     const disconnectGmail = useMutation(api.troops.disconnectEmailProvider);
-    const searchParams = useSearchParams();
-    const router = useRouter();
+    const connectGmailSmtp = useAction(api.mailer.connectGmailSmtp);
 
     const [isConnecting, setIsConnecting] = useState(false);
-    const [paramsProcessed, setParamsProcessed] = useState(false);
+    const [gmailEmail, setGmailEmail] = useState("");
+    const [appPassword, setAppPassword] = useState("");
     const [showComposer, setShowComposer] = useState(false);
     const [composerSubject, setComposerSubject] = useState("");
     const [composerBody, setComposerBody] = useState("");
 
-    // Read params once at mount before they get cleared
-    useEffect(() => {
-        if (paramsProcessed) return; // Only run once
-
-        let gmailConnected: string | null = null;
-        let email: string | null = null;
-        let gmailError: string | null = null;
-        let gmailErrorCode: string | null = null;
-
-        // Try useSearchParams hook first
-        gmailConnected = searchParams?.get('gmail_connected');
-        email = searchParams?.get('email');
-        gmailError = searchParams?.get('gmail_error');
-        gmailErrorCode = searchParams?.get('gmail_error_code');
-
-        // Fallback: read from window.location.search
-        if (!gmailConnected && !email && !gmailError && !gmailErrorCode && typeof window !== 'undefined') {
-            const urlParams = new URLSearchParams(window.location.search);
-            gmailConnected = urlParams.get('gmail_connected');
-            email = urlParams.get('email');
-            gmailError = urlParams.get('gmail_error');
-            gmailErrorCode = urlParams.get('gmail_error_code');
-        }
-
-        if (gmailError || gmailErrorCode) {
-            showError({
-                title: "Gmail se nepodařilo propojit",
-                message: gmailErrorCode ? (oauthErrorMessages[gmailErrorCode] || oauthErrorMessages.OAUTH_CONNECTION_FAILED) : decodeURIComponent(gmailError || ""),
-                icon: "error",
-                canReport: gmailErrorCode !== "OAUTH_ADMIN_BLOCKED",
-            });
-            window.history.replaceState({}, document.title, window.location.pathname);
-            setParamsProcessed(true);
-            return;
-        }
-
-        if (gmailConnected === 'true') {
-            window.history.replaceState({}, document.title, window.location.pathname);
+    const handleConnect = async () => {
+        setIsConnecting(true);
+        try {
+            const result = await connectGmailSmtp({ troopId, email: gmailEmail, appPassword });
+            setAppPassword("");
             showSuccess({
-                title: "Úspěch",
-                message: email
-                    ? `Gmail účet ${email} byl připojen.`
-                    : "Gmail účet byl připojen.",
+                title: "Gmail SMTP připojeno",
+                message: `Účet ${result.email} je připravený k odesílání.`,
                 duration: 4000,
             });
+        } catch (error: any) {
+            showError({
+                title: "Gmail SMTP se nepodařilo připojit",
+                message: error?.message || "Zkontrolujte e-mail a heslo aplikace Google.",
+                icon: "error",
+                canReport: true,
+            });
+        } finally {
+            setIsConnecting(false);
         }
-
-        setParamsProcessed(true);
-    }, []); // Empty dependency array - run once on mount
-
-
-    const handleLoginClick = () => {
-        setIsConnecting(true);
-        router.push(`/settings/${troopId}/gmail-connect`);
     };
 
     const handleDisconnect = async () => {
         showError({
             title: "⚠️ Potvrzení",
-            message: "Opravdu odpojit Gmail účet? E-maily budou muset být odesílány znovu.",
+            message: "Opravdu odpojit Gmail účet? Automatické odesílání nebude dostupné, dokud jej znovu nepřipojíte.",
             icon: "warning",
             buttons: [
                 {
@@ -109,7 +62,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                             await disconnectGmail({ troopId });
                             showSuccess({
                                 title: "✅ Odpojeno",
-                                message: "Gmail účet byl úspěšně odpojený.",
+                                message: "Gmail účet byl úspěšně odpojen.",
                                 duration: 3000,
                             });
                         } catch (error: any) {
@@ -138,9 +91,10 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
     }
 
     const emailProvider = (troop as any).emailProvider;
-    const gmailOAuth = emailProvider?.provider === "gmail" ? emailProvider : (troop as any).gmailOAuth;
-    const isConnected = !!gmailOAuth;
-    const verificationStatus = process.env.NEXT_PUBLIC_GMAIL_OAUTH_VERIFICATION_STATUS || "testing";
+    const gmailConnection = ["gmail", "gmail-smtp"].includes(emailProvider?.provider)
+        ? emailProvider
+        : (troop as any).gmailOAuth;
+    const isConnected = !!gmailConnection;
     const memberEmails = Array.from(
         new Set(
             (members || [])
@@ -190,7 +144,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 boxShadow: "6px 6px 0 0 #000"
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                    <div style={{ fontSize: "1.25rem", fontWeight: "900" }}>Gmail propojení</div>
+                    <div style={{ fontSize: "1.25rem", fontWeight: "900" }}>Gmail SMTP</div>
                     <span style={{
                         padding: "0.25rem 0.6rem",
                         borderRadius: "999px",
@@ -203,12 +157,9 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                     </span>
                 </div>
                 <p style={{ fontSize: "0.95rem", fontWeight: "600", color: "#374151", marginBottom: "0.75rem" }}>
-                    Propojte oficiální e-mailovou adresu oddílu (např. info@vasoddil.cz) přes Google OAuth 2.0. Tento e-mail bude použit jako odesílatel pro všechny zprávy k výpravám.
+                    Propojte oddílový Google účet pomocí samostatného hesla aplikace. SkauTreg pak odesílá zprávy přes zabezpečený server smtp.gmail.com.
                 </p>
-                {gmailOAuth?.requiresReconnect && <p role="alert" style={{ padding: ".75rem", background: "#fef3c7", border: "2px solid #92400e", borderRadius: 8, fontWeight: 800 }}>Připojení je potřeba bezpečně obnovit. Klikněte na „Připojit Gmail“ a znovu udělte oprávnění.</p>}
-                {verificationStatus !== "verified" && <p role="status" style={{ padding: ".75rem", background: "#fff7d6", border: "2px solid #7c5c00", borderRadius: 8, fontWeight: 750 }}>
-                    Ověření aplikace u Googlu: {verificationStatus === "submitted" ? "odesláno ke kontrole" : "testovací režim"}. Účty ve spravované doméně, například skaut.cz, může navíc blokovat správce organizace.
-                </p>}
+                {gmailConnection?.requiresReconnect && <p role="alert" style={{ padding: ".75rem", background: "#fef3c7", border: "2px solid #92400e", borderRadius: 8, fontWeight: 800 }}>Google přihlašovací údaje už nefungují. Účet odpojte a připojte znovu s novým heslem aplikace.</p>}
                 <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                     <div style={{
                         padding: "0.5rem 0.75rem",
@@ -218,7 +169,7 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                         fontWeight: "800",
                         fontSize: "0.85rem"
                     }}>
-                        OAuth 2.0 • Bez hesla
+                        SMTP přes TLS
                     </div>
                     <div style={{
                         padding: "0.5rem 0.75rem",
@@ -249,10 +200,10 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                     <div>
                         <div style={{ fontWeight: "900", color: "#065f46" }}>✓ Propojeno</div>
                         <div style={{ fontSize: "0.95rem", fontWeight: "700", color: "#065f46" }}>
-                            E-mail: <strong>{gmailOAuth.email}</strong>
+                            E-mail: <strong>{gmailConnection.email}</strong>
                         </div>
                         <div style={{ fontSize: "0.85rem", fontWeight: "600", color: "#047857" }}>
-                            Propojeno: {new Date(gmailOAuth.connectedAt).toLocaleString("cs-CZ")}
+                            {emailProvider?.provider === "gmail-smtp" ? "Heslo aplikace" : "Starší OAuth připojení"} · připojeno {new Date(gmailConnection.connectedAt).toLocaleString("cs-CZ")}
                         </div>
                     </div>
                     {isAuthorized && (
@@ -268,15 +219,42 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                             Pouze vlastník nebo hlavní vedoucí může propojit Gmail účet.
                         </div>
                     ) : (
-                        <div style={{
+                        <form onSubmit={(event) => { event.preventDefault(); void handleConnect(); }} style={{
                             border: "3px solid #000",
                             borderRadius: "12px",
                             padding: "1rem 1.25rem",
                             backgroundColor: "white",
-                            boxShadow: "4px 4px 0 0 #000"
+                            boxShadow: "4px 4px 0 0 #000",
+                            display: "grid",
+                            gap: ".85rem",
                         }}>
+                            <label style={{ display: "grid", gap: ".35rem", fontWeight: 800 }}>
+                                Gmail adresa
+                                <input
+                                    type="email"
+                                    value={gmailEmail}
+                                    onChange={(event) => setGmailEmail(event.target.value)}
+                                    placeholder="oddil@gmail.com"
+                                    autoComplete="username"
+                                    required
+                                    style={{ padding: ".75rem", border: "3px solid #000", borderRadius: 10, fontWeight: 650 }}
+                                />
+                            </label>
+                            <label style={{ display: "grid", gap: ".35rem", fontWeight: 800 }}>
+                                Heslo aplikace Google
+                                <input
+                                    type="password"
+                                    value={appPassword}
+                                    onChange={(event) => setAppPassword(event.target.value)}
+                                    placeholder="xxxx xxxx xxxx xxxx"
+                                    autoComplete="new-password"
+                                    required
+                                    minLength={16}
+                                    style={{ padding: ".75rem", border: "3px solid #000", borderRadius: 10, fontWeight: 650, letterSpacing: ".08em" }}
+                                />
+                            </label>
                             <button
-                                onClick={handleLoginClick}
+                                type="submit"
                                 disabled={isConnecting}
                                 style={{
                                     padding: "0.75rem 1.5rem",
@@ -293,18 +271,12 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                                     boxShadow: "3px 3px 0 0 #000"
                                 }}
                             >
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                                </svg>
-                                {isConnecting ? "Přesměrovávám…" : "Propojit s Gmailem"}
+                                {isConnecting ? "Ověřuji připojení…" : "Připojit Gmail SMTP"}
                             </button>
                             <p className="text-xs text-gray-500 mt-2">
-                                Budete přesměrováni na Google pro přihlášení.
+                                Ukládá se pouze šifrované heslo aplikace, nikoli vaše běžné heslo Google.
                             </p>
-                        </div>
+                        </form>
                     )}
                 </>
             )}
@@ -316,19 +288,18 @@ export default function GmailSettings({ troopId, isAuthorized }: GmailSettingsPr
                 backgroundColor: "#eff6ff",
                 boxShadow: "4px 4px 0 0 #000"
             }}>
-                <div style={{ fontWeight: "900", color: "#1e3a8a", marginBottom: "0.5rem" }}>Jak funguje OAuth?</div>
+                <div style={{ fontWeight: "900", color: "#1e3a8a", marginBottom: "0.5rem" }}>Jak vytvořit heslo aplikace?</div>
                 <ol style={{ margin: 0, paddingLeft: "1.25rem", color: "#1e40af", fontWeight: "600", display: "grid", gap: "0.25rem" }}>
-                    <li>Klikněte na &quot;Propojit s Gmailem&quot;</li>
-                    <li>Přihlaste se ke svému Google účtu</li>
-                    <li>Udělte oprávnění pro odesílání e-mailů</li>
-                    <li>Budete vráceni zpět sem</li>
-                    <li>Hotovo! Váš oddílový e-mail je připojen</li>
+                    <li>Zapněte u Google účtu dvoufázové ověření.</li>
+                    <li>Otevřete <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer" style={{ textDecoration: "underline" }}>Hesla aplikací Google</a>.</li>
+                    <li>Vytvořte heslo s názvem „SkauTreg“.</li>
+                    <li>Zkopírujte zobrazených 16 znaků do pole výše a účet připojte.</li>
                 </ol>
                 <div style={{ marginTop: "0.75rem", color: "#1e3a8a", fontWeight: "700" }}>
-                    Bezpečnost: aplikace nikdy nezná vaše heslo. Používáme OAuth 2.0.
+                    Heslo aplikace lze kdykoli samostatně zrušit v nastavení Google účtu.
                 </div>
                 <div style={{ marginTop: "0.75rem", paddingTop: "0.75rem", borderTop: "1px solid #93c5fd", color: "#1e3a8a", fontWeight: "650" }}>
-                    Pokud účet skaut.cz zobrazí „Přístup zablokován“, klikněte u Googlu na „Požádat o přístup“. Správce skaut.cz musí následně schválit OAuth klienta SkauTreg; samotné ověření aplikace u Googlu toto organizační pravidlo nepřepíše.
+                    U pracovních nebo školních účtů, včetně spravovaných domén, může správce tvorbu hesel aplikací zakázat.
                 </div>
             </div>
 

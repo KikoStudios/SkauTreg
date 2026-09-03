@@ -1,5 +1,7 @@
 # Google OAuth production checklist
 
+> Legacy only: new Gmail connections use SMTP with a per-account Google app password. Keep this checklist only while existing OAuth connections or callback routes remain in service.
+
 SkauTreg requests only `openid`, `email`, `profile`, and
 `https://www.googleapis.com/auth/gmail.send`. It sends messages selected and
 confirmed by an owner or main leader. It does not read Gmail messages.
@@ -52,9 +54,9 @@ screenshots containing account data.
 The OAuth callback runs on Vercel, while token encryption and message delivery
 run in Convex. Configure the variables in both systems deliberately:
 
-- Vercel production: `APP_ORIGIN`, `NEXT_PUBLIC_GMAIL_CLIENT_ID`,
+- Legacy OAuth callback on Vercel: `APP_ORIGIN`, `NEXT_PUBLIC_GMAIL_CLIENT_ID`,
   `GMAIL_CLIENT_SECRET`, and `OAUTH_STATE_SECRET`.
-- Convex production: `APP_ORIGIN`, `NEXT_PUBLIC_GMAIL_CLIENT_ID`,
+- Legacy OAuth delivery on Convex: `APP_ORIGIN`, `NEXT_PUBLIC_GMAIL_CLIENT_ID`,
   `GMAIL_CLIENT_SECRET`, and `CREDENTIAL_ENCRYPTION_KEY`.
 - Vercel staging and Convex development/staging use separate Google OAuth
   credentials and a stable staging origin. Do not use an ephemeral preview URL

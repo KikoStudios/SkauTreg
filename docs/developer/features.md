@@ -1,19 +1,20 @@
 # Feature Architecture and APIs
 
-This document consolidates the high-level technical docs for Email, OAuth, Meetings, and Integrations.
+This document consolidates the high-level technical docs for Email, Meetings, and Integrations.
 
-## Email + Gmail OAuth
+## Email + Gmail SMTP
 
 ### Functional Scope
-- Gmail OAuth connection in troop settings
+- Gmail SMTP connection with a Google app password in troop settings
+- Server-side credential verification before the encrypted password is stored
 - Draft-based trip email workflow
 - Role-based sending (leader/owner)
 - Smart tag personalization (`<user.name>`, `<user.sign.link>`)
 
 ### Backend Areas
-- `convex/troops.ts` for Gmail connect/disconnect
+- `convex/troops.ts` for encrypted Gmail SMTP configuration and disconnect
 - `convex/emailDrafts.ts` for draft CRUD and recipients
-- `convex/mailer.ts` for final sending flow
+- `convex/mailer.ts` for SMTP verification and final sending flow
 
 ### Frontend Areas
 - `src/components/GmailSettings.tsx`
