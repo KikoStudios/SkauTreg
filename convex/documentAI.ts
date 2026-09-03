@@ -14,6 +14,9 @@ const processors = [
   "generate_task_context",
 ] as const;
 
+const PROCESSOR_CONCURRENCY = 2;
+const PROCESSING_DEBOUNCE_MS = 1_800;
+
 function hashInput(value: string) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -109,7 +112,7 @@ export const queueProjectedSnapshot = internalMutation({
         createdAt: Date.now(),
       });
     }
-    const scheduledId = await ctx.scheduler.runAfter(0, internal.documentAI.executeRun, { runId, changedBlockIds: args.changedBlockIds });
+    const scheduledId = await ctx.scheduler.runAfter(PROCESSING_DEBOUNCE_MS, internal.documentAI.executeRun, { runId, changedBlockIds: args.changedBlockIds });
     await ctx.db.patch(runId, { scheduledId });
   },
 });
@@ -199,10 +202,30 @@ async function callProcessorWithRetry(
       return { ...(await callProcessor(baseUrl, token, job, payload)), attempt, durationMs: Date.now() - startedAt };
     } catch (error) {
       lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const retryable = /^HTTP_(502|503|504)$/.test(message);
+      if (!retryable || attempt === 2) break;
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
     }
   }
   throw lastError;
 }
+
+export const getRunStatus = internalQuery({
+  args: { runId: v.id("document_ai_runs") },
+  handler: async (ctx, { runId }) => (await ctx.db.get(runId))?.status ?? null,
+});
+
+export const finishEmptyRun = internalMutation({
+  args: { runId: v.id("document_ai_runs") },
+  handler: async (ctx, { runId }) => {
+    const run = await ctx.db.get(runId);
+    if (!run || run.status === "stale") return;
+    const jobs = await ctx.db.query("document_ai_jobs").withIndex("by_run", (q) => q.eq("runId", runId)).collect();
+    for (const job of jobs) await ctx.db.patch(job._id, { status: "stale", completedAt: Date.now() });
+    await ctx.db.patch(runId, { status: "complete", completedAt: Date.now() });
+  },
+});
 
 export const findCache = internalQuery({
   args: { inputHash: v.string(), processor: v.string(), schemaVersion: v.string() },
@@ -217,6 +240,10 @@ export const executeRun = internalAction({
   handler: async (ctx, args) => {
     const payload = await ctx.runQuery(internal.documentAI.loadRun, args);
     if (!payload || payload.run.status === "stale") return;
+    if (payload.blocks.length === 0) {
+      await ctx.runMutation(internal.documentAI.finishEmptyRun, { runId: args.runId });
+      return;
+    }
     const baseUrl = process.env.WIN10_AI_BASE_URL;
     const token = process.env.WIN10_AI_TOKEN;
     if (!baseUrl || !token) {
@@ -224,22 +251,29 @@ export const executeRun = internalAction({
       return;
     }
     await ctx.runMutation(internal.documentAI.startRun, { runId: args.runId });
-    const outcomes = await Promise.allSettled(payload.jobs.map(async (job) => {
-      const cached = await ctx.runQuery(internal.documentAI.findCache, { inputHash: job.inputHash, processor: job.processor, schemaVersion: job.schemaVersion });
-      if (cached) return { output: cached.outputJson, confidence: cached.confidence, attempt: 0, durationMs: 0, cacheHit: true };
-      return { ...(await callProcessorWithRetry(baseUrl, token, job, payload)), cacheHit: false };
-    }));
-    await Promise.all(outcomes.map((outcome, index) => ctx.runMutation(internal.documentAI.completeJob, {
-      jobId: payload.jobs[index]._id,
-      runId: args.runId,
-      ok: outcome.status === "fulfilled",
-      outputJson: outcome.status === "fulfilled" ? outcome.value.output : undefined,
-      confidence: outcome.status === "fulfilled" ? outcome.value.confidence : undefined,
-      attempt: outcome.status === "fulfilled" ? outcome.value.attempt : 2,
-      durationMs: outcome.status === "fulfilled" ? outcome.value.durationMs : undefined,
-      cacheHit: outcome.status === "fulfilled" ? outcome.value.cacheHit : false,
-      errorCode: outcome.status === "rejected" ? String(outcome.reason instanceof Error ? outcome.reason.message : outcome.reason).slice(0, 120) : undefined,
-    })));
+    for (let offset = 0; offset < payload.jobs.length; offset += PROCESSOR_CONCURRENCY) {
+      if (offset > 0) {
+        const status = await ctx.runQuery(internal.documentAI.getRunStatus, { runId: args.runId });
+        if (status === null || status === "stale") return;
+      }
+      const jobs = payload.jobs.slice(offset, offset + PROCESSOR_CONCURRENCY);
+      const outcomes = await Promise.allSettled(jobs.map(async (job) => {
+        const cached = await ctx.runQuery(internal.documentAI.findCache, { inputHash: job.inputHash, processor: job.processor, schemaVersion: job.schemaVersion });
+        if (cached) return { output: cached.outputJson, confidence: cached.confidence, attempt: 0, durationMs: 0, cacheHit: true };
+        return { ...(await callProcessorWithRetry(baseUrl, token, job, payload)), cacheHit: false };
+      }));
+      await Promise.all(outcomes.map((outcome, index) => ctx.runMutation(internal.documentAI.completeJob, {
+        jobId: jobs[index]._id,
+        runId: args.runId,
+        ok: outcome.status === "fulfilled",
+        outputJson: outcome.status === "fulfilled" ? outcome.value.output : undefined,
+        confidence: outcome.status === "fulfilled" ? outcome.value.confidence : undefined,
+        attempt: outcome.status === "fulfilled" ? outcome.value.attempt : 1,
+        durationMs: outcome.status === "fulfilled" ? outcome.value.durationMs : undefined,
+        cacheHit: outcome.status === "fulfilled" ? outcome.value.cacheHit : false,
+        errorCode: outcome.status === "rejected" ? String(outcome.reason instanceof Error ? outcome.reason.message : outcome.reason).slice(0, 120) : undefined,
+      })));
+    }
     await ctx.runMutation(internal.documentAI.finishRun, { runId: args.runId });
   },
 });

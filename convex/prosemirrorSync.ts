@@ -143,7 +143,7 @@ export const {
         }
         await ctx.db.patch(document._id, { contentVersion: version, updatedAt: Date.now() });
         if (changedBlockIds.length > 0) {
-            await ctx.scheduler.runAfter(650, internal.documentAI.queueProjectedSnapshot, {
+            await ctx.scheduler.runAfter(0, internal.documentAI.queueProjectedSnapshot, {
                 documentId: document._id,
                 pageId,
                 requestedVersion: version,

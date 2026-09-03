@@ -13,7 +13,7 @@ const CACHE_LIMIT = 500;
 
 const schemas = {
   segment_agenda: collectionSchema("segments", {
-    label: stringSchema(180), start_time: optionalString(), end_time: optionalString(), activity_type: optionalString(),
+    label: stringSchema(180), start_time: stringSchema(8), end_time: stringSchema(8), activity_type: stringSchema(80),
   }),
   extract_tasks: collectionSchema("tasks", {
     title: stringSchema(240), description: optionalString(1200), due_at: optionalString(80),
@@ -35,7 +35,7 @@ const schemas = {
 };
 
 const instructions = {
-  segment_agenda: "Rozděl text na skutečné programové bloky. Časy zachovej jako HH:MM, nic nevymýšlej.",
+  segment_agenda: "Rozděl text na skutečné programové bloky. Časy zachovej jako HH:MM, nic nevymýšlej. Pokud čas nebo typ aktivity není uveden, vrať pro dané pole prázdný řetězec.",
   extract_tasks: "Najdi pouze konkrétní budoucí úkoly nebo přípravy. title musí být krátká akce v infinitivu, nikdy název dokumentu. Příklad: z textu 'Petr má do pátku připravit lana a lékárničku' vrať title 'Připravit lana a lékárničku' a assignee_names ['Petr']. Nepřeváděj obecné poznámky na úkoly.",
   extract_materials: "Vypiš výslovně zmíněné pomůcky, materiál a vybavení. Nic nedoplňuj z obecných znalostí.",
   resolve_dates: "Převeď výslovné relativní a absolutní termíny na ISO 8601 podle metadat schůzky. Nejasné datum vynech.",
@@ -47,6 +47,7 @@ const instructions = {
 let active = 0;
 const queue = [];
 const cache = new Map();
+const inFlight = new Map();
 
 const server = createServer(async (request, response) => {
   const startedAt = Date.now();
@@ -60,8 +61,6 @@ const server = createServer(async (request, response) => {
 
   if (request.method !== "POST" || request.url !== "/v1/process") return send(response, 404, { error: "not_found" });
   if (!authorized(request.headers.authorization)) return send(response, 401, { error: "unauthorized" });
-  if (queue.length >= MAX_QUEUE) return send(response, 503, { error: "queue_full", retryable: true });
-
   try {
     const input = await readJson(request);
     const validation = validateRequest(input);
@@ -69,8 +68,15 @@ const server = createServer(async (request, response) => {
     const key = createHash("sha256").update(JSON.stringify(input)).digest("hex");
     const cached = cache.get(key);
     if (cached) return send(response, 200, { ...cached, cache_hit: true });
-
-    const result = await enqueue(() => processRequest(input));
+    let pending = inFlight.get(key);
+    if (!pending) {
+      if (queue.length >= MAX_QUEUE) return send(response, 503, { error: "queue_full", retryable: true });
+      const deadlineAt = startedAt + Math.max(5_000, Math.min(35_000, Number(input.deadline_ms || 25_000)));
+      pending = enqueue(() => processRequest(input), deadlineAt);
+      inFlight.set(key, pending);
+      void pending.finally(() => inFlight.delete(key)).catch(() => undefined);
+    }
+    const result = await pending;
     cache.set(key, result);
     if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
     log({ level: "info", event: "processed", request_id: input.request_id, processor: input.processor, duration_ms: Date.now() - startedAt, cache_hit: false });
@@ -115,7 +121,13 @@ async function processRequest(input) {
         options: { temperature: 0, num_predict: Math.min(800, input.generation?.max_output_tokens || 600), num_ctx: 4096, seed: 7 },
       }),
     });
-    if (!ollamaResponse.ok) throw new Error(`ollama_http_${ollamaResponse.status}`);
+    if (!ollamaResponse.ok) {
+      const errorBody = await ollamaResponse.json().catch(() => null);
+      const reason = typeof errorBody?.error === "string"
+        ? errorBody.error.replace(/[\r\n]+/g, " ").slice(0, 180)
+        : "request_rejected";
+      throw new Error(`ollama_http_${ollamaResponse.status}:${reason}`);
+    }
     const ollama = await ollamaResponse.json();
     const output = normalizeOutput(input.processor, JSON.parse(ollama?.message?.content || "null"));
     validateOutput(input.processor, output, input.context.blocks.map((block) => block.block_id));
@@ -209,13 +221,17 @@ function readJson(request) {
   });
 }
 
-function enqueue(task) {
-  return new Promise((resolve, reject) => { queue.push({ task, resolve, reject }); drain(); });
+function enqueue(task, deadlineAt) {
+  return new Promise((resolve, reject) => { queue.push({ task, deadlineAt, resolve, reject }); drain(); });
 }
 
 function drain() {
   while (active < MAX_CONCURRENCY && queue.length) {
     const item = queue.shift();
+    if (Date.now() >= item.deadlineAt) {
+      item.reject(new Error("deadline_exceeded"));
+      continue;
+    }
     active += 1;
     item.task().then(item.resolve, item.reject).finally(() => { active -= 1; drain(); });
   }
