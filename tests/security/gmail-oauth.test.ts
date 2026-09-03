@@ -13,7 +13,8 @@ describe("Gmail OAuth state", () => {
     process.env.OAUTH_STATE_SECRET = "ab".repeat(32);
     const state = signOAuthState({ nonce: "nonce", troopId: "troop", userId: "user", returnAction: "", expiresAt: Date.now() + 60_000 });
     expect(verifyOAuthState(state).troopId).toBe("troop");
-    expect(() => verifyOAuthState(`${state.slice(0, -1)}x`)).toThrow();
+    const tamperedPrefix = state[0] === "a" ? "b" : "a";
+    expect(() => verifyOAuthState(`${tamperedPrefix}${state.slice(1)}`)).toThrow();
   });
 
   it("rejects expired state", () => {
