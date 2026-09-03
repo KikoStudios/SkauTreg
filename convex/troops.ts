@@ -510,13 +510,13 @@ export const connectEmailProvider = mutation({
     handler: async (ctx, args) => {
         const { user } = await requireTroopManager(ctx, args.troopId);
         if (args.provider !== "gmail") {
-            authError("VALIDATION_ERROR", "V produkčním režimu je podporován pouze Gmail.");
+            authError("VALIDATION_ERROR", "Toto připojení podporuje pouze starší Gmail OAuth.");
         }
         const email = args.email.trim().toLowerCase();
-        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254 || !args.refreshToken || args.refreshToken.length > 4096) {
-            authError("VALIDATION_ERROR", "Google nevrátil platné údaje pro propojení Gmailu.");
+        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) {
+            authError("VALIDATION_ERROR", "Zadejte platnou e-mailovou adresu Google účtu.");
         }
-        if (args.smtpHost || args.smtpPort || args.smtpPassword || args.groupEmail || args.memberMapping || args.matchedMemberIds || args.newMembers) {
+        if (!args.refreshToken || args.refreshToken.length > 4096 || args.smtpHost || args.smtpPort || args.smtpPassword || args.groupEmail || args.memberMapping || args.matchedMemberIds || args.newMembers) {
             authError("VALIDATION_ERROR", "Gmail propojení nepřijímá nastavení jiných poskytovatelů.");
         }
 
@@ -525,6 +525,37 @@ export const connectEmailProvider = mutation({
                 provider: "gmail",
                 email,
                 refreshToken: await encryptCredential(args.refreshToken),
+                connectedAt: new Date().toISOString(),
+                connectedBy: user._id,
+                requiresReconnect: false,
+            },
+        });
+    },
+});
+
+export const storeGmailSmtp = internalMutation({
+    args: {
+        troopId: v.id("troops"),
+        email: v.string(),
+        appPassword: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const { user } = await requireTroopManager(ctx, args.troopId);
+        const email = args.email.trim().toLowerCase();
+        const appPassword = args.appPassword.replace(/\s/g, "");
+        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) {
+            authError("VALIDATION_ERROR", "Zadejte platnou e-mailovou adresu Google účtu.");
+        }
+        if (!/^[a-zA-Z0-9]{16}$/.test(appPassword)) {
+            authError("VALIDATION_ERROR", "Zadejte platné šestnáctimístné heslo aplikace Google.");
+        }
+        await ctx.db.patch(args.troopId, {
+            emailProvider: {
+                provider: "gmail-smtp",
+                email,
+                smtpHost: "smtp.gmail.com",
+                smtpPort: 465,
+                smtpPassword: await encryptCredential(appPassword),
                 connectedAt: new Date().toISOString(),
                 connectedBy: user._id,
                 requiresReconnect: false,
@@ -656,7 +687,7 @@ export const markGmailReconnectRequired = internalMutation({
     handler: async (ctx, args) => {
         await requireTroopManager(ctx, args.troopId);
         const troop = await ctx.db.get(args.troopId);
-        if (!troop?.emailProvider || troop.emailProvider.provider !== "gmail") return;
+        if (!troop?.emailProvider || !["gmail", "gmail-smtp"].includes(troop.emailProvider.provider)) return;
         await ctx.db.patch(args.troopId, {
             emailProvider: { ...troop.emailProvider, requiresReconnect: true },
         });

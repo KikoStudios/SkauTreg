@@ -45,7 +45,7 @@ Produkční build vyžaduje úplné právní, bezpečnostní a feature-stage pro
 - Vývojové prostředí: `docs/developer/setup.md`
 - Nasazení: `docs/developer/deployment.md`
 - Testování: `docs/testing/testing-guide.md`
-- Gmail OAuth, Google verification a schválení doménou skaut.cz: `docs/google-oauth-verification.md`
+- Gmail SMTP používá heslo aplikace vytvořené v nastavení Google účtu; starší OAuth provozní poznámky jsou v `docs/google-oauth-verification.md`.
 
 Právní text na `/privacy` a `/tos` musí před produkčním vydáním schválit odpovědná osoba nebo právník.
 

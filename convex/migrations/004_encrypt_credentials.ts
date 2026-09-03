@@ -7,17 +7,19 @@ export const auditCredentialState = internalQuery({
   handler: async (ctx) => {
     const troops = await ctx.db.query("troops").collect();
     const integrations = await ctx.db.query("integrations").collect();
-    const gmailTokens = troops.flatMap((troop) => {
-      const token = troop.emailProvider?.provider === "gmail"
-        ? troop.emailProvider.refreshToken
-        : troop.gmailOAuth?.refreshToken;
-      return token ? [token] : [];
+    const gmailCredentials = troops.flatMap((troop) => {
+      const credential = troop.emailProvider?.provider === "gmail-smtp"
+        ? troop.emailProvider.smtpPassword
+        : troop.emailProvider?.provider === "gmail"
+          ? troop.emailProvider.refreshToken
+          : troop.gmailOAuth?.refreshToken;
+      return credential ? [credential] : [];
     });
     const integrationSecrets = integrations.flatMap((integration) => [integration.configPayload, integration.webhookUrl].filter((value): value is string => Boolean(value)));
     return {
-      gmailConnections: gmailTokens.length,
-      gmailEncrypted: gmailTokens.filter(isEncryptedCredential).length,
-      gmailPlaintext: gmailTokens.filter((token) => !isEncryptedCredential(token)).length,
+      gmailConnections: gmailCredentials.length,
+      gmailEncrypted: gmailCredentials.filter(isEncryptedCredential).length,
+      gmailPlaintext: gmailCredentials.filter((credential) => !isEncryptedCredential(credential)).length,
       integrationSecrets: integrationSecrets.length,
       integrationEncrypted: integrationSecrets.filter(isEncryptedCredential).length,
       integrationPlaintext: integrationSecrets.filter((secret) => !isEncryptedCredential(secret)).length,
