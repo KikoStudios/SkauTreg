@@ -187,11 +187,15 @@ export const getSendConfiguration = query({
     handler: async (ctx, args) => {
         const { troop } = await requireTripLeader(ctx, args.tripId);
         await requireTroopManager(ctx, troop._id);
-        const provider = troop.emailProvider?.provider === "gmail" ? troop.emailProvider : undefined;
+        const provider = troop.emailProvider && ["gmail", "gmail-smtp"].includes(troop.emailProvider.provider)
+            ? troop.emailProvider
+            : undefined;
         return {
-            provider: provider ? "gmail" as const : null,
+            provider: provider?.provider === "gmail-smtp" ? "gmail-smtp" as const : provider ? "gmail" as const : null,
             senderEmail: provider?.email ?? troop.gmailOAuth?.email ?? null,
-            connected: Boolean(provider?.refreshToken || troop.gmailOAuth?.refreshToken),
+            connected: provider?.provider === "gmail-smtp"
+                ? Boolean(provider.smtpPassword)
+                : Boolean(provider?.refreshToken || troop.gmailOAuth?.refreshToken),
             requiresReconnect: provider?.requiresReconnect === true,
         };
     },

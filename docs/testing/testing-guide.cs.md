@@ -28,10 +28,10 @@ npx convex dev
 - CRUD výprav funguje.
 - RSVP odkazy fungují.
 
-## 3) Email + OAuth test
+## 3) Email + SMTP test
 
-- Propojení Gmailu v nastavení projde bez chyby.
-- OAuth callback uloží propojený email.
+- Propojení Gmail SMTP v nastavení projde s platným heslem aplikace.
+- Neplatné přihlašovací údaje se neuloží.
 - Draft e-mailu lze vytvořit/upravit/smazat.
 - Vedoucí může odeslat, ne-vedoucí ne.
 - `<user.name>` a `<user.sign.link>` se správně nahradí.

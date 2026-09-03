@@ -2,6 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { ConvexError, v } from "convex/values";
+import nodemailer from "nodemailer";
 import { action } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -13,6 +14,8 @@ type PreparedTarget = DeliveryTarget & { memberName: string; capabilityKey: stri
 
 const toBase64Url = (input: string) => Buffer.from(input, "utf8").toString("base64url");
 const toBase64 = (input: string) => Buffer.from(input, "utf8").toString("base64");
+const GMAIL_SMTP_HOST = "smtp.gmail.com";
+const GMAIL_SMTP_PORT = 465;
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, "&amp;")
@@ -56,6 +59,32 @@ const errorCode = (error: unknown, fallback: string) =>
   error instanceof ConvexError && typeof error.data === "object" && error.data && "code" in error.data
     ? String(error.data.code)
     : fallback;
+
+const normalizeAppPassword = (value: string) => value.replace(/\s/g, "");
+
+const createGmailSmtpTransport = (email: string, appPassword: string) => nodemailer.createTransport({
+  host: GMAIL_SMTP_HOST,
+  port: GMAIL_SMTP_PORT,
+  secure: true,
+  auth: { user: email, pass: appPassword },
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 20_000,
+});
+
+const gmailSmtpError = (error: unknown) => {
+  const smtpError = error as { code?: string; responseCode?: number };
+  if (smtpError.code === "EAUTH" || smtpError.responseCode === 534 || smtpError.responseCode === 535) {
+    return new ConvexError({
+      code: "GMAIL_SMTP_AUTH_FAILED",
+      message: "Google odmítl e-mail nebo heslo aplikace. Vygenerujte nové heslo aplikace a připojení obnovte.",
+    });
+  }
+  if (["ETIMEDOUT", "ECONNECTION", "ECONNRESET", "ESOCKET", "EDNS"].includes(smtpError.code ?? "") || (smtpError.responseCode ?? 0) >= 400 && (smtpError.responseCode ?? 0) < 500) {
+    return new ConvexError({ code: "GMAIL_TEMPORARILY_UNAVAILABLE", message: "Gmail SMTP je dočasně nedostupný. Zkuste to později." });
+  }
+  return new ConvexError({ code: "GMAIL_DELIVERY_FAILED", message: "Gmail zprávu přes SMTP nepřijal." });
+};
 
 async function getGmailAccessToken(refreshToken?: string) {
   const clientId = process.env.NEXT_PUBLIC_GMAIL_CLIENT_ID;
@@ -135,6 +164,72 @@ async function sendGmailMessage(params: {
   return result.id;
 }
 
+async function sendGmailSmtpMessage(params: {
+  transport: ReturnType<typeof createGmailSmtpTransport>;
+  fromName: string;
+  fromEmail: string;
+  to: string;
+  subject: string;
+  html: string;
+  replyTo?: string;
+}) {
+  try {
+    const result = await params.transport.sendMail({
+      from: { name: params.fromName, address: params.fromEmail },
+      to: params.to,
+      subject: params.subject,
+      text: params.html.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim(),
+      html: params.html,
+      replyTo: params.replyTo,
+      headers: { "X-Mailer": "SkauTreg" },
+    });
+    return result.messageId;
+  } catch (error) {
+    throw gmailSmtpError(error);
+  }
+}
+
+export const connectGmailSmtp = action({
+  args: {
+    troopId: v.id("troops"),
+    email: v.string(),
+    appPassword: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ email: string }> => {
+    if (!await ctx.auth.getUserIdentity()) {
+      throw new ConvexError({ code: "UNAUTHENTICATED", message: "Pro připojení Gmailu se musíte přihlásit." });
+    }
+    const role = await ctx.runQuery(api.troops.getMyRole, { troopId: args.troopId });
+    if (role !== "owner" && role !== "main_leader") {
+      throw new ConvexError({ code: "FORBIDDEN", message: "Gmail může připojit pouze majitel nebo hlavní vedoucí." });
+    }
+    const email = args.email.trim().toLowerCase();
+    const appPassword = normalizeAppPassword(args.appPassword);
+    if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) {
+      throw new ConvexError({ code: "VALIDATION_ERROR", message: "Zadejte platnou e-mailovou adresu Google účtu." });
+    }
+    if (!/^[a-zA-Z0-9]{16}$/.test(appPassword)) {
+      throw new ConvexError({ code: "VALIDATION_ERROR", message: "Heslo aplikace Google musí mít 16 znaků." });
+    }
+
+    const transport = createGmailSmtpTransport(email, appPassword);
+    try {
+      await transport.verify();
+    } catch (error) {
+      throw gmailSmtpError(error);
+    } finally {
+      transport.close();
+    }
+
+    await ctx.runMutation(internal.troops.storeGmailSmtp, {
+      troopId: args.troopId,
+      email,
+      appPassword,
+    });
+    return { email };
+  },
+});
+
 export const sendFromDraft = action({
   args: {
     draftId: v.id("email_drafts"),
@@ -165,10 +260,15 @@ export const sendFromDraft = action({
       const provider = troop.emailProvider;
       const legacy = troop.gmailOAuth;
       if (provider?.requiresReconnect) throw new ConvexError({ code: "GMAIL_RECONNECT_REQUIRED", message: "Gmail je potřeba znovu připojit." });
-      if (provider?.provider !== "gmail" && !legacy) throw new ConvexError({ code: "GMAIL_RECONNECT_REQUIRED", message: "Gmail není připojen." });
-      const refreshToken = provider?.refreshToken || legacy?.refreshToken;
+      const usesSmtp = provider?.provider === "gmail-smtp";
+      const usesOAuth = provider?.provider === "gmail" || Boolean(legacy);
+      if (!usesSmtp && !usesOAuth) throw new ConvexError({ code: "GMAIL_RECONNECT_REQUIRED", message: "Gmail není připojen." });
       const senderEmail = provider?.email || legacy?.email;
-      if (!refreshToken || !senderEmail) throw new ConvexError({ code: "GMAIL_RECONNECT_REQUIRED", message: "Gmail není připojen." });
+      const refreshToken = provider?.refreshToken || legacy?.refreshToken;
+      const smtpPassword = provider?.smtpPassword;
+      if (!senderEmail || (usesSmtp ? !smtpPassword : !refreshToken)) {
+        throw new ConvexError({ code: "GMAIL_RECONNECT_REQUIRED", message: "Gmail není připojen." });
+      }
 
       const recipients = await ctx.runQuery(internal.emailDrafts.listRecipientsForSend, { tripId: draft.tripId });
       const selected = args.memberIds ? new Set(args.memberIds) : null;
@@ -210,17 +310,20 @@ export const sendFromDraft = action({
       if (!attempt) throw new ConvexError({ code: "EMAIL_ATTEMPT_FAILED", message: "Pokus o odeslání se nepodařilo založit." });
       await ctx.runMutation(internal.emailDelivery.initializeDeliveries, { attemptId: attempt._id, targets: prepared.map(({ memberId, contactKind }) => ({ memberId, contactKind })) });
 
-      let accessToken: string;
-      try {
-        accessToken = await getGmailAccessToken(refreshToken);
-      } catch (error) {
-        const code = errorCode(error, "GMAIL_TEMPORARILY_UNAVAILABLE");
-        if (code === "GMAIL_RECONNECT_REQUIRED") await ctx.runMutation(internal.troops.markGmailReconnectRequired, { troopId: trip.trip.troopId });
-        for (const target of prepared) {
-          await ctx.runMutation(internal.emailDelivery.recordDelivery, { attemptId: attempt._id, memberId: target.memberId, contactKind: target.contactKind, status: "failed", errorCode: code });
+      let accessToken: string | undefined;
+      const smtpTransport = usesSmtp ? createGmailSmtpTransport(senderEmail, smtpPassword as string) : undefined;
+      if (!usesSmtp) {
+        try {
+          accessToken = await getGmailAccessToken(refreshToken);
+        } catch (error) {
+          const code = errorCode(error, "GMAIL_TEMPORARILY_UNAVAILABLE");
+          if (code === "GMAIL_RECONNECT_REQUIRED") await ctx.runMutation(internal.troops.markGmailReconnectRequired, { troopId: trip.trip.troopId });
+          for (const target of prepared) {
+            await ctx.runMutation(internal.emailDelivery.recordDelivery, { attemptId: attempt._id, memberId: target.memberId, contactKind: target.contactKind, status: "failed", errorCode: code });
+          }
+          await ctx.runMutation(internal.emailDelivery.completeAttempt, { attemptId: attempt._id, sentCount: 0, failedCount: prepared.length });
+          throw error;
         }
-        await ctx.runMutation(internal.emailDelivery.completeAttempt, { attemptId: attempt._id, sentCount: 0, failedCount: prepared.length });
-        throw error;
       }
 
       const fromName = (troop.name || process.env.GMAIL_FROM_NAME || "SkauTreg").replace(/[\r\n]/g, " ");
@@ -242,7 +345,9 @@ export const sendFromDraft = action({
             .replace(/&lt;user\.name&gt;/g, escapeHtml(target.memberName));
           const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0;padding:20px">${bodyText.replace(/\n/g, "<br/>")}</body></html>`;
           try {
-            const providerMessageId = await sendGmailMessage({ accessToken, from: `${fromName} <${senderEmail}>`, to: target.email, subject: draft.subject, html, replyTo });
+            const providerMessageId = smtpTransport
+              ? await sendGmailSmtpMessage({ transport: smtpTransport, fromName, fromEmail: senderEmail, to: target.email, subject: draft.subject, html, replyTo })
+              : await sendGmailMessage({ accessToken: accessToken as string, from: `${fromName} <${senderEmail}>`, to: target.email, subject: draft.subject, html, replyTo });
             await ctx.runMutation(internal.emailDelivery.recordDelivery, { attemptId: attempt._id, memberId: target.memberId, contactKind: target.contactKind, status: "sent", providerMessageId });
             return { memberId: target.memberId, contactKind: target.contactKind, sent: true };
           } catch (error) {
@@ -255,7 +360,8 @@ export const sendFromDraft = action({
 
       const sentCount = results.filter((result) => result.sent).length;
       const failed = results.filter((result): result is typeof result & { errorCode: string } => !result.sent && Boolean(result.errorCode));
-      if (failed.some((result) => result.errorCode === "GMAIL_RECONNECT_REQUIRED")) {
+      smtpTransport?.close();
+      if (failed.some((result) => ["GMAIL_RECONNECT_REQUIRED", "GMAIL_SMTP_AUTH_FAILED"].includes(result.errorCode))) {
         await ctx.runMutation(internal.troops.markGmailReconnectRequired, { troopId: trip.trip.troopId });
       }
       await ctx.runMutation(internal.emailDelivery.completeAttempt, { attemptId: attempt._id, sentCount, failedCount: failed.length });
@@ -269,7 +375,7 @@ export const sendFromDraft = action({
         total: prepared.length,
       };
     } catch (error) {
-      console.error("Gmail send failed", { operation: "gmail_send", code: errorCode(error, "EMAIL_SEND_FAILED") });
+      console.error("Email send failed", { operation: "email_send", code: errorCode(error, "EMAIL_SEND_FAILED") });
       if (error instanceof ConvexError) throw error;
       throw new ConvexError({ code: "EMAIL_SEND_FAILED", message: "Odeslání se nepodařilo. Zkuste to později." });
     }

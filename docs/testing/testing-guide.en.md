@@ -28,10 +28,10 @@ npx convex dev
 - Trip CRUD works.
 - RSVP links work.
 
-## 3) Email + OAuth test
+## 3) Email + SMTP test
 
-- Gmail connect in settings succeeds.
-- OAuth callback persists connected email.
+- Gmail SMTP connection succeeds with a valid Google app password.
+- Invalid SMTP credentials are rejected before being saved.
 - Draft can be created/edited/deleted.
 - Leader can send, non-leader cannot.
 - `<user.name>` and `<user.sign.link>` resolve correctly.

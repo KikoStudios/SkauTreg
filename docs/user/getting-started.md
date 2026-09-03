@@ -19,7 +19,7 @@ This section is focused on troop leaders and members using SkauTreg in daily wor
 - Use participant overview as the operational source of truth before trip.
 
 ### Email Workflow (for leaders)
-- Connect Gmail in troop settings.
+- In troop settings, connect Gmail with a 16-character Google app password.
 - Draft trip emails in `Výprava -> E-maily`.
 - Send with smart tags:
   - `<user.name>`
@@ -29,7 +29,7 @@ This section is focused on troop leaders and members using SkauTreg in daily wor
 
 - Missing send permission: only leader/owner can send.
 - Email not delivered to member: verify member has email in profile.
-- Gmail connection issues: reconnect account and verify environment setup with your admin.
+- Gmail connection issues: create a new Google app password and reconnect the account. Managed Google Workspace accounts may require administrator approval.
 
 ## In-App Help Source
 

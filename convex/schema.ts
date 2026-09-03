@@ -43,16 +43,16 @@ export default defineSchema({
         archivedBy: v.optional(v.id("users")),
         archiveReason: v.optional(v.string()),
         
-        // Email provider integration (OAuth or SMTP)
+        // Email provider integration (legacy OAuth or Gmail SMTP app password)
         emailProvider: v.optional(v.object({
-            provider: v.string(), // "gmail", "outlook", "seznam", "centrum", "google-groups"
+            provider: v.string(), // "gmail-smtp" or legacy "gmail"
             email: v.string(), // Connected email address
             // OAuth fields (for Gmail)
             refreshToken: v.optional(v.string()), // OAuth refresh token
-            // SMTP fields (for Seznam, Centrum, O2)
-            smtpHost: v.optional(v.string()), // e.g., "smtp.seznam.cz"
-            smtpPort: v.optional(v.number()), // e.g., 465
-            smtpPassword: v.optional(v.string()), // Encrypted password
+            // SMTP fields (Gmail settings are server-controlled)
+            smtpHost: v.optional(v.string()),
+            smtpPort: v.optional(v.number()),
+            smtpPassword: v.optional(v.string()), // Encrypted Google app password
             // Google Groups integration
             groupEmail: v.optional(v.string()), // Google Group email address
             memberMapping: v.optional(v.array(v.object({
