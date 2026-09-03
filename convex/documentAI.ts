@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { authError, requireDocumentEditor, requireDocumentViewer } from "./lib/auth";
 
 const processors = [
@@ -62,6 +63,124 @@ function validateProcessorOutput(processor: string, output: unknown) {
   return output;
 }
 
+function processorItems(job: Doc<"document_ai_jobs"> | undefined, collection: string, blockId?: string) {
+  const output = job?.outputJson as Record<string, unknown> | undefined;
+  const items = output?.[collection];
+  if (!Array.isArray(items)) return [];
+  return items.filter((item): item is Record<string, unknown> =>
+    !!item && typeof item === "object" && (!blockId || (item as Record<string, unknown>).block_id === blockId),
+  );
+}
+
+function normalizePersonName(value: string) {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("cs");
+}
+
+function hasExplicitTaskSignal(text: string) {
+  return /\b(?:má|musí|připrav(?:it|í|te)?|vzít|vezm(?:e|ou)|donést|donese|přinést|přinese|zajistit|zajistí|udělat|udělá|poslat|pošle|objednat|objedná|ověřit|ověří|zkontrolovat|zkontroluje|domluvit|domluví|je\s+třeba|je\s+potřeba)\b/iu.test(text);
+}
+
+async function materializeTaskItems(
+  ctx: MutationCtx,
+  args: {
+    document: Doc<"documents">;
+    pageId: Id<"meeting_pages">;
+    fallbackBlockId: string;
+    sourceVersion: number;
+    jobId: Id<"document_ai_jobs">;
+    createdBy: Id<"users">;
+    items: Array<Record<string, unknown>>;
+    siblingJobs: Array<Doc<"document_ai_jobs">>;
+  },
+) {
+  const createdTaskIds: Id<"document_tasks">[] = [];
+  const leaderLinks = await ctx.db.query("troop_leaders").withIndex("by_troop", (q) => q.eq("troopId", args.document.troopId)).collect();
+  const leaders = (await Promise.all(leaderLinks.map(async (link) => ({ link, user: await ctx.db.get(link.userId) })))).filter((entry) => entry.user);
+  const setup = await ctx.db.query("schuzka_setups").withIndex("by_document", (q) => q.eq("documentId", args.document._id)).unique();
+
+  for (const item of args.items.slice(0, 20)) {
+    const title = typeof item.title === "string" ? item.title.trim().slice(0, 240) : "";
+    if (!title) continue;
+    const requestedBlockId = typeof item.block_id === "string" ? item.block_id : args.fallbackBlockId;
+    const requestedBlock = await ctx.db.query("document_blocks").withIndex("by_page_block", (q) => q.eq("pageId", args.pageId).eq("blockId", requestedBlockId)).unique();
+    const blockId = requestedBlock?.documentId === args.document._id ? requestedBlockId : args.fallbackBlockId;
+    const sourceBlock = blockId === requestedBlockId
+      ? requestedBlock
+      : await ctx.db.query("document_blocks").withIndex("by_page_block", (q) => q.eq("pageId", args.pageId).eq("blockId", blockId)).unique();
+    const taskKey = `ai_${hashInput(`${args.document._id}:${args.pageId}`)}_${hashInput(`${blockId}:${title.toLocaleLowerCase("cs")}`)}`;
+    const existing = await ctx.db.query("document_tasks").withIndex("by_task_key", (q) => q.eq("taskKey", taskKey)).unique();
+    if (existing) continue;
+
+    const priority = item.priority === "low" || item.priority === "high" || item.priority === "critical" ? item.priority : "normal";
+    const generatedTags = processorItems(
+      args.siblingJobs.find((candidate) => candidate.processor === "generate_tags" && (candidate.status === "succeeded" || candidate.status === "cache_hit")),
+      "tags",
+      blockId,
+    ).map((tag) => tag.value).filter((tag): tag is string => typeof tag === "string");
+    const tags = [...new Set([
+      ...(Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : []),
+      ...generatedTags,
+    ].map((tag) => tag.trim()).filter(Boolean))].slice(0, 12);
+    const resolvedDate = processorItems(
+      args.siblingJobs.find((candidate) => candidate.processor === "resolve_dates" && (candidate.status === "succeeded" || candidate.status === "cache_hit")),
+      "dates",
+      blockId,
+    ).map((date) => date.iso).find((iso): iso is string => typeof iso === "string" && Number.isFinite(Date.parse(iso)));
+    const dueSource = typeof item.due_at === "string" && Number.isFinite(Date.parse(item.due_at)) ? item.due_at : resolvedDate;
+    const dueAt = dueSource ? Date.parse(dueSource) : undefined;
+    const summary = processorItems(
+      args.siblingJobs.find((candidate) => candidate.processor === "generate_task_context" && (candidate.status === "succeeded" || candidate.status === "cache_hit")),
+      "summaries",
+      blockId,
+    ).map((entry) => entry.summary).find((value): value is string => typeof value === "string" && !!value.trim());
+    const requestedAssignees = Array.isArray(item.assignee_names)
+      ? item.assignee_names.filter((name): name is string => typeof name === "string").map(normalizePersonName)
+      : [];
+    const assigneeIds = requestedAssignees.flatMap((requestedName) => {
+      const matches = leaders.filter(({ user }) => {
+        const fullName = normalizePersonName(user?.name || "");
+        return fullName === requestedName || fullName.split(/\s+/)[0] === requestedName;
+      });
+      return matches.length === 1 ? [matches[0].link.userId] : [];
+    }).filter((userId, position, all) => all.indexOf(userId) === position);
+    const now = Date.now();
+    const taskId = await ctx.db.insert("document_tasks", {
+      troopId: args.document.troopId,
+      documentId: args.document._id,
+      sourcePageId: args.pageId,
+      sourceBlockId: blockId,
+      taskKey,
+      title,
+      description: typeof item.description === "string" ? item.description.trim().slice(0, 2000) || undefined : undefined,
+      status: "todo",
+      isOpen: true,
+      priority,
+      priorityRank: priority === "critical" ? 3 : priority === "high" ? 2 : priority === "low" ? 0 : 1,
+      assigneeIds,
+      dueAt,
+      tags,
+      tagsNormalized: tags.map((tag) => tag.toLocaleLowerCase("cs")),
+      sourceDocumentTitle: args.document.title,
+      sourceExcerpt: sourceBlock?.text || title,
+      sourceVersion: args.sourceVersion,
+      sourceState: sourceBlock ? "linked" : "linking",
+      meetingStartAt: setup?.scheduledStartAt,
+      aiSummary: summary?.trim().slice(0, 300),
+      aiConfidence: typeof item.confidence === "number" ? item.confidence : undefined,
+      aiJobId: args.jobId,
+      createdBy: args.createdBy,
+      updatedBy: args.createdBy,
+      createdAt: now,
+      updatedAt: now,
+    });
+    for (const assigneeId of assigneeIds) {
+      await ctx.db.insert("document_task_assignees", { troopId: args.document.troopId, taskId, assigneeId, isOpen: true, dueAt });
+    }
+    createdTaskIds.push(taskId);
+  }
+  return createdTaskIds;
+}
+
 export const queueProjectedSnapshot = internalMutation({
   args: {
     documentId: v.id("documents"),
@@ -83,6 +202,13 @@ export const queueProjectedSnapshot = internalMutation({
       if (run.scheduledId) await ctx.scheduler.cancel(run.scheduledId).catch(() => undefined);
       const jobs = await ctx.db.query("document_ai_jobs").withIndex("by_run", (q) => q.eq("runId", run._id)).collect();
       for (const job of jobs) await ctx.db.patch(job._id, { status: "stale", completedAt: Date.now() });
+    }
+    const pendingSuggestions = await ctx.db
+      .query("document_ai_suggestions")
+      .withIndex("by_document_state", (q) => q.eq("documentId", args.documentId).eq("state", "pending"))
+      .take(100);
+    for (const suggestion of pendingSuggestions.filter((suggestion) => suggestion.sourceVersion !== args.requestedVersion)) {
+      await ctx.db.patch(suggestion._id, { state: "stale", resolvedAt: Date.now() });
     }
 
     const runId = await ctx.db.insert("document_ai_runs", {
@@ -313,16 +439,19 @@ export const completeJob = internalMutation({
       completedAt: Date.now(),
     });
     const confidence = args.confidence ?? 0;
-    if (args.ok && args.outputJson !== undefined && confidence >= 0.7 && job.blockId) {
+    const taskCandidates = job.processor === "extract_tasks"
+      ? processorItems({ ...job, outputJson: args.outputJson }, "tasks").filter((item) => typeof item.confidence === "number" && item.confidence >= 0.7)
+      : [];
+    if (args.ok && taskCandidates.length > 0 && job.blockId) {
       await ctx.db.insert("document_ai_suggestions", {
         troopId: job.troopId,
         documentId: job.documentId,
         pageId: job.pageId,
-        blockId: job.blockId,
+        blockId: typeof taskCandidates[0].block_id === "string" ? taskCandidates[0].block_id : job.blockId,
         jobId: job._id,
         kind: job.processor,
-        payload: args.outputJson,
-        confidence,
+        payload: { tasks: taskCandidates },
+        confidence: Math.max(confidence, ...taskCandidates.map((item) => typeof item.confidence === "number" ? item.confidence : 0)),
         sourceVersion: job.requestedVersion,
         state: "pending",
         createdAt: Date.now(),
@@ -337,8 +466,94 @@ export const finishRun = internalMutation({
     const run = await ctx.db.get(runId);
     if (!run || run.status === "stale") return;
     const jobs = await ctx.db.query("document_ai_jobs").withIndex("by_run", (q) => q.eq("runId", runId)).collect();
+    const document = await ctx.db.get(run.documentId);
+    if (!document || document.contentVersion !== run.requestedVersion) {
+      await ctx.db.patch(runId, { status: "stale", completedAt: Date.now() });
+      return;
+    }
+    const taskJob = jobs.find((job) => job.processor === "extract_tasks" && (job.status === "succeeded" || job.status === "cache_hit"));
+    const extractedTasks = processorItems(taskJob, "tasks");
+    const sourceBlocks = await ctx.db.query("document_blocks").withIndex("by_page_order", (q) => q.eq("pageId", run.pageId)).collect();
+    const sourceTextByBlock = new Map(sourceBlocks.filter((block) => !block.deletedAt).map((block) => [block.blockId, block.text]));
+    const automaticTasks = extractedTasks.filter((item) => {
+      const blockId = typeof item.block_id === "string" ? item.block_id : taskJob?.blockId;
+      const sourceText = blockId ? sourceTextByBlock.get(blockId) : undefined;
+      return typeof item.confidence === "number" && item.confidence >= 0.9 && !!sourceText && hasExplicitTaskSignal(sourceText);
+    });
+    if (taskJob && automaticTasks.length > 0) {
+      await materializeTaskItems(ctx, {
+        document,
+        pageId: run.pageId,
+        fallbackBlockId: taskJob.blockId || "document-root",
+        sourceVersion: run.requestedVersion,
+        jobId: taskJob._id,
+        createdBy: document.updatedBy,
+        items: automaticTasks,
+        siblingJobs: jobs,
+      });
+    }
+    if (taskJob) {
+      const suggestions = await ctx.db.query("document_ai_suggestions")
+        .withIndex("by_document_state", (q) => q.eq("documentId", document._id).eq("state", "pending"))
+        .take(100);
+      const taskSuggestion = suggestions.find((suggestion) => suggestion.jobId === taskJob._id);
+      if (taskSuggestion) {
+        const automaticSet = new Set(automaticTasks);
+        const remaining = extractedTasks.filter((item) => typeof item.confidence === "number" && item.confidence >= 0.7 && !automaticSet.has(item));
+        if (remaining.length > 0) {
+          await ctx.db.patch(taskSuggestion._id, {
+            blockId: typeof remaining[0].block_id === "string" ? remaining[0].block_id : taskSuggestion.blockId,
+            payload: { tasks: remaining },
+            confidence: Math.max(...remaining.map((item) => item.confidence as number)),
+          });
+        } else {
+          await ctx.db.patch(taskSuggestion._id, { state: "accepted", resolvedAt: Date.now(), resolvedBy: document.updatedBy });
+        }
+      }
+    }
     const succeeded = jobs.filter((job) => job.status === "succeeded" || job.status === "cache_hit").length;
     await ctx.db.patch(runId, { status: succeeded === jobs.length ? "complete" : succeeded > 0 ? "partial" : "failed", completedAt: Date.now() });
+  },
+});
+
+export const getPageInsights = query({
+  args: { documentId: v.id("documents"), pageId: v.id("meeting_pages") },
+  handler: async (ctx, { documentId, pageId }) => {
+    const { document } = await requireDocumentViewer(ctx, documentId);
+    const page = await ctx.db.get(pageId);
+    if (!page || page.meetingId !== document.meetingId) authError("VALIDATION_ERROR", "Stránka nepatří do dokumentu.");
+    const latestRun = await ctx.db.query("document_ai_runs").withIndex("by_page_generation", (q) => q.eq("pageId", pageId)).order("desc").first();
+    if (!latestRun || latestRun.documentId !== documentId || latestRun.requestedVersion !== document.contentVersion) {
+      return { status: latestRun?.status ?? "idle", segments: [], materials: [] };
+    }
+    const jobs = await ctx.db.query("document_ai_jobs").withIndex("by_run", (q) => q.eq("runId", latestRun._id)).collect();
+    const successfulJob = (processor: string) => jobs.find((job) => job.processor === processor && (job.status === "succeeded" || job.status === "cache_hit"));
+    const segments = processorItems(successfulJob("segment_agenda"), "segments")
+      .filter((item) => typeof item.confidence === "number" && item.confidence >= 0.78)
+      .map((item) => ({
+        blockId: String(item.block_id),
+        label: String(item.label).trim().slice(0, 180),
+        startTime: typeof item.start_time === "string" ? item.start_time : "",
+        endTime: typeof item.end_time === "string" ? item.end_time : "",
+        confidence: item.confidence as number,
+      }));
+    const materialItems = processorItems(successfulJob("extract_materials"), "materials")
+      .filter((item) => typeof item.confidence === "number" && item.confidence >= 0.72);
+    const seenMaterials = new Set<string>();
+    const materials = materialItems.flatMap((item) => {
+      const name = String(item.name).trim().slice(0, 180);
+      const key = `${String(item.block_id)}:${name.toLocaleLowerCase("cs")}`;
+      if (!name || seenMaterials.has(key)) return [];
+      seenMaterials.add(key);
+      return [{
+        blockId: String(item.block_id),
+        name,
+        quantity: typeof item.quantity === "string" ? item.quantity.trim().slice(0, 80) : undefined,
+        reason: typeof item.reason === "string" ? item.reason.trim().slice(0, 280) : undefined,
+        confidence: item.confidence as number,
+      }];
+    });
+    return { status: latestRun.status, segments, materials };
   },
 });
 
@@ -412,70 +627,16 @@ export const resolveSuggestion = mutation({
       const siblingJobs = sourceJob
         ? await ctx.db.query("document_ai_jobs").withIndex("by_run", (q) => q.eq("runId", sourceJob.runId)).collect()
         : [];
-      const outputItems = (processor: string, collection: string, blockId: string) => {
-        const job = siblingJobs.find((candidate) => candidate.processor === processor && (candidate.status === "succeeded" || candidate.status === "cache_hit"));
-        const output = job?.outputJson as Record<string, unknown> | undefined;
-        const items = output?.[collection];
-        return Array.isArray(items) ? items.filter((item): item is Record<string, unknown> => !!item && typeof item === "object" && (item as Record<string, unknown>).block_id === blockId) : [];
-      };
-      const leaderLinks = await ctx.db.query("troop_leaders").withIndex("by_troop", (q) => q.eq("troopId", document.troopId)).collect();
-      const leaders = (await Promise.all(leaderLinks.map(async (link) => ({ link, user: await ctx.db.get(link.userId) })))).filter((entry) => entry.user);
-      const normalizeName = (value: string) => value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("cs");
-      for (const [index, item] of (payload.tasks ?? []).slice(0, 20).entries()) {
-        const title = typeof item.title === "string" ? item.title.trim().slice(0, 240) : "";
-        if (!title) continue;
-        const requestedBlockId = typeof item.block_id === "string" ? item.block_id : suggestion.blockId;
-        const sourceBlock = await ctx.db.query("document_blocks").withIndex("by_page_block", (q) => q.eq("pageId", suggestion.pageId).eq("blockId", requestedBlockId)).unique();
-        const blockId = sourceBlock?.documentId === document._id ? requestedBlockId : suggestion.blockId;
-        const priority = item.priority === "low" || item.priority === "high" || item.priority === "critical" ? item.priority : "normal";
-        const generatedTags = outputItems("generate_tags", "tags", blockId).map((tag) => tag.value).filter((tag): tag is string => typeof tag === "string");
-        const tags = [...new Set([
-          ...(Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === "string") : []),
-          ...generatedTags,
-        ].map((tag) => tag.trim()).filter(Boolean))].slice(0, 12);
-        const resolvedDate = outputItems("resolve_dates", "dates", blockId).map((date) => date.iso).find((iso): iso is string => typeof iso === "string" && Number.isFinite(Date.parse(iso)));
-        const dueSource = typeof item.due_at === "string" && Number.isFinite(Date.parse(item.due_at)) ? item.due_at : resolvedDate;
-        const dueAt = dueSource ? Date.parse(dueSource) : undefined;
-        const summary = outputItems("generate_task_context", "summaries", blockId).map((entry) => entry.summary).find((value): value is string => typeof value === "string" && !!value.trim());
-        const requestedAssignees = Array.isArray(item.assignee_names) ? item.assignee_names.filter((name): name is string => typeof name === "string").map(normalizeName) : [];
-        const assigneeIds = requestedAssignees.flatMap((requestedName) => {
-          const matches = leaders.filter(({ user: candidate }) => {
-            const fullName = normalizeName(candidate?.name || "");
-            return fullName === requestedName || fullName.split(/\s+/)[0] === requestedName;
-          });
-          return matches.length === 1 ? [matches[0].link.userId] : [];
-        }).filter((userId, position, all) => all.indexOf(userId) === position);
-        const now = Date.now();
-        const taskId = await ctx.db.insert("document_tasks", {
-          troopId: document.troopId,
-          documentId: document._id,
-          sourcePageId: suggestion.pageId,
-          sourceBlockId: blockId,
-          taskKey: `ai_${suggestion._id}_${index}`,
-          title,
-          description: typeof item.description === "string" ? item.description.trim().slice(0, 2000) || undefined : undefined,
-          status: "todo",
-          isOpen: true,
-          priority,
-          priorityRank: priority === "critical" ? 3 : priority === "high" ? 2 : priority === "low" ? 0 : 1,
-          assigneeIds,
-          dueAt,
-          tags,
-          tagsNormalized: tags.map((tag) => tag.toLocaleLowerCase("cs")),
-          sourceDocumentTitle: document.title,
-          sourceExcerpt: sourceBlock?.text || title,
-          sourceVersion: suggestion.sourceVersion,
-          sourceState: "linked",
-          aiSummary: summary?.trim().slice(0, 300),
-          aiConfidence: typeof item.confidence === "number" ? item.confidence : suggestion.confidence,
-          aiJobId: suggestion.jobId,
-          createdBy: user._id,
-          updatedBy: user._id,
-          createdAt: now,
-          updatedAt: now,
-        });
-        createdTaskIds.push(taskId);
-      }
+      createdTaskIds.push(...await materializeTaskItems(ctx, {
+        document,
+        pageId: suggestion.pageId,
+        fallbackBlockId: suggestion.blockId,
+        sourceVersion: suggestion.sourceVersion,
+        jobId: suggestion.jobId,
+        createdBy: user._id,
+        items: payload.tasks ?? [],
+        siblingJobs,
+      }));
     }
     await ctx.db.patch(suggestion._id, {
       state: decision === "accept" ? "accepted" : "rejected",

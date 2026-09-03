@@ -35,9 +35,9 @@ const schemas = {
 };
 
 const instructions = {
-  segment_agenda: "Rozděl text na skutečné programové bloky. Časy zachovej jako HH:MM, nic nevymýšlej. Pokud čas nebo typ aktivity není uveden, vrať pro dané pole prázdný řetězec.",
+  segment_agenda: "Rozděl text na skutečné programové bloky. label musí být krátký přesný název nebo hlavní slovní spojení zkopírované ze zdrojového bloku, ne nový nadpis. Časy zachovej jako HH:MM, nic nevymýšlej. Pokud čas nebo typ aktivity není uveden, vrať pro dané pole prázdný řetězec.",
   extract_tasks: "Najdi pouze konkrétní budoucí úkoly nebo přípravy. title musí být krátká akce v infinitivu, nikdy název dokumentu. Příklad: z textu 'Petr má do pátku připravit lana a lékárničku' vrať title 'Připravit lana a lékárničku' a assignee_names ['Petr']. Nepřeváděj obecné poznámky na úkoly.",
-  extract_materials: "Vypiš výslovně zmíněné pomůcky, materiál a vybavení. Nic nedoplňuj z obecných znalostí.",
+  extract_materials: "Vypiš výslovně zmíněné pomůcky, materiál a vybavení a jen ty další položky, které jsou pro popsanou aktivitu přímo a jednoznačně nutné. Spekulativní nebo volitelné vybavení vynech. reason stručně spoj s aktivitou.",
   resolve_dates: "Převeď výslovné relativní a absolutní termíny na ISO 8601 podle metadat schůzky. Nejasné datum vynech.",
   detect_people_roles: "Najdi jmenované osoby a jejich výslovně uvedené role nebo odpovědnosti.",
   generate_tags: "Navrhni nejvýše pět různých českých štítků. Každý value má jen 1 až 3 slova, malá písmena, například 'výprava', 'vybavení', 'první pomoc'. Nikdy nekopíruj celou větu.",
@@ -129,7 +129,7 @@ async function processRequest(input) {
       throw new Error(`ollama_http_${ollamaResponse.status}:${reason}`);
     }
     const ollama = await ollamaResponse.json();
-    const output = normalizeOutput(input.processor, JSON.parse(ollama?.message?.content || "null"));
+    const output = normalizeOutput(input.processor, JSON.parse(ollama?.message?.content || "null"), input.context.blocks);
     validateOutput(input.processor, output, input.context.blocks.map((block) => block.block_id));
     return { request_id: input.request_id, output, model_version: MODEL, confidence: averageConfidence(output), cache_hit: false };
   } catch (error) {
@@ -167,10 +167,23 @@ function averageConfidence(output) {
   return items.reduce((sum, item) => sum + item.confidence, 0) / items.length;
 }
 
-function normalizeOutput(processor, output) {
+function normalizeOutput(processor, output, blocks = []) {
   if (!output || typeof output !== "object") return output;
   const collection = Object.keys(schemas[processor].properties)[0];
   if (!Array.isArray(output[collection])) return output;
+  if (processor === "segment_agenda") output[collection] = normalizeAgendaSegments(output[collection], blocks);
+  if (processor === "extract_materials") output[collection] = normalizeMaterials(output[collection], blocks);
+  if (processor === "extract_tasks") {
+    const blockById = new Map(blocks.map((block) => [block.block_id, block]));
+    output[collection] = output[collection]
+      .filter((item) => hasTaskSignal(String(blockById.get(item?.block_id)?.text || "")))
+      .map((item) => ({
+        ...item,
+        tags: Array.isArray(item?.tags)
+          ? item.tags.map((tag) => String(tag).trim()).filter((tag) => tag && tag.split(/\s+/).length <= 3).slice(0, 8)
+          : [],
+      }));
+  }
   const limits = { generate_tags: 5, segment_agenda: 20, extract_tasks: 20, extract_materials: 30, resolve_dates: 20, detect_people_roles: 20, generate_task_context: 20 };
   const seen = new Set();
   output[collection] = output[collection].filter((item) => {
@@ -181,6 +194,80 @@ function normalizeOutput(processor, output) {
     return true;
   }).slice(0, limits[processor] ?? 20);
   return output;
+}
+
+const timeRangePattern = /\b([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|–|—)\s*([01]?\d|2[0-3]):([0-5]\d)\b/;
+const genericAgendaLabels = new Set(["paragraph", "heading", "activity", "aktivita", "program", "blok", "text"]);
+
+function normalizeAgendaSegments(items, blocks) {
+  const blockById = new Map(blocks.map((block) => [block.block_id, block]));
+  const normalized = items.flatMap((item) => {
+    const block = blockById.get(item?.block_id);
+    if (!block) return [];
+    const source = String(block.text || "");
+    const range = source.match(timeRangePattern);
+    const proposedLabel = String(item.label || "").trim();
+    const exactLabel = proposedLabel
+      && !genericAgendaLabels.has(proposedLabel.toLocaleLowerCase("cs"))
+      && source.toLocaleLowerCase("cs").includes(proposedLabel.toLocaleLowerCase("cs"));
+    const label = exactLabel ? proposedLabel : agendaLabelFromSource(source, range);
+    if (!label) return [];
+    const activityType = /^(hra|příprava|přesun|pauza|zahájení|závěr|aktivita)$/iu.test(String(item.activity_type || "").trim())
+      ? String(item.activity_type).trim()
+      : "";
+    return [{
+      ...item,
+      label,
+      start_time: range ? `${range[1].padStart(2, "0")}:${range[2]}` : String(item.start_time || ""),
+      end_time: range ? `${range[3].padStart(2, "0")}:${range[4]}` : String(item.end_time || ""),
+      activity_type: activityType,
+    }];
+  });
+  for (const block of blocks) {
+    const source = String(block.text || "");
+    const range = source.match(timeRangePattern);
+    if (!range || normalized.some((item) => item.block_id === block.block_id && item.start_time === `${range[1].padStart(2, "0")}:${range[2]}`)) continue;
+    const label = agendaLabelFromSource(source, range);
+    if (label) normalized.push({
+      block_id: block.block_id,
+      confidence: 1,
+      label,
+      start_time: `${range[1].padStart(2, "0")}:${range[2]}`,
+      end_time: `${range[3].padStart(2, "0")}:${range[4]}`,
+      activity_type: "",
+    });
+  }
+  return normalized;
+}
+
+function agendaLabelFromSource(source, range = source.match(timeRangePattern)) {
+  const afterTime = range ? source.slice((range.index || 0) + range[0].length) : source;
+  return afterTime
+    .replace(/^\s*[-–—:|]\s*/, "")
+    .split(/(?:\r?\n|[.!?;])/)[0]
+    .trim()
+    .slice(0, 180);
+}
+
+function normalizeMaterials(items, blocks) {
+  const blockById = new Map(blocks.map((block) => [block.block_id, block]));
+  return items.filter((item) => {
+    const block = blockById.get(item?.block_id);
+    const name = String(item?.name || "").trim();
+    if (!block || !name) return false;
+    const source = String(block.text || "");
+    const label = agendaLabelFromSource(source).toLocaleLowerCase("cs");
+    const normalizedName = name.toLocaleLowerCase("cs");
+    const sourceLower = source.toLocaleLowerCase("cs");
+    const nameIndex = sourceLower.indexOf(normalizedName);
+    const preparationIndex = sourceLower.search(/\b(?:připrav|vezm|vzít|potřeb|pomůc|vybaven|materiál|zajist|donést|přinést)\w*/iu);
+    const looksLikeActivityName = label && (label === normalizedName || label.startsWith(`${normalizedName} `));
+    return !(looksLikeActivityName && nameIndex >= 0 && (preparationIndex < 0 || nameIndex < preparationIndex));
+  });
+}
+
+function hasTaskSignal(source) {
+  return /\b(?:má|musí|připrav(?:it|í|te)?|vzít|vezm(?:e|ou)|donést|donese|přinést|přinese|zajistit|zajistí|udělat|udělá|poslat|pošle|objednat|objedná|ověřit|ověří|zkontrolovat|zkontroluje|domluvit|domluví|je\s+třeba|je\s+potřeba)\b/iu.test(source);
 }
 
 function collectionSchema(name, properties) {

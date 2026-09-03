@@ -103,16 +103,36 @@
 .sectionTitle { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; color: #777a74; font-size: 10px; font-weight: 850; letter-spacing: .08em; }
 .sectionContent { display: grid; gap: 5px; }
 
-.taskItem { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; padding: 6px 0; cursor: pointer; font-size: 11px; }
-.taskItem input { margin-top: 2px; accent-color: #252725; }
-.taskItem strong,
-.taskItem small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.taskItem small { margin-top: 2px; color: #92948f; font-size: 9px; }
+.taskItem { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; padding: 6px 0; cursor: pointer; font-size: 11px; }
+.taskCheckboxInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.taskCheckbox { width: 15px; height: 15px; display: grid; place-items: center; margin-top: 1px; border: 1px solid #aeb0ab; border-radius: 4px; background: #fff; color: transparent; transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease; }
+.taskCheckboxInput:focus-visible + .taskCheckbox { outline: 2px solid color-mix(in srgb, var(--color-primary) 45%, transparent); outline-offset: 2px; }
+.taskCopy { min-width: 0; transition: opacity 160ms ease; }
+.taskCopy strong,
+.taskCopy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskCopy small { margin-top: 2px; color: #92948f; font-size: 9px; }
+.taskItem[data-state="completed"] .taskCheckbox { border-color: #3f7048; background: #3f7048; color: #fff; }
+.taskItem[data-state="completed"] .taskCheckbox svg { animation: taskCheck 180ms ease-out; }
+.taskItem[data-state="completed"] .taskCopy { opacity: .52; }
+.taskItem[data-state="completed"] .taskCopy strong { text-decoration: line-through; text-decoration-thickness: 1px; }
+.taskItem[data-saving="true"] { cursor: wait; }
 .taskEmpty { margin: 0; color: #8b8d88; font-size: 10px; }
+.taskError { margin: 0; color: #9a3d36; font-size: 9px; }
+.taskError:empty { display: none; }
 .taskForm { display: flex; gap: 5px; margin-top: 7px; }
 .taskForm input { min-width: 0; flex: 1; height: 31px; padding: 0 8px; border: 1px solid #d7d8d4; border-radius: 4px; outline: 0; font: inherit; font-size: 10px; }
 .taskForm input:focus { border-color: #747771; }
 .taskForm button { width: 31px; display: grid; place-items: center; border: 1px solid #d7d8d4; border-radius: 4px; background: white; cursor: pointer; }
+
+.materialList { display: grid; gap: 2px; }
+.materialItem { min-width: 0; width: 100%; display: grid; grid-template-columns: 6px minmax(0, 1fr); gap: 8px; align-items: start; padding: 6px 0; border: 0; background: transparent; color: #31332f; cursor: pointer; font: inherit; text-align: left; }
+.materialItem:hover strong { color: #111; }
+.materialMark { width: 4px; height: 4px; margin-top: 5px; border-radius: 50%; background: color-mix(in srgb, var(--color-primary) 58%, #959892); }
+.materialItem strong,
+.materialItem small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.materialItem strong { font-size: 10px; font-weight: 680; }
+.materialItem small { margin-top: 2px; color: #8d908a; font-size: 9px; }
+.materialProcessing { margin: 0; padding: 5px 0; color: #8b8d88; font-size: 9px; }
 
 .filesGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .fileCard { min-width: 0; aspect-ratio: 1.25; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #dedfdb; border-radius: 5px; background: #f8f8f6; cursor: pointer; color: #70736d; }
@@ -191,6 +211,7 @@
 @keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
 @keyframes pulse { 50% { opacity: .3; transform: scale(.88); } }
+@keyframes taskCheck { 0% { opacity: 0; transform: scale(.45); } 70% { transform: scale(1.14); } 100% { opacity: 1; transform: scale(1); } }
 
 @media (max-width: 1120px) {
   .workspaceGrid { grid-template-columns: 210px minmax(0, 1fr) 270px; }
@@ -233,5 +254,8 @@
   .inspector { transition: none; }
   .pageSkeleton,
   .loadingLine::after,
-  .aiStatus[data-processing="true"] svg { animation: none; }
+  .aiStatus[data-processing="true"] svg,
+  .taskItem[data-state="completed"] .taskCheckbox svg { animation: none; }
+  .taskCheckbox,
+  .taskCopy { transition: none; }
 }

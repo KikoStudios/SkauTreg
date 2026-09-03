@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import DocumentAISuggestions from "../documents/DocumentAISuggestions";
+import DocumentMaterialsPanel from "../documents/DocumentMaterialsPanel";
 import DocumentTasksPanel from "../documents/DocumentTasksPanel";
 import GameInsertPanel from "../documents/GameInsertPanel";
 import SchuzkaSetupPanel from "../documents/SchuzkaSetupPanel";
@@ -28,6 +29,7 @@ export default function MeetingSidebar({ meetingId, activePageId, onImageClick }
       </div>
       <SchuzkaSetupPanel meetingId={meetingId} />
       {document && <DocumentAISuggestions documentId={document._id} />}
+      {document && <DocumentMaterialsPanel documentId={document._id} activePageId={activePageId} />}
       <DocumentTasksPanel meetingId={meetingId} activePageId={activePageId} />
       <GameInsertPanel meetingId={meetingId} activePageId={activePageId} />
       <FilesPanel meetingId={meetingId} onImageClick={onImageClick} />

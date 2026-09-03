@@ -11,7 +11,7 @@ import Underline from "@tiptap/extension-underline";
 import TextStyle from "@tiptap/extension-text-style";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
-import { useConvex, useMutation } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Extension, mergeAttributes } from "@tiptap/core";
@@ -49,23 +49,61 @@ const BlockAnchor = Extension.create({
     },
 });
 
-const AgendaTimeDecorations = Extension.create({
-    name: "agendaTimeDecorations",
+interface AgendaSegmentInsight {
+    blockId: string;
+    label: string;
+    startTime: string;
+    endTime: string;
+    confidence: number;
+}
+
+const agendaStructureKey = new PluginKey<AgendaSegmentInsight[]>("agenda-structure-decorations");
+
+const AgendaStructureDecorations = Extension.create({
+    name: "agendaStructureDecorations",
     addProseMirrorPlugins() {
         return [new Plugin({
-            key: new PluginKey("agenda-time-decorations"),
+            key: agendaStructureKey,
+            state: {
+                init: () => [],
+                apply(transaction, current) {
+                    return transaction.getMeta(agendaStructureKey) ?? current;
+                },
+            },
             props: {
                 decorations(state) {
                     const decorations: Decoration[] = [];
                     const pattern = /\b(?:[01]?\d|2[0-3]):[0-5]\d\s*(?:-|–|—)\s*(?:[01]?\d|2[0-3]):[0-5]\d\b/g;
+                    const insights = agendaStructureKey.getState(state) ?? [];
+                    const byBlockId = new Map<string, AgendaSegmentInsight[]>();
+                    for (const insight of insights) {
+                        byBlockId.set(insight.blockId, [...(byBlockId.get(insight.blockId) ?? []), insight]);
+                    }
                     state.doc.descendants((node, position) => {
-                        if (!node.isText || !node.text) return;
-                        for (const match of node.text.matchAll(pattern)) {
-                            const start = position + (match.index ?? 0);
-                            decorations.push(Decoration.inline(start, start + match[0].length, {
-                                class: "agenda-time-token",
-                                title: "Rozpoznaný časový blok",
-                            }));
+                        if (node.isText && node.text) {
+                            for (const match of node.text.matchAll(pattern)) {
+                                const start = position + (match.index ?? 0);
+                                decorations.push(Decoration.inline(start, start + match[0].length, { class: "agenda-time-token" }));
+                            }
+                            return;
+                        }
+                        const blockId = typeof node.attrs?.blockId === "string" ? node.attrs.blockId : null;
+                        const blockInsights = blockId ? byBlockId.get(blockId) : undefined;
+                        if (!blockInsights?.length || !node.isBlock) return;
+                        decorations.push(Decoration.node(position, position + node.nodeSize, {
+                            class: "ai-agenda-block",
+                            "data-ai-structured": "true",
+                        }));
+                        for (const insight of blockInsights) {
+                            const normalizedLabel = insight.label.trim().toLocaleLowerCase("cs");
+                            if (!normalizedLabel) continue;
+                            node.descendants((child, relativePosition) => {
+                                if (!child.isText || !child.text) return;
+                                const labelStart = child.text.toLocaleLowerCase("cs").indexOf(normalizedLabel);
+                                if (labelStart < 0) return;
+                                const start = position + 1 + relativePosition + labelStart;
+                                decorations.push(Decoration.inline(start, start + insight.label.length, { class: "ai-agenda-title" }));
+                            });
                         }
                     });
                     return DecorationSet.create(state.doc, decorations);
@@ -87,12 +125,14 @@ function ensureBlockAnchors(editor: NonNullable<ReturnType<typeof useEditor>>) {
 
 interface CollaborativeEditorProps {
     pageId: Id<"meeting_pages">;
+    documentId?: Id<"documents">;
     troopId?: Id<"troops">;
     editable?: boolean;
 }
 
 export default function CollaborativeEditor({
     pageId,
+    documentId,
     troopId,
     editable = true,
 }: CollaborativeEditorProps) {
@@ -100,6 +140,7 @@ export default function CollaborativeEditor({
     const convex = useConvex();
     const updateCursor = useMutation(api.editorPresence.updateCursor);
     const removeCursor = useMutation(api.editorPresence.removeCursor);
+    const aiInsights = useQuery(api.documentAI.getPageInsights, documentId ? { documentId, pageId } : "skip");
     const editorContainerRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const colorButtonRef = useRef<HTMLButtonElement>(null);
@@ -175,7 +216,7 @@ export default function CollaborativeEditor({
                 history: false, // Disable local history when using collaboration
             }),
             BlockAnchor,
-            AgendaTimeDecorations,
+            AgendaStructureDecorations,
             Underline,
             TextStyle,
             Color,
@@ -235,6 +276,11 @@ export default function CollaborativeEditor({
         onCreate: ({ editor }) => ensureBlockAnchors(editor),
         onUpdate: ({ editor }) => ensureBlockAnchors(editor),
     }, [sync.initialContent, sync.extension, pageId, editable]);
+
+    useEffect(() => {
+        if (!editor) return;
+        editor.view.dispatch(editor.state.tr.setMeta(agendaStructureKey, aiInsights?.segments ?? []));
+    }, [aiInsights?.segments, editor]);
 
     // Cleanup cursor on unmount
     useEffect(() => {

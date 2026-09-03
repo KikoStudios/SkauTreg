@@ -7,13 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import styles from "../../app/(dashboard)/rady/[meetingId]/MeetingRoom.module.css";
 
 const labels: Record<string, string> = {
-  segment_agenda: "Struktura programu",
   extract_tasks: "Kandidátní úkoly",
-  extract_materials: "Materiál",
-  resolve_dates: "Termíny",
-  detect_people_roles: "Lidé a role",
-  generate_tags: "Štítky",
-  generate_task_context: "Kontext úkolů",
 };
 
 function suggestionText(kind: string, payload: unknown) {
@@ -30,18 +24,19 @@ export default function DocumentAISuggestions({ documentId }: { documentId: Id<"
   const state = useQuery(api.documentAI.getState, { documentId });
   const resolve = useMutation(api.documentAI.resolveSuggestion);
   const retry = useMutation(api.documentAI.retryProcessing);
-  if (!state || (state.status === "idle" && state.suggestions.length === 0 && state.accepted.length === 0)) return null;
+  if (!state) return null;
   const processing = state.status === "queued" || state.status === "running";
+  const taskSuggestions = state.suggestions.filter((suggestion) => suggestion.kind === "extract_tasks");
+  if (!processing && state.status !== "failed" && taskSuggestions.length === 0) return null;
 
   return <section className={styles.aiSuggestions} aria-label="AI návrhy">
-    <div className={styles.aiStatus} data-processing={processing}><Sparkles size={13} /><span>{processing ? "Zpracovávám změny…" : state.status === "failed" ? "AI je dočasně mimo provoz" : state.status === "partial" ? "Část návrhů je připravena" : "Návrhy"}</span>{state.status === "failed" && <button type="button" onClick={() => retry({ documentId })} aria-label="Zkusit AI znovu"><RefreshCw size={12} /> Zkusit znovu</button>}</div>
-    {state.suggestions.map((suggestion) => <article key={suggestion._id} className={styles.aiSuggestion}>
+    <div className={styles.aiStatus} data-processing={processing} aria-live="polite"><Sparkles size={13} /><span>{processing ? "Tiše zpracovávám program…" : state.status === "failed" ? "Automatické zpracování je dočasně nedostupné" : "Ověřit úkol"}</span>{state.status === "failed" && <button type="button" onClick={() => retry({ documentId })} aria-label="Zkusit AI znovu"><RefreshCw size={12} /> Zkusit znovu</button>}</div>
+    {taskSuggestions.map((suggestion) => <article key={suggestion._id} className={styles.aiSuggestion}>
       <button type="button" className={styles.aiSuggestionText} onClick={() => { const target = window.document.getElementById(`b_${suggestion.blockId}`); target?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
         <small>{labels[suggestion.kind] || suggestion.kind} · {Math.round(suggestion.confidence * 100)} %</small>
         <strong>{suggestionText(suggestion.kind, suggestion.payload)}</strong>
       </button>
       <div><button type="button" aria-label="Přijmout návrh" onClick={() => resolve({ suggestionId: suggestion._id, decision: "accept" })}><Check size={13} /></button><button type="button" aria-label="Odmítnout návrh" onClick={() => resolve({ suggestionId: suggestion._id, decision: "reject" })}><X size={13} /></button></div>
     </article>)}
-    {state.accepted.filter((suggestion) => suggestion.kind !== "extract_tasks").slice(0, 6).map((suggestion) => <button type="button" className={styles.aiInsight} key={suggestion._id} onClick={() => window.document.getElementById(`b_${suggestion.blockId}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}><span>{labels[suggestion.kind] || suggestion.kind}</span>{suggestionText(suggestion.kind, suggestion.payload)}</button>)}
   </section>;
 }

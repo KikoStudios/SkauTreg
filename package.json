@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:convex": "vitest run tests/convex",
     "test:e2e": "playwright test",
+    "probe:document-ai": "node services/win10-ai/contract-probe.mjs",
     "test:security": "vitest run tests/security",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "sync:all": "node scripts/sync-all-bases-with-stations.mjs",

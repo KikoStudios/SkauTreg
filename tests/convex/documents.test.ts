@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, expect, it } from "vitest";
-import { api } from "../../convex/_generated/api";
+import { api, internal } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import schema from "../../convex/schema";
 
@@ -125,5 +125,88 @@ describe("Dokumenty domain", () => {
     expect(resolved.createdTaskIds).toHaveLength(1);
     const tasks = await owner.query(api.documentTasks.list, { troopId: fixture.troopId });
     expect(tasks[0]).toMatchObject({ title: "Připravit lana", priority: "high", aiConfidence: .91, sourceBlockId: "prep-block" });
+  });
+
+  it("automatically adds only high-confidence tasks and does not duplicate them", async () => {
+    const { t, owner, fixture } = await seed();
+    const created = await createSchuzka(owner, fixture.troopId);
+    const runId = await t.run(async (ctx) => {
+      await ctx.db.insert("document_blocks", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "clear-task", blockType: "paragraph", phase: "plan", orderKey: "00000000",
+        text: "Petr připraví lana", normalizedText: "petr připraví lana", contentHash: "clear", sourceVersion: 0, updatedAt: Date.now(),
+      });
+      await ctx.db.insert("document_blocks", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "passive-activity", blockType: "paragraph", phase: "plan", orderKey: "00000001",
+        text: "Děti trénují základní uzly", normalizedText: "děti trénují základní uzly", contentHash: "passive", sourceVersion: 0, updatedAt: Date.now(),
+      });
+      const id = await ctx.db.insert("document_ai_runs", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        requestedVersion: 0, generation: 1, status: "running", createdAt: Date.now(),
+      });
+      const extractedTasks = [
+        { block_id: "clear-task", title: "Připravit lana", priority: "normal", tags: ["materiál"], assignee_names: [], confidence: .96 },
+        { block_id: "passive-activity", title: "Trénovat uzly", priority: "normal", tags: ["program"], assignee_names: [], confidence: .98 },
+      ];
+      const taskJobId = await ctx.db.insert("document_ai_jobs", {
+        runId: id, troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "clear-task", processor: "extract_tasks", schemaVersion: "extract_tasks.v1",
+        modelProfile: "fast-structured-cs-v1", inputHash: "high-confidence-task", requestedVersion: 0,
+        status: "succeeded", attempt: 1, confidence: .96,
+        outputJson: { tasks: extractedTasks },
+        createdAt: Date.now(), completedAt: Date.now(),
+      });
+      await ctx.db.insert("document_ai_suggestions", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId, blockId: "clear-task",
+        jobId: taskJobId, kind: "extract_tasks", payload: { tasks: extractedTasks }, confidence: .98,
+        sourceVersion: 0, state: "pending", createdAt: Date.now(),
+      });
+      return id;
+    });
+
+    await owner.mutation(internal.documentAI.finishRun, { runId });
+    await owner.mutation(internal.documentAI.finishRun, { runId });
+    const tasks = await owner.query(api.documentTasks.list, { troopId: fixture.troopId, openOnly: false });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({ title: "Připravit lana", aiConfidence: .96, sourceBlockId: "clear-task" });
+    const aiState = await owner.query(api.documentAI.getState, { documentId: created.documentId });
+    expect(aiState.suggestions).toEqual([expect.objectContaining({ blockId: "passive-activity" })]);
+  });
+
+  it("exposes current agenda formatting and material insights without changing source text", async () => {
+    const { t, owner, fixture } = await seed();
+    const created = await createSchuzka(owner, fixture.troopId);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("document_blocks", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "agenda-game", blockType: "paragraph", phase: "plan", orderKey: "00000000",
+        text: "16:00 - 16:45 Uzlování venku", normalizedText: "16:00 - 16:45 uzlování venku", contentHash: "agenda", sourceVersion: 0, updatedAt: Date.now(),
+      });
+      const runId = await ctx.db.insert("document_ai_runs", {
+        troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        requestedVersion: 0, generation: 1, status: "complete", createdAt: Date.now(), completedAt: Date.now(),
+      });
+      await ctx.db.insert("document_ai_jobs", {
+        runId, troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "agenda-game", processor: "segment_agenda", schemaVersion: "segment_agenda.v1",
+        modelProfile: "fast-structured-cs-v1", inputHash: "segment", requestedVersion: 0, status: "succeeded", attempt: 1, confidence: .94,
+        outputJson: { segments: [{ block_id: "agenda-game", label: "Uzlování", start_time: "16:00", end_time: "16:45", activity_type: "hra", confidence: .94 }] },
+        createdAt: Date.now(), completedAt: Date.now(),
+      });
+      await ctx.db.insert("document_ai_jobs", {
+        runId, troopId: fixture.troopId, documentId: created.documentId, pageId: created.pageId,
+        blockId: "agenda-game", processor: "extract_materials", schemaVersion: "extract_materials.v1",
+        modelProfile: "fast-structured-cs-v1", inputHash: "materials", requestedVersion: 0, status: "succeeded", attempt: 1, confidence: .92,
+        outputJson: { materials: [{ block_id: "agenda-game", name: "lana", quantity: "6 ks", reason: "na uzlování", confidence: .92 }] },
+        createdAt: Date.now(), completedAt: Date.now(),
+      });
+    });
+
+    const insights = await owner.query(api.documentAI.getPageInsights, { documentId: created.documentId, pageId: created.pageId });
+    expect(insights.segments).toEqual([expect.objectContaining({ blockId: "agenda-game", label: "Uzlování", startTime: "16:00", endTime: "16:45" })]);
+    expect(insights.materials).toEqual([expect.objectContaining({ blockId: "agenda-game", name: "lana", quantity: "6 ks" })]);
+    const source = await t.run(async (ctx) => ctx.db.query("document_blocks").withIndex("by_page_block", (q) => q.eq("pageId", created.pageId).eq("blockId", "agenda-game")).unique());
+    expect(source?.text).toBe("16:00 - 16:45 Uzlování venku");
   });
 });

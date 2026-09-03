@@ -56,7 +56,9 @@
 .editorStart { padding: 12px 0; }
 .editorStart button { padding: 8px 12px; border: 1px solid #313330; border-radius: 5px; background: #292b29; color: #fff; cursor: pointer; font: inherit; font-size: 12px; font-weight: 720; }
 
-:global(.agenda-time-token) { padding: 0 2px; border-radius: 2px; background: color-mix(in srgb, var(--color-primary) 18%, transparent); box-decoration-break: clone; color: #285e34; font-variant-numeric: tabular-nums; font-weight: 680; }
+:global(.agenda-time-token) { color: #252824; font-variant-numeric: tabular-nums; font-weight: 780; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-primary) 32%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+:global(.ai-agenda-block) { margin-block: .65em; padding: .55em .7em; border-left: 2px solid color-mix(in srgb, var(--color-primary) 34%, #dfe1dc); border-radius: 0 3px 3px 0; background: color-mix(in srgb, var(--color-primary) 3.5%, transparent); transition: background-color 160ms ease, border-color 160ms ease; }
+:global(.ai-agenda-title) { padding: 0 .08em; border-radius: 2px; background: color-mix(in srgb, var(--color-primary) 9%, transparent); color: #20231f; box-decoration-break: clone; font-weight: 690; }
 
 @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
 @keyframes shimmer { to { background-position: -200% 0; } }
@@ -70,4 +72,5 @@
 @media (prefers-reduced-motion: reduce) {
   .cursorCaret,
   .editorState span { animation: none; }
+  :global(.ai-agenda-block) { transition: none; }
 }

@@ -150,7 +150,7 @@ export default function MeetingRoomPage({ params }: { params: Promise<{ meetingI
                   placeholder="Název stránky"
                   aria-label="Název stránky"
                 />
-                {effectivePageId && <CollaborativeEditor key={effectivePageId} pageId={effectivePageId} troopId={meeting.troopId} />}
+                {effectivePageId && <CollaborativeEditor key={effectivePageId} pageId={effectivePageId} documentId={document?._id} troopId={meeting.troopId} />}
               </article>
             )}
           </section>

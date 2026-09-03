@@ -57,3 +57,6 @@ next-env.d.ts
 # local inspection and migration artifacts
 /tmp/
 /needtoorganize/
+
+# clerk configuration (can include secrets)
+/.clerk/
