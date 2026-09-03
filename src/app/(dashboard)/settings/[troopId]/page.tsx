@@ -222,6 +222,16 @@ export default function TroopSettingsPage() {
             </header>
 
             <div className={styles.settingsLayout}>
+            {activeTab === "gmail" ? (
+                <div className={styles.settingsContent}>
+                    <div className={styles.settingsPanel}>
+                        <GmailSettings
+                            troopId={troopId}
+                            isAuthorized={true}
+                        />
+                    </div>
+                </div>
+            ) : (
             <form onSubmit={handleSave} className={styles.settingsContent}>
                 {/* GENERAL TAB */}
                 {activeTab === "general" && (
@@ -393,16 +403,6 @@ export default function TroopSettingsPage() {
                     </div>
                 )}
 
-                {/* GMAIL TAB */}
-                {activeTab === "gmail" && (
-                    <div className={styles.settingsPanel}>
-                        <GmailSettings
-                            troopId={troopId}
-                            isAuthorized={true}
-                        />
-                    </div>
-                )}
-
                 {/* DANGER TAB */}
                 {activeTab !== "danger" && (
                     <div className={styles.saveBar}>
@@ -442,6 +442,7 @@ export default function TroopSettingsPage() {
                     </div>
                 )}
             </form>
+            )}
             </div>
 
             {/* Cropper Modal */}
