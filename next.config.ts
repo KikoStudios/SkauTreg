@@ -1,23 +1,18 @@
 import type { NextConfig } from "next";
 import { validateProductionEnv } from "./src/lib/env";
+import {
+  buildContentSecurityPolicy,
+  isProductionDeployment,
+} from "./src/lib/contentSecurityPolicy";
 
 validateProductionEnv();
 
-const csp = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "form-action 'self'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com",
-  "connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.clerk.accounts.dev https://*.clerk.com https://eu.i.posthog.com https://*.sentry.io",
-  "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
-  "worker-src 'self' blob:",
-  "upgrade-insecure-requests",
-].join("; ");
+const enforceCsp = isProductionDeployment();
+const csp = buildContentSecurityPolicy({
+  enforce: enforceCsp,
+  clerkPublishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  clerkFrontendApi: process.env.NEXT_PUBLIC_CLERK_FRONTEND_API,
+});
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -34,13 +29,13 @@ const nextConfig: NextConfig = {
       },
       { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
       {
-        key: process.env.CONTEXT === "production"
+        key: enforceCsp
           ? "Content-Security-Policy"
           : "Content-Security-Policy-Report-Only",
         value: csp,
       },
     ];
-    if (process.env.CONTEXT === "production") {
+    if (enforceCsp) {
       securityHeaders.push({
         key: "Strict-Transport-Security",
         value: "max-age=63072000; includeSubDomains; preload",
